@@ -1,5 +1,7 @@
 using BepInEx;
+using Fairoots.Diagnostics;
 using HarmonyLib;
+using UnityEngine;
 
 namespace Fairoots
 {
@@ -25,12 +27,35 @@ namespace Fairoots
         {
             Instance = this;
             Cfg = new PluginConfig(Config);
+            Diag.Source = Logger;
+
             _harmony = new Harmony(PluginInfo.Guid);
+            _harmony.PatchAll(typeof(Plugin).Assembly);
 
             Logger.LogInfo(
                 $"{PluginInfo.Name} {PluginInfo.Version} loaded. " +
                 $"seed={Cfg.Seed.Value}, preset={Cfg.Preset.Value}, " +
                 $"spore-bomb cull fraction={Cfg.SporeBombCullFraction:0.##}");
+            if (Cfg.EnableDebugLogging.Value)
+            {
+                Logger.LogInfo(
+                    $"Debug logging ON. Auto scene scan on load={Cfg.LogSceneScanOnLoad.Value}, " +
+                    $"scan hotkey={Cfg.SceneScanHotkey.Value}.");
+            }
+        }
+
+        private void Update()
+        {
+            if (Cfg == null || !Cfg.EnableDebugLogging.Value)
+            {
+                return;
+            }
+
+            var key = Cfg.SceneScanHotkey.Value;
+            if (key != KeyCode.None && Input.GetKeyDown(key))
+            {
+                SceneDiagnostics.DumpReport($"hotkey {key}");
+            }
         }
     }
 }

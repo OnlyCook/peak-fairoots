@@ -56,6 +56,47 @@ the same profile, and click **Start modded**.
 grep -iE "Fairoots" ~/.config/r2modmanPlus-local/PEAK/profiles/Default/BepInEx/LogOutput.log
 ```
 
+## Debug diagnostics (runtime "what works / what doesn't" report)
+
+The mod ships a diagnostic harness, off by default. Turn it on in the config's
+**`Debug`** section (bottom of `OnlyCook.Fairoots.cfg`, or the in-game settings
+menu if PEAKLib.ModConfig is installed):
+
+- `enable-debug-logging = true` — master switch (nothing below runs without it).
+- `log-scene-scan-on-load = true` — auto-dump a report each time a level
+  finishes generating.
+- `scene-scan-hotkey = F9` — press in-game to dump a report on demand (e.g.
+  while standing next to a spore bomb). Set to `None` to disable.
+
+The report goes to `LogOutput.log` (see above) and prints, per section, whether
+each thing was found (`OK`/`MISSING`) plus live values read straight off the
+scene objects:
+
+- **Biome** — current biome, whether Roots is present, current segment.
+- **Wind** — `WindChillZone` field values (`windForce`, `windMovesItems`,
+  `windItemFactor`, and crucially `useRaycast` + its min/max distances).
+- **SporeBombs** — every object matching the
+  `SporeFungus`/`SporeMushroom`/`SporeMushroomExplo` name substrings, grouped by
+  exact name (this confirms the real Roots prefab prefix), with each one's
+  `AOE` / `ExplosionEffect` / `AddScreenshake` / `StatusEmitter` components and
+  their configured values (range, knockback, shake range, particle counts).
+- **SporeAreas** — `StatusEmitter` count and how many are
+  `WindAffectedStatusEmitter` (tells us if "wind disperses spore areas" already
+  partly exists), with radius/amount/fade per emitter.
+- **Creatures** — `ZombieManager.maxActiveZombies` and live
+  MushroomZombie/Beetle/Spider counts.
+
+To capture a report: enable the three settings above, **Start modded**, load
+into a Roots run (press F9 next to a spore bomb), then:
+
+```bash
+grep -iE "Fairoots|scene diagnostics|\[SporeBombs\]|\[Wind\]|\[SporeAreas\]|\[Biome\]|\[Creatures\]" \
+  ~/.config/r2modmanPlus-local/PEAK/profiles/Default/BepInEx/LogOutput.log
+```
+
+Paste that back and it resolves most of RESEARCH.md's remaining runtime open
+questions in one pass.
+
 ## Test checklist
 
 Nothing to test yet — repo-setup phase only, no gameplay code. This section

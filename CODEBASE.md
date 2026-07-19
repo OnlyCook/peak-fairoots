@@ -27,10 +27,20 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
 - `src/Fairoots/` — the BepInEx plugin project (game-facing).
   - `Plugin.cs` — entry point (`BepInPlugin`); loads config + Harmony, logs.
   - `PluginConfig.cs` — config binding: the `seed` field, the `preset` 1-4
-    selector, and per-mechanic override entries (default to a "follow preset"
-    sentinel). Exposes *resolved* accessors (e.g. `SporeBombCullFraction`) that
-    fold preset + override together via `Core/Presets/OverrideResolution`.
+    selector, per-mechanic override entries (default to a "follow preset"
+    sentinel), and the `Debug` section (bound last). Exposes *resolved*
+    accessors (e.g. `SporeBombCullFraction`) that fold preset + override
+    together via `Core/Presets/OverrideResolution`.
   - `PluginInfo.cs` — GUID/name/version constants.
+  - **`Diagnostics/`** — the debug/runtime-logging harness (game-facing, off
+    unless `Debug/enable-debug-logging` is on). See `docs/TESTING.md`.
+    - `Diag.cs` — gated logger wrapper; `Diag.V(...)` only logs when debug is on.
+    - `SceneDiagnostics.cs` — scans a loaded level and reports what the mod can
+      and can't find (biome, wind zone + live field values, spore-bomb
+      candidates + their hazard components/values, spore-area emitters,
+      creatures). This is the Phase 3 tool for confirming the RESEARCH.md open
+      questions from a real Roots level. Triggered by a postfix on
+      `PropGrouper.RunAll` (auto, after level gen) and by a config hotkey.
   - **`Core/`** — the pure, Unity-free decision layer (see split rule above):
     - `GridPos.cs` — a world position rounded to an integer grid; the stable
       per-object identity every seeded decision keys off. `GridPos.Round(...)`

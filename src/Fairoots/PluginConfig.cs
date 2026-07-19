@@ -1,5 +1,6 @@
 using BepInEx.Configuration;
 using Fairoots.Core.Presets;
+using UnityEngine;
 
 namespace Fairoots
 {
@@ -32,6 +33,16 @@ namespace Fairoots
         /// </summary>
         public ConfigEntry<double> SporeBombCullFractionOverride { get; }
 
+        // --- Debug (kept last) --------------------------------------------
+        /// <summary>Master switch for verbose diagnostic logging (the whole Debug harness is a no-op unless this is on).</summary>
+        public ConfigEntry<bool> EnableDebugLogging { get; }
+
+        /// <summary>Auto-dump a scene diagnostics report each time a level finishes generating.</summary>
+        public ConfigEntry<bool> LogSceneScanOnLoad { get; }
+
+        /// <summary>Hotkey to dump a scene diagnostics report on demand while playing.</summary>
+        public ConfigEntry<KeyCode> SceneScanHotkey { get; }
+
         public PluginConfig(ConfigFile config)
         {
             Seed = config.Bind(
@@ -61,6 +72,33 @@ namespace Fairoots
                     "combined), e.g. 0.5 cuts them in half. Leave at -1 to follow the active " +
                     "preset; set 0-1 to override it.",
                     new AcceptableValueRange<double>(OverrideResolution.FollowPreset, 1.0)));
+
+            // --- Debug section: bound last so it sorts to the bottom of the
+            // config file. Everything here is diagnostic-only and off by default.
+            EnableDebugLogging = config.Bind(
+                "Debug",
+                "enable-debug-logging",
+                false,
+                "Master switch for Fairoots' verbose diagnostic logging. When on, the mod " +
+                "reports what it can and can't find in a loaded Roots level (spore bombs, " +
+                "wind zone, spore areas, zombies) so you can see what's working. Leave off " +
+                "for normal play - it's noisy and only useful for development/bug reports.");
+
+            LogSceneScanOnLoad = config.Bind(
+                "Debug",
+                "log-scene-scan-on-load",
+                true,
+                "When debug logging is on, automatically dump a scene diagnostics report " +
+                "each time a level finishes generating. Turn this off if you only want to " +
+                "trigger the report manually with the hotkey below.");
+
+            SceneScanHotkey = config.Bind(
+                "Debug",
+                "scene-scan-hotkey",
+                KeyCode.F9,
+                "When debug logging is on, press this key in-game to dump a scene " +
+                "diagnostics report on demand (e.g. right when you're standing next to a " +
+                "spore bomb). Set to None to disable the hotkey.");
         }
 
         /// <summary>
