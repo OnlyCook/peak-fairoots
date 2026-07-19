@@ -1,0 +1,15 @@
+# dont include research / decompilation notes
+*.zip
+scratch/
+RESEARCH.md
+CLAUDE.md
+.claude
+
+# build output
+[Bb]in/
+[Oo]bj/
+*.user
+Directory.Build.props.local
+
+# packaging output
+dist/

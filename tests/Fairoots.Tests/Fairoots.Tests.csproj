@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <!--
+    Deliberately NOT referencing the Fairoots.csproj game-facing project (that one
+    needs BepInEx/Harmony/game assemblies on disk to even restore). Instead, the mod's
+    seed/preset decision logic (which spore bombs to cull, which creature stats a preset
+    picks, etc.) lives in plain C# with no Unity/game dependency - see ROADMAP.md
+    "Testing strategy" - and gets linked or referenced into this test project directly
+    once that logic exists. Keeps `dotnet test` runnable on any machine, no game
+    install required.
+  -->
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+</Project>
