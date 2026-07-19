@@ -16,16 +16,21 @@ namespace Fairoots
     {
         internal static Plugin Instance { get; private set; }
 
-        private PluginConfig _cfg;
+        /// <summary>The bound config. Mechanic patches read seed/preset/resolved values from here.</summary>
+        internal static PluginConfig Cfg { get; private set; }
+
         private Harmony _harmony;
 
         private void Awake()
         {
             Instance = this;
-            _cfg = new PluginConfig(Config);
+            Cfg = new PluginConfig(Config);
             _harmony = new Harmony(PluginInfo.Guid);
 
-            Logger.LogInfo($"{PluginInfo.Name} {PluginInfo.Version} loaded.");
+            Logger.LogInfo(
+                $"{PluginInfo.Name} {PluginInfo.Version} loaded. " +
+                $"seed={Cfg.Seed.Value}, preset={Cfg.Preset.Value}, " +
+                $"spore-bomb cull fraction={Cfg.SporeBombCullFraction:0.##}");
         }
     }
 }
