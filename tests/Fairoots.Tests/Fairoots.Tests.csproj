@@ -13,10 +13,17 @@
     needs BepInEx/Harmony/game assemblies on disk to even restore). Instead, the mod's
     seed/preset decision logic (which spore bombs to cull, which creature stats a preset
     picks, etc.) lives in plain C# with no Unity/game dependency - see ROADMAP.md
-    "Testing strategy" - and gets linked or referenced into this test project directly
-    once that logic exists. Keeps `dotnet test` runnable on any machine, no game
+    "Testing strategy" - and gets linked into this test project directly via the
+    source-link glob below. Keeps `dotnet test` runnable on any machine, no game
     install required.
+
+    Everything under src/Fairoots/Core is guaranteed Unity/BepInEx-free (that's the
+    whole point of the Core split), so it compiles cleanly into the net10 test target.
   -->
+  <ItemGroup>
+    <Compile Include="../../src/Fairoots/Core/**/*.cs"
+             Link="Core/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
