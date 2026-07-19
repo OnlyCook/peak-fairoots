@@ -106,7 +106,9 @@ once and left alone).
 | Wind: items/backpack immunity | backpack only | backpack + reduced item force | backpack immune, items −60% | backpack + items fully immune |
 | Wind: obstacle occlusion | off (vanilla) | on, coarse | on, tuned | on, generous radius |
 | Wind: fog-while-active density | vanilla | −25% | −50% | −80% |
-| Spore bomb cull rate (seeded) | 0% (none culled) | −25% | −50% (OVERVIEW's literal ask) | −75% |
+| Wind-induced fall camera spin dampening (new — see below) | off | on, mild clamp | on, moderate clamp | on, strong clamp |
+| Spore bomb total removal target (bush/grass removal + seeded cull, combined — see below) | 0% seeded on top of bush removal | 25% | 50% (OVERVIEW's literal ask) | 75% |
+| Spore bomb bush/grass placement removal | ✅ on, all presets (see below) | ✅ on | ✅ on | ✅ on |
 | Spore bomb trigger radius | vanilla | −15% | −30% | −45% |
 | Spore bomb knockback/explosion force | vanilla | −20% | −40% | −60% |
 | Spore bomb screen-shake distance cap | vanilla (~75m, unconfirmed) | 30m | 20m | 10m |
@@ -130,6 +132,39 @@ derivatives of the same underlying per-mechanic sliders (scaled up/down from
 preset 2's values), not independently hand-tuned from scratch, so most of the
 tuning effort concentrates on preset 2.
 
+**Spore bomb removal is two passes, not one, and the second is budgeted
+against the first (confirmed design, see `RESEARCH.md` Q7):**
+
+1. **Bush/grass placement removal** — unconditional, seed-independent,
+   runs on every preset including Subtle. The game genuinely does nothing
+   to stop a spore bomb landing inside bush/grass geometry (confirmed —
+   this isn't existing behavior to tune, it's a gap this mod fixes
+   outright), so any spore bomb detected sitting inside foliage is always
+   removed, regardless of preset.
+2. **Seeded cull, budgeted against pass 1** — the preset's "total removal
+   target" percentage is a target for *combined* removal, not an additional
+   cut on top of whatever pass 1 already removed. Worked example: 100 spore
+   bombs, 20 sit in bushes (removed by pass 1), preset target is 50% → only
+   30 more get removed by the seeded pass (50 total target − 20 already
+   gone), not 50 more. If pass 1 alone already meets or exceeds a preset's
+   target (plausible on Preset 1, whose target is 0% beyond bush removal),
+   the seeded pass removes nothing further — it never removes *more* than
+   the preset's configured fraction just because bush placement happened to
+   overshoot it.
+
+**Wind-induced fall camera spin dampening** targets a specific, now fully
+understood mechanism (`RESEARCH.md` Q6): the moment a character starts
+falling — from any cause, wind-knockback-off-a-ledge being the common Roots
+case — the game's camera stops being player-controlled and starts directly
+tracking the physics-simulated rotation of the ragdoll's head bone, which is
+what actually produces the disorienting "screen spins" effect (not
+screen-shake, which is a separate, additive effect). Since the underlying
+game mechanism doesn't distinguish "fell because of wind" from "fell because
+you jumped badly," this mod needs to decide whether to dampen it for every
+fall in Roots (simpler) or only fall episodes preceded by a recent wind-force
+application (closer to the original complaint, more implementation
+complexity — see "Open questions" below, not yet decided).
+
 ## Mechanic notes (implementation feasibility, from `RESEARCH.md`)
 
 Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
@@ -139,19 +174,30 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   obstacle-raycast option, and a climbing-stamina-multiplier field that's
   almost exactly the hook the counter-wind-by-climbing mechanic needs).
   Backpack immunity and fog-during-wind scaling are both simple, isolated
-  patches. The "screen goes crazy while falling in wind" complaint does not
-  have a dedicated wind-shake code path — it's most likely a combination of
-  existing generic fall-shake calls, needs a runtime logging pass to
-  pinpoint before it can be scoped precisely.
+  patches. The "screen goes crazy while falling" complaint is now **fully
+  traced and understood** (`RESEARCH.md` Q6) — it's the game's camera
+  directly tracking uncontrolled ragdoll-head physics rotation the instant
+  a character starts falling (any fall, not wind-exclusive), not a
+  wind-specific shake effect. The fix targets that camera-blend mechanism
+  directly; the remaining open item is a scoping/playtesting decision, not
+  a code-location question.
 - **Spore bombs**: no dedicated class exists — the hazard is built from
   generic, reusable components (an area-of-effect/explosion component, a
   separate particle-orb VFX spawner, a generic proximity-screenshake
-  component). This means most of the levers are plain public fields,
-  directly patchable once a runtime logging pass confirms which specific
-  prefab/GameObject the Roots spore bomb actually is (open question, shared
-  with the achievement-spawn item below — several mechanics need the same
-  one-time "log what actually spawns in Roots and what components it has"
-  pass before implementation starts).
+  component). Prefab identity is **now confirmed**, cross-referenced from
+  the maintainer's `peak-sense-of-direction` mod, which independently
+  solved the same "what GameObject is this" problem for its item-ping
+  feature via in-game debug logging: the hazard is one of three
+  name-substring-matched variants, `SporeFungus`/`SporeMushroom`/
+  `SporeMushroomExplo` (see `RESEARCH.md` Q7 for the full table). Bush/grass
+  placement removal is a **confirmed real gap in vanilla** (not a
+  misunderstanding to double check) — the game does nothing to prevent it,
+  and this mod's fix budgets that removal against the seeded cull target
+  rather than stacking on top of it (see the Presets section above for the
+  worked example). Remaining open items are narrower now: confirming the
+  same name substrings on the Roots-specific instance, the exact trigger
+  hitbox size, and the foliage-detection method for the bush/grass check —
+  all runtime-logging tasks, not further decompilation.
 - **Spore areas** (the status-effect gas clouds — a different hazard from
   spore bombs, despite the similar name) run through a single generic
   radius-based hazard-zone component with public radius/lethality/falloff
@@ -227,9 +273,14 @@ other PEAK mods already use.
 - `~/Projects/GitHub/peak-checkpoint-save/` and
   `~/Projects/GitHub/peak-sense-of-direction/` — the maintainer's other two
   PEAK mods, used throughout this project as the reference for project
-  structure, packaging conventions, coding style, and (for
-  sense-of-direction specifically) precedent on how to document open
-  research questions inline without letting them block a roadmap.
+  structure, packaging conventions, and coding style. `sense-of-direction`
+  specifically turned out to be a genuine research **data source**, not just
+  a style reference: its item-ping feature independently solved the
+  spore-bomb prefab-identity problem this mod also needed (see
+  `RESEARCH.md` Q7) — worth checking that repo's `RESEARCH.md`/source
+  comments first any time this mod hits a "no dedicated class in the
+  decompile" wall, since the same object may have already been identified
+  there via debug logging for an unrelated feature.
 - `scratch/decomp/game/` — full decompile of the currently-installed PEAK
   build. See `CLAUDE.md` for how to regenerate it after a game update.
 
@@ -243,19 +294,28 @@ other PEAK mods already use.
    non-destructive preset-application/override-resolution logic (also
    tested standalone).
 3. **Phase 3:** one-time runtime logging pass — a temporary debug harness
-   (not shipped) that, run once in an actual Roots level, dumps the exact
-   `GameObject` names/component signatures/prefab identities of spore
-   bombs, spore areas, and the honeycomb/stove spawn pools. Resolves the
-   open questions in `RESEARCH.md` that block precise implementation of
-   Phase 4+. (candidate for the AssetRipper/Unity-asset-extraction route
-   mentioned throughout `RESEARCH.md`, if runtime logging alone doesn't
-   resolve everything, e.g. exact spawn-pool weights.)
-4. **Phase 4:** Spore Bombs — cull rate (the mechanic the seed system exists
-   for), trigger radius, knockback, screenshake range, particle count,
-   bush/grass placement avoidance if found to be missing.
+   (not shipped) that, run once in an actual Roots level, confirms the
+   `SporeFungus`/`SporeMushroom`/`SporeMushroomExplo` prefab-name matches
+   (cross-referenced from `peak-sense-of-direction`, see `RESEARCH.md` Q7)
+   actually apply in Roots specifically, dumps their exact
+   Inspector-configured field values (trigger hitbox size, knockback,
+   screenshake range) and component signatures, identifies the
+   bush/grass-foliage detection method for the cull-budget algorithm, and
+   does the same for spore areas and the honeycomb/stove spawn pools.
+   Resolves the open questions in `RESEARCH.md` that block precise
+   implementation of Phase 4+ — narrower in scope now than originally
+   planned, since spore-bomb identity itself is already resolved. (candidate
+   for the AssetRipper/Unity-asset-extraction route mentioned throughout
+   `RESEARCH.md`, if runtime logging alone doesn't resolve everything, e.g.
+   exact spawn-pool weights.)
+4. **Phase 4:** Spore Bombs — bush/grass placement removal (unconditional,
+   all presets), seeded cull rate budgeted against it (the mechanic the seed
+   system primarily exists for), trigger radius, knockback, screenshake
+   range, particle count.
 5. **Phase 5:** Wind — force/frequency scaling, backpack/item immunity,
    obstacle occlusion tuning, fog scaling, the new climb-to-counter-wind
-   mechanic.
+   mechanic, and the wind-induced-fall camera spin dampening (scoping
+   decision needed first — see "Open questions").
 6. **Phase 6:** Spore Areas — radius/lethality/opacity scaling, wind
    interaction, the new cover-mouth mechanic.
 7. **Phase 7:** Creatures — zombie deaggro (new logic), zombie/beetle speed
@@ -270,11 +330,15 @@ other PEAK mods already use.
 
 ## Open questions
 
-See `RESEARCH.md`'s per-section "Open questions" for the full technical
-list (mostly: exact prefab/GameObject names and Inspector-configured values
-that live in Unity scene assets rather than compiled code, and thus need a
-runtime logging pass or AssetRipper rather than more decompilation). At the
-design level, still undecided:
+See `RESEARCH.md`'s "OPEN QUESTIONS / COULDN'T CONFIRM" section for the full
+technical list and current status per item (several were resolved in the
+2026-07-19 follow-up pass — spore bomb prefab identity, the bush/grass
+cull-budget algorithm, and the wind-fall camera-spin mechanism are all now
+understood; what's left is mostly exact Inspector-configured values and a
+couple of items — trigger hitbox size, foliage-detection method, wind
+obstacle-occlusion tuning, spore-area wind interaction, zombie speed field,
+honeycomb/stove spawn weights — that need a runtime logging pass or
+AssetRipper, not more decompilation). At the design level, still undecided:
 
 - **Host-only vs. every-client-installs.** Unlike the maintainer's
   checkpoint-save mod (explicitly host-only) or sense-of-direction
@@ -291,3 +355,11 @@ design level, still undecided:
   exposed as a standalone toggle independent of presets, given it overlaps
   with the game's own pre-existing (cosmetic-only) `ZombiePhobiaSetting`
   accessibility option.
+- **Wind-induced fall camera-spin dampening scope** (see "Presets" above):
+  dampen for every fall while in Roots (simpler, biome-gated only), or track
+  "was this fall preceded by a recent wind-force application" and only
+  dampen that specific case (closer to the original complaint, needs new
+  state-tracking — a short-lived timestamp/flag set wherever wind force is
+  applied to a character, checked when a fall starts). Leaning toward the
+  simpler biome-gated version unless playtesting shows non-wind falls
+  feeling wrong with it on, but not yet decided.
