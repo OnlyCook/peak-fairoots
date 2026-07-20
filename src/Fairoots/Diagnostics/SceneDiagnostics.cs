@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using HarmonyLib;
 using UnityEngine;
 using Zorro.Core; // Singleton<T> (Zorro.Core.Runtime.dll) - MapHandler's base
 
@@ -37,6 +36,156 @@ namespace Fairoots.Diagnostics
             DumpReport(reason);
         }
 
+        /// <summary>
+        /// Phase 4 research tool (ROADMAP.md/RESEARCH.md Q7 open item): probes the
+        /// spore-bomb candidate nearest the local player for whatever geometry might
+        /// identify "sitting inside bush/grass" - procedural grass-blade density
+        /// (<see cref="GrassChunk"/>, the only foliage system visible to static
+        /// decompilation) plus a broad nearby-collider/renderer name dump to catch
+        /// any decorative bush/foliage prefab that isn't. Not part of the shipped
+        /// cull feature - purely diagnostic, reads only, never mutates the scene.
+        /// Intended use: stand next to a spore bomb that's visibly camouflaged in
+        /// foliage in-game, press the probe hotkey, compare the numbers against a
+        /// spore bomb standing in the open.
+        /// </summary>
+        internal static void ProbeFoliageNearestSporeBomb()
+        {
+            Diag.Info("===== Fairoots foliage probe =====");
+            try
+            {
+                var player = Character.localCharacter;
+                if (player == null)
+                {
+                    Diag.Info("[FoliageProbe] MISSING: no local Character yet");
+                    return;
+                }
+
+                Vector3 playerPos = player.Center;
+
+                Transform nearest = null;
+                float nearestDist = float.MaxValue;
+                foreach (var t in UnityEngine.Object.FindObjectsOfType<Transform>(true))
+                {
+                    if (ClassifySporeBomb(t.name) == null)
+                    {
+                        continue;
+                    }
+
+                    float d = Vector3.Distance(t.position, playerPos);
+                    if (d < nearestDist)
+                    {
+                        nearestDist = d;
+                        nearest = t;
+                    }
+                }
+
+                if (nearest == null)
+                {
+                    Diag.Info("[FoliageProbe] MISSING: no spore-bomb candidates found in scene");
+                    return;
+                }
+
+                Vector3 pos = nearest.position;
+                Diag.Info($"[FoliageProbe] nearest candidate \"{nearest.name}\" @ {Fmt(pos)}, {nearestDist:0.0}m from player");
+
+                // Grass-blade density: only known code-level foliage system
+                // (BasicGrassSpawner/GrassChunk - real per-blade world positions,
+                // not a mesh/collider). Count blades within a few radii.
+                var chunks = UnityEngine.Object.FindObjectsOfType<GrassChunk>(true);
+                int total = 0;
+                foreach (var c in chunks)
+                {
+                    if (c.GrassPoints != null)
+                    {
+                        total += c.GrassPoints.Count;
+                    }
+                }
+
+                Diag.Info($"[FoliageProbe] {chunks.Length} GrassChunk(s) in scene, {total} blade(s) total");
+                foreach (float r in new[] { 1f, 2f, 3f, 5f })
+                {
+                    int count = 0;
+                    foreach (var c in chunks)
+                    {
+                        if (c.GrassPoints == null)
+                        {
+                            continue;
+                        }
+
+                        foreach (var p in c.GrassPoints)
+                        {
+                            if (Vector3.Distance(((Vector3)p.worldPos), pos) <= r)
+                            {
+                                count++;
+                            }
+                        }
+                    }
+
+                    Diag.Info($"[FoliageProbe]   blades within {r:0}m: {count}");
+                }
+
+                // Broad nearby-collider dump - catches anything with a hitbox
+                // (bush/rock/foliage prefab), grass blades have none.
+                var cols = Physics.OverlapSphere(pos, 3f);
+                Diag.Info($"[FoliageProbe] {cols.Length} collider(s) within 3m:");
+                foreach (var c in cols)
+                {
+                    Diag.Info($"[FoliageProbe]   collider \"{c.gameObject.name}\" tag={c.tag} layer={LayerMask.LayerToName(c.gameObject.layer)}");
+                }
+
+                // Broad nearby-renderer dump - catches decorative meshes with no
+                // collider at all (most likely home for a purely-visual bush prefab).
+                // Skip anything attached to a Character (status-effect VFX like
+                // Glow/VFX_Hot follow the player, not the plant, and swamp the list).
+                int shown = 0, skippedCharacter = 0;
+                foreach (var r in UnityEngine.Object.FindObjectsOfType<Renderer>(true))
+                {
+                    if (Vector3.Distance(r.transform.position, pos) > 3f)
+                    {
+                        continue;
+                    }
+
+                    if (r.GetComponentInParent<Character>() != null)
+                    {
+                        skippedCharacter++;
+                        continue;
+                    }
+
+                    if (shown++ >= 40)
+                    {
+                        Diag.Info("[FoliageProbe]   ...(more renderers within 3m, truncated)");
+                        break;
+                    }
+
+                    // Print the immediate parent chain (not walked all the way to
+                    // the scene root, which turned out to be a big shared "Biome_2"
+                    // container for everything) so the actual prefab instance name
+                    // this mesh belongs to is visible.
+                    var chain = new List<string>();
+                    var anc = r.transform.parent;
+                    for (int i = 0; i < 5 && anc != null; i++, anc = anc.parent)
+                    {
+                        chain.Add(anc.name);
+                    }
+
+                    Diag.Info(
+                        $"[FoliageProbe]   renderer \"{r.gameObject.name}\" @ {Fmt(r.transform.position)} " +
+                        $"tag={r.tag} layer={LayerMask.LayerToName(r.gameObject.layer)} " +
+                        $"boundsSize={Fmt(r.bounds.size)} parents=[{string.Join(" < ", chain)}]");
+                }
+
+                Diag.Info($"[FoliageProbe] (skipped {skippedCharacter} character-attached renderer(s) within 3m)");
+            }
+            catch (System.Exception e)
+            {
+                Diag.Error($"[FoliageProbe] threw: {e.GetType().Name}: {e.Message}");
+            }
+            finally
+            {
+                Diag.Info("===== end foliage probe =====");
+            }
+        }
+
         internal static void DumpReport(string reason)
         {
             _lastDump = Time.time;
@@ -46,7 +195,66 @@ namespace Fairoots.Diagnostics
             ReportSporeBombs();
             ReportSporeAreas();
             ReportCreatures();
+            ReportFoliageGroups();
             Diag.Info("===== end diagnostics =====");
+        }
+
+        /// <summary>
+        /// Phase 4 research (follow-up to <see cref="ProbeFoliageNearestSporeBomb"/>):
+        /// the F10 probe confirmed one camouflaging clump type ("Fern", grouped under
+        /// a "Ferns (N)" container inside "PlateauProps"), which has no collider - the
+        /// scene has no dedicated foliage class to query, only scene-authored naming.
+        /// This catalogs every sibling group under each "PlateauProps" container so we
+        /// know the *complete* set of clump type names to allowlist (Ferns plus
+        /// whatever else exists - bushes, shrubs, etc.), not just the one instance the
+        /// F10 probe happened to be standing next to.
+        /// </summary>
+        private static void ReportFoliageGroups()
+        {
+            Section("FoliageGroups", () =>
+            {
+                // Only containers actually under "Roots Segment" - the scene loads
+                // every biome's PlateauProps at once, and non-Roots set-dressing
+                // (BeachGrass, Urchins, Palms, ...) would otherwise pollute the
+                // allowlist since this mod only ever acts in Roots.
+                var propsContainers = UnityEngine.Object.FindObjectsOfType<Transform>(true)
+                    .Where(t => t.name == "PlateauProps" && IsUnderRootsSegment(t))
+                    .ToList();
+
+                Diag.Info($"[FoliageGroups] found {propsContainers.Count} \"PlateauProps\" container(s) under Roots Segment");
+
+                var groupCounts = new Dictionary<string, int>();
+                var groupChildCounts = new Dictionary<string, int>();
+                foreach (var props in propsContainers)
+                {
+                    for (int i = 0; i < props.childCount; i++)
+                    {
+                        var child = props.GetChild(i);
+                        groupCounts[child.name] = groupCounts.TryGetValue(child.name, out var n) ? n + 1 : 1;
+                        groupChildCounts[child.name] = groupChildCounts.TryGetValue(child.name, out var cn)
+                            ? cn + child.childCount
+                            : child.childCount;
+                    }
+                }
+
+                foreach (var kv in groupCounts.OrderByDescending(kv => kv.Value))
+                {
+                    Diag.Info($"[FoliageGroups]   group \"{kv.Key}\" x{kv.Value} instance(s), {groupChildCounts[kv.Key]} total children");
+                }
+            });
+        }
+
+        private static bool IsUnderRootsSegment(Transform t)
+        {
+            for (var p = t; p != null; p = p.parent)
+            {
+                if (p.name == "Roots Segment")
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void ReportBiome()
@@ -288,25 +496,6 @@ namespace Fairoots.Diagnostics
             {
                 Diag.Error($"[{name}] diagnostics section threw: {e.GetType().Name}: {e.Message}");
             }
-        }
-    }
-
-    /// <summary>
-    /// Fires the auto scene scan after native prop placement finishes - the same
-    /// postfix-on-<c>PropGrouper.RunAll</c> seam the real spore-bomb cull will
-    /// eventually hook (RESEARCH.md Q5). Gated entirely on the debug toggle.
-    /// </summary>
-    [HarmonyPatch(typeof(PropGrouper), nameof(PropGrouper.RunAll))]
-    internal static class PropGrouper_RunAll_Diagnostics
-    {
-        private static void Postfix()
-        {
-            if (!Diag.Enabled || Plugin.Cfg == null || !Plugin.Cfg.LogSceneScanOnLoad.Value)
-            {
-                return;
-            }
-
-            SceneDiagnostics.AutoDump("level generated (PropGrouper.RunAll)");
         }
     }
 }

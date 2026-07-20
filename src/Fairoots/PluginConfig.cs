@@ -43,6 +43,9 @@ namespace Fairoots
         /// <summary>Hotkey to dump a scene diagnostics report on demand while playing.</summary>
         public ConfigEntry<KeyCode> SceneScanHotkey { get; }
 
+        /// <summary>Hotkey to probe the nearest spore-bomb candidate for a foliage-detection method (Phase 4 research, not shipped functionality).</summary>
+        public ConfigEntry<KeyCode> FoliageProbeHotkey { get; }
+
         public PluginConfig(ConfigFile config)
         {
             Seed = config.Bind(
@@ -99,6 +102,16 @@ namespace Fairoots
                 "When debug logging is on, press this key in-game to dump a scene " +
                 "diagnostics report on demand (e.g. right when you're standing next to a " +
                 "spore bomb). Set to None to disable the hotkey.");
+
+            FoliageProbeHotkey = config.Bind(
+                "Debug",
+                "foliage-probe-hotkey",
+                KeyCode.F10,
+                "When debug logging is on, press this key while standing next to a spore " +
+                "bomb visibly camouflaged in bush/grass to probe it for a foliage-detection " +
+                "method (grass-blade density, nearby colliders/renderers). Research tool for " +
+                "Phase 4 (ROADMAP.md); not part of the shipped cull feature. Set to None to " +
+                "disable the hotkey.");
         }
 
         /// <summary>

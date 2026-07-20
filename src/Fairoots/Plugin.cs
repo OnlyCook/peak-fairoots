@@ -46,7 +46,14 @@ namespace Fairoots
 
         private void Update()
         {
-            if (Cfg == null || !Cfg.EnableDebugLogging.Value)
+            if (Cfg == null)
+            {
+                return;
+            }
+
+            RootsLevelWatcher.CheckAndRun();
+
+            if (!Cfg.EnableDebugLogging.Value)
             {
                 return;
             }
@@ -56,6 +63,22 @@ namespace Fairoots
             {
                 SceneDiagnostics.DumpReport($"hotkey {key}");
             }
+
+            var foliageKey = Cfg.FoliageProbeHotkey.Value;
+            if (foliageKey != KeyCode.None && Input.GetKeyDown(foliageKey))
+            {
+                SceneDiagnostics.ProbeFoliageNearestSporeBomb();
+            }
+        }
+
+        private void OnGUI()
+        {
+            if (Cfg == null)
+            {
+                return;
+            }
+
+            RemovedMarkerOverlay.Draw();
         }
     }
 }
