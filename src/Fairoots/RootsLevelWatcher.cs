@@ -20,16 +20,25 @@ namespace Fairoots
     internal static class RootsLevelWatcher
     {
         /// <summary>
-        /// The Roots Segment instance already processed this load. Unity's
-        /// overridden `!= null` treats a destroyed object as null even though the
-        /// C# reference isn't, so this naturally goes "stale" again when the level
-        /// unloads without any explicit reset.
+        /// The Roots Segment instance already processed this load. Checked via
+        /// <c>gameObject.activeInHierarchy</c>, not a bare `!= null` - an earlier
+        /// version only relied on Unity's overridden null-check making a
+        /// *destroyed* object compare equal to null to detect "the level changed",
+        /// which never re-triggered if the previous run's Roots Segment was instead
+        /// left behind merely deactivated (not destroyed) rather than a full scene
+        /// reload - live testing confirmed this: changing config (e.g.
+        /// <see cref="PluginConfig.KeepVanillaTriggerRadius"/>) and starting a new
+        /// run without restarting the game had zero effect, because the cull/shrink
+        /// pass never ran again for the entire rest of the game session after the
+        /// very first level. Checking `activeInHierarchy` catches both cases
+        /// (destroyed *or* deactivated) while still avoiding a full scene scan on
+        /// every frame once a still-active segment has already been processed.
         /// </summary>
         private static Transform _processed;
 
         internal static void CheckAndRun()
         {
-            if (_processed != null)
+            if (_processed != null && _processed.gameObject.activeInHierarchy)
             {
                 return;
             }
@@ -37,7 +46,7 @@ namespace Fairoots
             Transform found = null;
             foreach (var t in Object.FindObjectsOfType<Transform>(true))
             {
-                if (t.name == "Roots Segment")
+                if (t.name == "Roots Segment" && t.gameObject.activeInHierarchy)
                 {
                     found = t;
                     break;

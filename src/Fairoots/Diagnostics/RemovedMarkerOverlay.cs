@@ -19,7 +19,9 @@ namespace Fairoots.Diagnostics
     /// through walls for free with no custom shader - the vanilla ping prefab was
     /// considered instead but its own visibility model actually *fades* through
     /// walls (<c>PointPing.visibilityFullNoneNoLos</c>), the opposite of what's
-    /// wanted here. Gated on debug logging; costs nothing during normal play.
+    /// wanted here. Gated on debug logging plus its own opt-in toggle
+    /// (<c>Debug/show-removed-spore-bomb-markers</c>, off by default even with
+    /// debug logging on); costs nothing during normal play.
     /// </summary>
     internal static class RemovedMarkerOverlay
     {
@@ -27,7 +29,7 @@ namespace Fairoots.Diagnostics
 
         internal static void Draw()
         {
-            if (Plugin.Cfg == null || !Plugin.Cfg.EnableDebugLogging.Value)
+            if (Plugin.Cfg == null || !Plugin.Cfg.EnableDebugLogging.Value || !Plugin.Cfg.ShowRemovedSporeBombMarkers.Value)
             {
                 return;
             }

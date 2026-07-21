@@ -109,7 +109,7 @@ once and left alone).
 | Wind-induced fall camera spin dampening (new — see below) | off | on, mild clamp | on, moderate clamp | on, strong clamp |
 | Spore bomb total removal target (bush/grass removal + seeded cull, combined — see below) | 0% seeded on top of bush removal | 25% | 50% (OVERVIEW's literal ask) | 75% |
 | Spore bomb bush/grass placement removal | ✅ on, all presets (see below) | ✅ on | ✅ on | ✅ on |
-| Spore bomb trigger radius | vanilla | −15% | −30% | −45% |
+| Spore bomb trigger radius | vanilla | −25% (playtest-confirmed) | −30% | −45% |
 | Spore bomb knockback/explosion force | vanilla | −20% | −40% | −60% |
 | Spore bomb screen-shake distance cap | vanilla (~75m, unconfirmed) | 30m | 20m | 10m |
 | Spore bomb particle/VFX count | vanilla | −25% | −50% | −65% |
@@ -198,6 +198,19 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   same name substrings on the Roots-specific instance, the exact trigger
   hitbox size, and the foliage-detection method for the bush/grass check —
   all runtime-logging tasks, not further decompilation.
+
+  **Trigger-height cutoff (implemented, not in the preset table above - a bug
+  fix, not a balance dial):** live playtesting against the trigger-radius
+  wireframe overlay confirmed the "Spore Bomb"/"Poison Spore Bomb" variants'
+  vanilla trigger sphere reaches absurdly far above the actual (short, wide)
+  mushroom mesh - tall enough that jumping over one is physically impossible
+  in vanilla, since the trigger volume is a full sphere reaching well above
+  head height rather than the flattened shape the hazard visually is. Fixed
+  via a Harmony prefix on `TriggerEvent.OnTriggerEnter` that suppresses the
+  hit when the player is above a configurable height over the spore bomb's
+  base (`Spore-Bombs/max-trigger-height-meters`, default 1.75m -
+  playtest-confirmed by the maintainer as "perfect" - 0 = vanilla). Left
+  untouched for the "Explosive Spore Bomb" variant, which is genuinely round.
 - **Spore areas** (the status-effect gas clouds — a different hazard from
   spore bombs, despite the similar name) run through a single generic
   radius-based hazard-zone component with public radius/lethality/falloff

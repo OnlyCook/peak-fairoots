@@ -97,6 +97,34 @@ namespace Fairoots.SporeBombs
             new List<(Vector3, CullOutcome)>();
 
         /// <summary>
+        /// The current (post-shrink) trigger <see cref="Collider"/> of every spore
+        /// bomb kept this level load, one per candidate - read live by
+        /// <see cref="TriggerRadiusOverlay"/> so its wireframe always matches
+        /// whatever the collider's actual fields say right now, not a cached
+        /// snapshot. Cleared and repopulated each <see cref="Run"/>.
+        /// </summary>
+        internal static readonly List<Collider> KeptTriggerColliders = new List<Collider>();
+
+        /// <summary>
+        /// The true, never-shrunk trigger size of every <see cref="SphereCollider"/>/
+        /// <see cref="BoxCollider"/> this session has ever touched, keyed by
+        /// <see cref="Object.GetInstanceID"/> and captured the *first* time each
+        /// collider is ever seen. Every reshrink (a normal level load, or a forced
+        /// <see cref="ReapplyTriggerRadiusToAll"/>) scales from this cached baseline,
+        /// never from the collider's current (possibly already-shrunk) value -
+        /// without this, repeatedly reprocessing the same still-alive GameObjects
+        /// (which live testing showed does happen: leaving and re-entering a run
+        /// doesn't always destroy the previous level's objects) would compound the
+        /// shrink further each time, and toggling
+        /// <see cref="PluginConfig.KeepVanillaTriggerRadius"/> back on would just
+        /// preserve whatever the *last* multiplier left behind instead of actually
+        /// restoring vanilla size.
+        /// </summary>
+        private static readonly Dictionary<int, float> VanillaSphereRadii = new Dictionary<int, float>();
+
+        private static readonly Dictionary<int, Vector3> VanillaBoxSizes = new Dictionary<int, Vector3>();
+
+        /// <summary>
         /// The exact vertex set the last cull run tested against, kept (position,
         /// owning renderer) so <see cref="NearestFoliageVertex"/> can explain *why*
         /// a candidate was flagged, not just that it was - a plain distance number
@@ -112,6 +140,7 @@ namespace Fairoots.SporeBombs
             try
             {
                 RemovedPositions.Clear();
+                KeptTriggerColliders.Clear();
 
                 var candidates = rootsSegment.GetComponentsInChildren<Transform>(true)
                     .Where(t => ClassifySporeBomb(t.name))
@@ -141,6 +170,13 @@ namespace Fairoots.SporeBombs
                     Plugin.Cfg.Seed.Value);
 
                 int removed = 0;
+                int shrunk = 0;
+                double triggerRadiusMultiplier = ResolveTriggerRadiusMultiplier();
+                if (Plugin.Cfg.KeepVanillaTriggerRadius.Value)
+                {
+                    Diag.Info("[SporeBombCull] keep-vanilla-trigger-radius is ON - trigger hitboxes left at vanilla size (for before/after comparison screenshots)");
+                }
+
                 for (int i = 0; i < candidates.Count; i++)
                 {
                     if (outcomes[i] != CullOutcome.Kept)
@@ -157,12 +193,18 @@ namespace Fairoots.SporeBombs
                         }
                         Diag.V($"[SporeBombCull]   removed \"{candidates[i].name}\" @ {positions[i]} ({outcomes[i]}{why})");
                     }
+                    else if (ShrinkTriggerRadius(candidates[i], triggerRadiusMultiplier, out Collider triggerCollider))
+                    {
+                        shrunk++;
+                        KeptTriggerColliders.Add(triggerCollider);
+                    }
                 }
 
                 var summary = SporeBombCull.Summarize(outcomes);
                 Diag.Info(
                     $"[SporeBombCull] {summary.Total} candidate(s): removed {removed} " +
-                    $"(foliage={summary.FoliageRemoved}, seeded={summary.SeededRemoved}), kept {summary.Kept}");
+                    $"(foliage={summary.FoliageRemoved}, seeded={summary.SeededRemoved}), kept {summary.Kept}, " +
+                    $"trigger-radius shrunk on {shrunk} (multiplier={triggerRadiusMultiplier:0.##})");
             }
             catch (Exception e)
             {
@@ -300,8 +342,140 @@ namespace Fairoots.SporeBombs
             return false;
         }
 
-        /// <summary>Match the confirmed hazard name substrings (RESEARCH.md Q7 / roots-runtime-findings).</summary>
-        private static bool ClassifySporeBomb(string name)
+        /// <summary>
+        /// The effective trigger-radius multiplier right now: vanilla (1.0) if the
+        /// screenshot-comparison debug toggle is on, otherwise the resolved preset/
+        /// override value. Shared by <see cref="Run"/> and
+        /// <see cref="ReapplyTriggerRadiusToAll"/> so both apply the exact same
+        /// number.
+        /// </summary>
+        private static double ResolveTriggerRadiusMultiplier() =>
+            Plugin.Cfg.KeepVanillaTriggerRadius.Value ? 1.0 : Plugin.Cfg.SporeBombTriggerRadiusMultiplier;
+
+        /// <summary>
+        /// Forces every currently-active spore bomb <em>anywhere in the loaded
+        /// scene</em> (not just the last-processed Roots Segment) to immediately
+        /// re-resolve its trigger-hitbox size against the current config - a full,
+        /// deliberately heavy scene-wide re-scan, wired up to
+        /// <c>SettingChanged</c> on <see cref="PluginConfig.KeepVanillaTriggerRadius"/>/
+        /// <see cref="PluginConfig.SporeBombTriggerRadiusMultiplierOverride"/>/
+        /// <see cref="PluginConfig.Preset"/> (see <c>Plugin.Awake</c>) so flipping
+        /// the debug toggle refreshes every spore bomb's collider *and* the
+        /// <see cref="TriggerRadiusOverlay"/> wireframe right away, without waiting
+        /// for (or requiring) a level reload. Safe to call as often as needed - it's
+        /// diagnostic tooling, not something that runs during normal play.
+        /// </summary>
+        internal static void ReapplyTriggerRadiusToAll()
+        {
+            if (Plugin.Cfg == null)
+            {
+                return;
+            }
+
+            try
+            {
+                double multiplier = ResolveTriggerRadiusMultiplier();
+                KeptTriggerColliders.Clear();
+
+                int found = 0, resized = 0;
+                foreach (var t in UnityEngine.Object.FindObjectsOfType<Transform>(true))
+                {
+                    if (!t.gameObject.activeInHierarchy || !ClassifySporeBomb(t.name))
+                    {
+                        continue;
+                    }
+
+                    found++;
+                    if (ShrinkTriggerRadius(t, multiplier, out Collider triggerCollider))
+                    {
+                        resized++;
+                        KeptTriggerColliders.Add(triggerCollider);
+                    }
+                }
+
+                Diag.Info(
+                    $"[SporeBombCull] full trigger-radius refresh: {found} active spore bomb(s) found scene-wide, " +
+                    $"{resized} resized (multiplier={multiplier:0.##})");
+            }
+            catch (Exception e)
+            {
+                Diag.Error($"[SporeBombCull] ReapplyTriggerRadiusToAll threw: {e.GetType().Name}: {e.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Shrinks every trigger <see cref="Collider"/> directly on a kept spore
+        /// bomb's trigger object by the configured multiplier (ROADMAP.md "Spore
+        /// bomb trigger radius" row), always scaling from each collider's cached
+        /// <see cref="VanillaSphereRadii"/>/<see cref="VanillaBoxSizes"/> baseline
+        /// (captured the first time it's ever seen) rather than its current value -
+        /// see those fields' remarks for why that matters. Per the confirmed
+        /// runtime architecture (roots-runtime-findings memory), the named object
+        /// itself carries the oversized trigger hitbox(es) - always
+        /// <see cref="SphereCollider"/>s in every case seen so far, but
+        /// <see cref="BoxCollider"/> is handled too in case some variant/future
+        /// biome uses one. The explosion components (AOE etc.) don't exist until
+        /// <c>SpawnGameObject</c> fires on trigger, so this is the only place the
+        /// trigger *size* can be tuned; see <see cref="SporeBombExplosionPatch"/>
+        /// for the knockback/shake/VFX tuning applied at spawn time instead.
+        /// </summary>
+        private static bool ShrinkTriggerRadius(Transform candidate, double multiplier, out Collider largestCollider)
+        {
+            largestCollider = null;
+            float largestExtent = 0f;
+
+            foreach (var col in candidate.GetComponents<Collider>())
+            {
+                float extent;
+                switch (col)
+                {
+                    case SphereCollider sphere:
+                    {
+                        int id = sphere.GetInstanceID();
+                        if (!VanillaSphereRadii.TryGetValue(id, out float vanillaRadius))
+                        {
+                            vanillaRadius = sphere.radius;
+                            VanillaSphereRadii[id] = vanillaRadius;
+                        }
+
+                        sphere.radius = SporeBombExplosionTuning.ScaleTriggerRadius(vanillaRadius, multiplier);
+                        extent = sphere.radius;
+                        break;
+                    }
+                    case BoxCollider box:
+                    {
+                        int id = box.GetInstanceID();
+                        if (!VanillaBoxSizes.TryGetValue(id, out Vector3 vanillaSize))
+                        {
+                            vanillaSize = box.size;
+                            VanillaBoxSizes[id] = vanillaSize;
+                        }
+
+                        box.size = vanillaSize * (float)multiplier;
+                        extent = box.size.magnitude;
+                        break;
+                    }
+                    default:
+                        continue;
+                }
+
+                if (extent > largestExtent)
+                {
+                    largestExtent = extent;
+                    largestCollider = col;
+                }
+            }
+
+            return largestCollider != null;
+        }
+
+        /// <summary>
+        /// Match the confirmed hazard name substrings (RESEARCH.md Q7 /
+        /// roots-runtime-findings). Internal (not private) so
+        /// <see cref="SporeBombExplosionPatch"/> can reuse the same identity check
+        /// against the triggering object at spawn time.
+        /// </summary>
+        internal static bool ClassifySporeBomb(string name)
         {
             if (string.IsNullOrEmpty(name))
             {
@@ -311,5 +485,19 @@ namespace Fairoots.SporeBombs
             return name.IndexOf("SporeFungus", StringComparison.OrdinalIgnoreCase) >= 0
                 || name.IndexOf("SporeMushroom", StringComparison.OrdinalIgnoreCase) >= 0;
         }
+
+        /// <summary>
+        /// True for the "Explosive Spore Bomb" variant (<c>SporeMushroomExplo</c>)
+        /// specifically - confirmed by the maintainer to actually be round (its
+        /// vanilla sphere trigger already matches its visual shape reasonably
+        /// well), unlike the plain "Spore Bomb" (<c>SporeFungus</c>) and "Poison
+        /// Spore Bomb" (<c>SporeMushroom</c>, non-Explo) variants, which are short/
+        /// wide mushroom clusters with a trigger sphere that reaches ridiculously
+        /// far above the actual mesh - used by
+        /// <see cref="SporeBombHeightGatePatch"/> to scope the trigger
+        /// height-cutoff fix to exactly the non-round variants it's meant for.
+        /// </summary>
+        internal static bool IsExplosiveVariant(string name) =>
+            !string.IsNullOrEmpty(name) && name.IndexOf("SporeMushroomExplo", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 }
