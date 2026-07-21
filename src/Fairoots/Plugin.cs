@@ -1,5 +1,6 @@
 using BepInEx;
 using Fairoots.Diagnostics;
+using Fairoots.SporeBombs;
 using HarmonyLib;
 using UnityEngine;
 
@@ -31,6 +32,20 @@ namespace Fairoots
 
             _harmony = new Harmony(PluginInfo.Guid);
             _harmony.PatchAll(typeof(Plugin).Assembly);
+
+            TriggerRadiusOverlay.Init();
+
+            // Any live change to a setting that feeds trigger-radius resolution
+            // forces an immediate, full scene-wide re-scan (SporeBombCullPatch.
+            // ReapplyTriggerRadiusToAll) rather than waiting for the next level
+            // load - live testing showed a level-load-only refresh left some spore
+            // bombs at their old size after a config change (whichever ones the
+            // per-level pass didn't happen to touch that load), which was
+            // confusing for exactly the before/after comparison this toggle exists
+            // for.
+            Cfg.KeepVanillaTriggerRadius.SettingChanged += (s, e) => SporeBombCullPatch.ReapplyTriggerRadiusToAll();
+            Cfg.SporeBombTriggerRadiusMultiplierOverride.SettingChanged += (s, e) => SporeBombCullPatch.ReapplyTriggerRadiusToAll();
+            Cfg.Preset.SettingChanged += (s, e) => SporeBombCullPatch.ReapplyTriggerRadiusToAll();
 
             Logger.LogInfo(
                 $"{PluginInfo.Name} {PluginInfo.Version} loaded. " +

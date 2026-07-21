@@ -1,3 +1,4 @@
+using Fairoots.Core;
 using Fairoots.Core.Presets;
 using Xunit;
 
@@ -93,6 +94,70 @@ namespace Fairoots.Tests
                 Assert.True(PresetCatalog.ClimbToCounterWind(p));
                 Assert.True(PresetCatalog.CoverMouth(p));
             }
+        }
+
+        [Fact]
+        public void SporeBombTriggerRadiusMultiplier_MatchesRoadmapTable()
+        {
+            Assert.Equal(1.00, PresetCatalog.SporeBombTriggerRadiusMultiplier(PresetId.Subtle));
+            Assert.Equal(0.75, PresetCatalog.SporeBombTriggerRadiusMultiplier(PresetId.Balanced));
+            Assert.Equal(0.70, PresetCatalog.SporeBombTriggerRadiusMultiplier(PresetId.Generous));
+            Assert.Equal(0.55, PresetCatalog.SporeBombTriggerRadiusMultiplier(PresetId.Tame));
+        }
+
+        [Fact]
+        public void SporeBombKnockbackMultiplier_MatchesRoadmapTable()
+        {
+            Assert.Equal(1.00, PresetCatalog.SporeBombKnockbackMultiplier(PresetId.Subtle));
+            Assert.Equal(0.80, PresetCatalog.SporeBombKnockbackMultiplier(PresetId.Balanced));
+            Assert.Equal(0.60, PresetCatalog.SporeBombKnockbackMultiplier(PresetId.Generous));
+            Assert.Equal(0.40, PresetCatalog.SporeBombKnockbackMultiplier(PresetId.Tame));
+        }
+
+        [Fact]
+        public void SporeBombScreenshakeRangeCapMeters_MatchesRoadmapTable()
+        {
+            Assert.Equal(SporeBombExplosionTuning.NoScreenshakeCap, PresetCatalog.SporeBombScreenshakeRangeCapMeters(PresetId.Subtle));
+            Assert.Equal(30f, PresetCatalog.SporeBombScreenshakeRangeCapMeters(PresetId.Balanced));
+            Assert.Equal(20f, PresetCatalog.SporeBombScreenshakeRangeCapMeters(PresetId.Generous));
+            Assert.Equal(10f, PresetCatalog.SporeBombScreenshakeRangeCapMeters(PresetId.Tame));
+        }
+
+        [Fact]
+        public void SporeBombVfxCountMultiplier_MatchesRoadmapTable()
+        {
+            Assert.Equal(1.00, PresetCatalog.SporeBombVfxCountMultiplier(PresetId.Subtle));
+            Assert.Equal(0.75, PresetCatalog.SporeBombVfxCountMultiplier(PresetId.Balanced));
+            Assert.Equal(0.50, PresetCatalog.SporeBombVfxCountMultiplier(PresetId.Generous));
+            Assert.Equal(0.35, PresetCatalog.SporeBombVfxCountMultiplier(PresetId.Tame));
+        }
+
+        [Fact]
+        public void CustomPreset_ExplicitConfigValue_Wins()
+        {
+            double resolved = OverrideResolution.Resolve(
+                PresetCatalog.SporeBombCullFraction(PresetId.Custom), configuredValue: 0.9);
+            Assert.Equal(0.9, resolved);
+        }
+
+        [Fact]
+        public void CustomPreset_UntouchedSetting_FallsBackToBalancedNumber_NotACrash()
+        {
+            double resolved = OverrideResolution.Resolve(
+                PresetCatalog.SporeBombCullFraction(PresetId.Custom), OverrideResolution.FollowPreset);
+            Assert.Equal(PresetCatalog.SporeBombCullFraction(PresetId.Balanced), resolved);
+        }
+
+        [Fact]
+        public void CustomPreset_CatalogLookup_FallsBackToBalancedNumbers()
+        {
+            // Custom has no numbers of its own - every catalog method must fall
+            // back to Balanced's value rather than throwing or returning garbage.
+            Assert.Equal(PresetCatalog.SporeBombCullFraction(PresetId.Balanced), PresetCatalog.SporeBombCullFraction(PresetId.Custom));
+            Assert.Equal(PresetCatalog.SporeBombTriggerRadiusMultiplier(PresetId.Balanced), PresetCatalog.SporeBombTriggerRadiusMultiplier(PresetId.Custom));
+            Assert.Equal(PresetCatalog.SporeBombKnockbackMultiplier(PresetId.Balanced), PresetCatalog.SporeBombKnockbackMultiplier(PresetId.Custom));
+            Assert.Equal(PresetCatalog.SporeBombScreenshakeRangeCapMeters(PresetId.Balanced), PresetCatalog.SporeBombScreenshakeRangeCapMeters(PresetId.Custom));
+            Assert.Equal(PresetCatalog.SporeBombVfxCountMultiplier(PresetId.Balanced), PresetCatalog.SporeBombVfxCountMultiplier(PresetId.Custom));
         }
     }
 }
