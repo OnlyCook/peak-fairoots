@@ -6,22 +6,40 @@ namespace Fairoots
 {
     /// <summary>
     /// Config binding for Fairoots. Holds the mod's defining knobs: the
-    /// deterministic seed, the preset 1-4 selector, and per-mechanic override
-    /// entries. Per-mechanic entries default to the "follow preset" sentinel
-    /// (<see cref="OverrideResolution.FollowPreset"/>) so switching presets never
-    /// clobbers a value the player explicitly changed (ROADMAP.md "Presets").
+    /// deterministic seed, the preset 1-4 selector, and per-mechanic Custom-only
+    /// entries (only read when <see cref="Preset"/> is <see cref="PresetId.Custom"/>
+    /// - see <see cref="OverrideResolution"/>).
     ///
     /// Config keys are kebab-case per CLAUDE.md; the C# property names stay
     /// PascalCase. Section names follow the maintainer's other PEAK mods
     /// (Capitalized-Hyphenated, or a plain word where there's nothing to hyphenate).
     ///
     /// Resolved accessors (e.g. <see cref="SporeBombCullFraction"/>) fold preset +
-    /// override together so callers never re-implement that logic.
+    /// override together so callers never re-implement that logic. Every
+    /// non-Debug setting is live by default (edits made in-game, e.g. via
+    /// PEAKLib.ModConfig, take effect immediately) - <see cref="ApplyChangesLive"/>
+    /// turns that off, in which case game-facing code should read the
+    /// <c>Effective*</c> accessors (snapshotted once per Roots level load via
+    /// <see cref="CaptureLevelSnapshot"/>) instead of the raw resolved ones. The
+    /// spore-bomb removal fraction and the seed are always level-load-only
+    /// regardless of this flag - which spore bombs were already removed can't be
+    /// undone mid-level, so there's nothing for "live" to mean there.
     /// </summary>
     public class PluginConfig
     {
         // --- General -------------------------------------------------------
         public ConfigEntry<int> Seed { get; }
+
+        /// <summary>
+        /// When on (default), every setting below (except <c>Debug</c> section
+        /// ones, which always apply immediately) takes effect the instant you
+        /// change it in-game - e.g. via PEAKLib.ModConfig. When off, changes are
+        /// only picked up the next time you load into a Roots biome; whatever was
+        /// configured at that moment stays in effect for the whole level,
+        /// regardless of what you change afterward. Useful for A/B-testing a
+        /// mechanic without values shifting under you mid-run.
+        /// </summary>
+        public ConfigEntry<bool> ApplyChangesLive { get; }
 
         // --- Presets -------------------------------------------------------
         public ConfigEntry<PresetId> Preset { get; }
@@ -123,6 +141,20 @@ namespace Fairoots
                 "bombs get culled, etc.). Same seed + same Roots level = identical result, " +
                 "every load. Change it to reroll; share it with your lobby so everyone sees " +
                 "the same layout (all clients must run the mod with this same seed).");
+
+            ApplyChangesLive = config.Bind(
+                "General",
+                "apply-changes-live",
+                true,
+                "When on (default), every setting below - except the Debug section, which " +
+                "always applies immediately - takes effect the instant you change it in-game " +
+                "(e.g. via PEAKLib.ModConfig): kept spore bombs resize live, the next " +
+                "detonation uses the new knockback/VFX/shake numbers, and the jump-over-height " +
+                "cutoff updates immediately. Turn this off to freeze all of that at whatever it " +
+                "was the moment you loaded into Roots - further changes only take effect the " +
+                "next time you load into a Roots biome. The spore-bomb removal fraction and the " +
+                "seed are always level-load-only either way, since which spore bombs were " +
+                "already removed can't be undone mid-level.");
 
             Preset = config.Bind(
                 "Presets",
@@ -313,5 +345,62 @@ namespace Fairoots
                 PresetCatalog.SporeBombVfxCountMultiplier(Preset.Value),
                 SporeBombVfxCountMultiplierOverride.Value,
                 UseCustomOverrides);
+
+        // --- Level-load snapshot (ApplyChangesLive == false) --------------
+        // Captured once per Roots level load (RootsLevelWatcher, right before
+        // SporeBombCullPatch.Run) so game-facing code has a single, consistent
+        // "what was configured when this level loaded" view to read from when the
+        // player has opted out of live updates. Not used at all while
+        // ApplyChangesLive is on - the Effective* accessors below just pass the
+        // live resolved value straight through in that case.
+        private bool _snapshotTaken;
+        private double _snapCullFraction;
+        private double _snapTriggerRadiusMultiplier;
+        private double _snapKnockbackMultiplier;
+        private float _snapScreenshakeRangeCapMeters;
+        private double _snapVfxCountMultiplier;
+        private float _snapMaxTriggerHeightMeters;
+
+        /// <summary>
+        /// Freezes every non-Debug resolved setting at its current (live) value.
+        /// Called once per Roots level load, unconditionally (cheap - a handful of
+        /// property reads), so a snapshot is always ready the moment the player
+        /// turns <see cref="ApplyChangesLive"/> off mid-session.
+        /// </summary>
+        internal void CaptureLevelSnapshot()
+        {
+            _snapCullFraction = SporeBombCullFraction;
+            _snapTriggerRadiusMultiplier = SporeBombTriggerRadiusMultiplier;
+            _snapKnockbackMultiplier = SporeBombKnockbackMultiplier;
+            _snapScreenshakeRangeCapMeters = SporeBombScreenshakeRangeCapMeters;
+            _snapVfxCountMultiplier = SporeBombVfxCountMultiplier;
+            _snapMaxTriggerHeightMeters = SporeBombMaxTriggerHeightMeters.Value;
+            _snapshotTaken = true;
+        }
+
+        /// <summary>
+        /// True while a live value should be used as-is: either the player wants
+        /// live updates, or no level has loaded yet to snapshot from (falling back
+        /// to live rather than a meaningless zeroed snapshot).
+        /// </summary>
+        private bool UseLiveValue => ApplyChangesLive.Value || !_snapshotTaken;
+
+        /// <summary>Game-facing code should read this instead of <see cref="SporeBombCullFraction"/>.</summary>
+        public double EffectiveSporeBombCullFraction => UseLiveValue ? SporeBombCullFraction : _snapCullFraction;
+
+        /// <summary>Game-facing code should read this instead of <see cref="SporeBombTriggerRadiusMultiplier"/>.</summary>
+        public double EffectiveSporeBombTriggerRadiusMultiplier => UseLiveValue ? SporeBombTriggerRadiusMultiplier : _snapTriggerRadiusMultiplier;
+
+        /// <summary>Game-facing code should read this instead of <see cref="SporeBombKnockbackMultiplier"/>.</summary>
+        public double EffectiveSporeBombKnockbackMultiplier => UseLiveValue ? SporeBombKnockbackMultiplier : _snapKnockbackMultiplier;
+
+        /// <summary>Game-facing code should read this instead of <see cref="SporeBombScreenshakeRangeCapMeters"/>.</summary>
+        public float EffectiveSporeBombScreenshakeRangeCapMeters => UseLiveValue ? SporeBombScreenshakeRangeCapMeters : _snapScreenshakeRangeCapMeters;
+
+        /// <summary>Game-facing code should read this instead of <see cref="SporeBombVfxCountMultiplier"/>.</summary>
+        public double EffectiveSporeBombVfxCountMultiplier => UseLiveValue ? SporeBombVfxCountMultiplier : _snapVfxCountMultiplier;
+
+        /// <summary>Game-facing code should read this instead of <see cref="SporeBombMaxTriggerHeightMeters"/>.Value.</summary>
+        public float EffectiveSporeBombMaxTriggerHeightMeters => UseLiveValue ? SporeBombMaxTriggerHeightMeters.Value : _snapMaxTriggerHeightMeters;
     }
 }

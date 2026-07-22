@@ -42,10 +42,23 @@ namespace Fairoots
             // bombs at their old size after a config change (whichever ones the
             // per-level pass didn't happen to touch that load), which was
             // confusing for exactly the before/after comparison this toggle exists
-            // for.
+            // for. KeepVanillaTriggerRadius lives in the Debug section, so unlike
+            // the other two it always reapplies immediately regardless of
+            // Cfg.ApplyChangesLive (see that flag's remarks) - the other two are
+            // regular gameplay settings, so they only get this immediate-reapply
+            // treatment while live updates are actually turned on; with it off,
+            // ResolveTriggerRadiusMultiplier's EffectiveSporeBombTriggerRadiusMultiplier
+            // read already keeps kept spore bombs at whatever was snapshotted at
+            // the last Roots level load instead.
             Cfg.KeepVanillaTriggerRadius.SettingChanged += (s, e) => SporeBombCullPatch.ReapplyTriggerRadiusToAll();
-            Cfg.SporeBombTriggerRadiusMultiplierOverride.SettingChanged += (s, e) => SporeBombCullPatch.ReapplyTriggerRadiusToAll();
-            Cfg.Preset.SettingChanged += (s, e) => SporeBombCullPatch.ReapplyTriggerRadiusToAll();
+            Cfg.SporeBombTriggerRadiusMultiplierOverride.SettingChanged += (s, e) =>
+            {
+                if (Cfg.ApplyChangesLive.Value) SporeBombCullPatch.ReapplyTriggerRadiusToAll();
+            };
+            Cfg.Preset.SettingChanged += (s, e) =>
+            {
+                if (Cfg.ApplyChangesLive.Value) SporeBombCullPatch.ReapplyTriggerRadiusToAll();
+            };
 
             Logger.LogInfo(
                 $"{PluginInfo.Name} {PluginInfo.Version} loaded. " +

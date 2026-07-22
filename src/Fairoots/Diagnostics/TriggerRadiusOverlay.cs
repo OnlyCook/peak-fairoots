@@ -200,7 +200,7 @@ namespace Fairoots.Diagnostics
                 return null;
             }
 
-            float maxHeight = Plugin.Cfg.SporeBombMaxTriggerHeightMeters.Value;
+            float maxHeight = Plugin.Cfg.EffectiveSporeBombMaxTriggerHeightMeters;
             if (maxHeight <= 0f)
             {
                 return null;

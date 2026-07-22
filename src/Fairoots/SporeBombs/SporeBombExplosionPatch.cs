@@ -61,7 +61,7 @@ namespace Fairoots.SporeBombs
 
         private static void ApplyTuning(GameObject spawned)
         {
-            double knockbackMultiplier = Plugin.Cfg.SporeBombKnockbackMultiplier;
+            double knockbackMultiplier = Plugin.Cfg.EffectiveSporeBombKnockbackMultiplier;
             foreach (var aoe in spawned.GetComponentsInChildren<AOE>(true))
             {
                 aoe.knockback = SporeBombExplosionTuning.ScaleKnockback(aoe.knockback, knockbackMultiplier);
@@ -69,7 +69,7 @@ namespace Fairoots.SporeBombs
                     SporeBombExplosionTuning.ScaleKnockback(aoe.itemKnockbackMultiplier, knockbackMultiplier);
             }
 
-            double vfxMultiplier = Plugin.Cfg.SporeBombVfxCountMultiplier;
+            double vfxMultiplier = Plugin.Cfg.EffectiveSporeBombVfxCountMultiplier;
             foreach (var vfx in spawned.GetComponentsInChildren<ExplosionEffect>(true))
             {
                 vfx.explosionPointCount = SporeBombExplosionTuning.ScaleVfxCount(vfx.explosionPointCount, vfxMultiplier);
@@ -77,7 +77,7 @@ namespace Fairoots.SporeBombs
                     SporeBombExplosionTuning.ScaleVfxCount(vfx.subExplosionPointCount, vfxMultiplier);
             }
 
-            float shakeCapMeters = Plugin.Cfg.SporeBombScreenshakeRangeCapMeters;
+            float shakeCapMeters = Plugin.Cfg.EffectiveSporeBombScreenshakeRangeCapMeters;
             foreach (var shake in spawned.GetComponentsInChildren<AddScreenshake>(true))
             {
                 shake.range = SporeBombExplosionTuning.CapScreenshakeRange(shake.range, shakeCapMeters);

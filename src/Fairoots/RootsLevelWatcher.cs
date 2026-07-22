@@ -78,6 +78,7 @@ namespace Fairoots
             }
 
             _processed = found.transform;
+            Plugin.Cfg.CaptureLevelSnapshot();
             SporeBombCullPatch.Run(found.transform);
 
             if (Plugin.Cfg.EnableDebugLogging.Value && Plugin.Cfg.LogSceneScanOnLoad.Value)

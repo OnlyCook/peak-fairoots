@@ -25,14 +25,22 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
 
 - `src/Fairoots/` — the BepInEx plugin project (game-facing).
   - `Plugin.cs` — entry point (`BepInPlugin`); loads config + Harmony, logs.
-  - `PluginConfig.cs` — config binding: the `seed` field, the `preset` 1-5
-    selector (1-4 are the fixed presets, 5 is Custom — see
-    `Core/Presets/PresetId.cs`), per-mechanic Custom-only entries (sane numeric
-    defaults, only read when preset is set to Custom — ignored under presets
-    1-4 even if changed), and the `Debug` section (bound last). Exposes
-    *resolved* accessors (e.g. `SporeBombCullFraction`,
+  - `PluginConfig.cs` — config binding: the `seed` field, `apply-changes-live`
+    (see below), the `preset` 1-5 selector (1-4 are the fixed presets, 5 is
+    Custom — see `Core/Presets/PresetId.cs`), per-mechanic Custom-only entries
+    (sane numeric defaults, only read when preset is set to Custom — ignored
+    under presets 1-4 even if changed), and the `Debug` section (bound last).
+    Exposes *resolved* accessors (e.g. `SporeBombCullFraction`,
     `SporeBombKnockbackMultiplier`) that fold preset + override together via
-    `Core/Presets/OverrideResolution`.
+    `Core/Presets/OverrideResolution`, plus a parallel set of `Effective*`
+    accessors (e.g. `EffectiveSporeBombKnockbackMultiplier`) that game-facing
+    code should read instead: with `apply-changes-live` on (default) they just
+    pass the live resolved value through, but with it off they return a
+    snapshot frozen at the last Roots level load (`CaptureLevelSnapshot`,
+    called by `RootsLevelWatcher` right before `SporeBombCullPatch.Run`), so
+    every non-Debug setting only changes on the next Roots load instead of
+    mid-level. The spore-bomb removal fraction and the seed are level-load-only
+    either way — which bombs got removed can't un-happen mid-level.
   - `PluginInfo.cs` — GUID/name/version constants.
   - `RootsLevelWatcher.cs` — detects a freshly-loaded Roots level (Roots prop
     placement is baked into the scene at author time, not regenerated at

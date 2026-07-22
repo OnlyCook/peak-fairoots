@@ -153,6 +153,32 @@ questions in one pass.
 and whether the felt in-game effect (distance thrown, particle count, shake
 range) matched the logged multipliers.
 
+### Live vs. level-load-only setting updates (`General/apply-changes-live`)
+
+**Pre-req:** debug logging on, in a Roots run, preset set to `Custom` (5) so
+the `Spore-Bombs` entries are actually in effect.
+
+1. With `apply-changes-live` at its default (`true`), change
+   `knockback-multiplier` while standing in Roots (e.g. via PEAKLib.ModConfig)
+   and trigger a spore bomb - the new value should apply to that very
+   detonation. Change `trigger-radius-multiplier` too - already-placed spore
+   bombs should visibly resize immediately, no reload needed.
+2. Set `apply-changes-live` to `false`. Change `knockback-multiplier` again
+   and trigger a spore bomb - it should still use whatever was in effect
+   *before* you flipped the flag off (the level's frozen snapshot), not the
+   new value. Same for `trigger-radius-multiplier` - existing hitboxes should
+   stay exactly the size they already were, not resize.
+3. Leave Roots and reload into a fresh Roots level (or `Custom` → any preset →
+   `Custom` isn't required here, an actual level load is): the new
+   `knockback-multiplier`/`trigger-radius-multiplier` values should now be in
+   effect, confirming the freeze only lasts until the next Roots load.
+4. Confirm `Debug` section settings (e.g. `keep-vanilla-trigger-radius`) still
+   apply immediately regardless of `apply-changes-live`'s value.
+
+**Report back:** whether step 1's changes applied instantly, whether step 2's
+changes were correctly ignored until step 3's reload, and whether step 4's
+debug toggle stayed live throughout.
+
 ### Trigger-box wireframe + vanilla-size comparison (for the README screenshot)
 
 **Pre-req:** debug logging on, `show-spore-bomb-trigger-radius = true`.

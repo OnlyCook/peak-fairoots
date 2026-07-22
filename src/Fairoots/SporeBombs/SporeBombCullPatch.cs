@@ -166,7 +166,7 @@ namespace Fairoots.SporeBombs
                 var outcomes = SporeBombCull.Decide(
                     positions,
                     inFoliage,
-                    Plugin.Cfg.SporeBombCullFraction,
+                    Plugin.Cfg.EffectiveSporeBombCullFraction,
                     Plugin.Cfg.Seed.Value);
 
                 int removed = 0;
@@ -345,12 +345,13 @@ namespace Fairoots.SporeBombs
         /// <summary>
         /// The effective trigger-radius multiplier right now: vanilla (1.0) if the
         /// screenshot-comparison debug toggle is on, otherwise the resolved preset/
-        /// override value. Shared by <see cref="Run"/> and
-        /// <see cref="ReapplyTriggerRadiusToAll"/> so both apply the exact same
-        /// number.
+        /// override value (frozen at the last level load if
+        /// <see cref="PluginConfig.ApplyChangesLive"/> is off). Shared by
+        /// <see cref="Run"/> and <see cref="ReapplyTriggerRadiusToAll"/> so both
+        /// apply the exact same number.
         /// </summary>
         private static double ResolveTriggerRadiusMultiplier() =>
-            Plugin.Cfg.KeepVanillaTriggerRadius.Value ? 1.0 : Plugin.Cfg.SporeBombTriggerRadiusMultiplier;
+            Plugin.Cfg.KeepVanillaTriggerRadius.Value ? 1.0 : Plugin.Cfg.EffectiveSporeBombTriggerRadiusMultiplier;
 
         /// <summary>
         /// Forces every currently-active spore bomb <em>anywhere in the loaded
