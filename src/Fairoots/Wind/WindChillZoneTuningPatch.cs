@@ -79,7 +79,7 @@ namespace Fairoots.Wind
 
         private static void Apply(WindChillZone zone, Baseline baseline)
         {
-            if (Plugin.Cfg.DisableWindEntirely.Value)
+            if (Plugin.Cfg.EffectiveDisableWindEntirely)
             {
                 zone.windForce = baseline.WindForce;
                 zone.windTimeRangeOn = baseline.WindTimeRangeOn;
@@ -196,7 +196,7 @@ namespace Fairoots.Wind
     {
         private static void Prefix(ref bool set)
         {
-            if (Plugin.Cfg.DisableWindEntirely.Value)
+            if (Plugin.Cfg.EffectiveDisableWindEntirely)
             {
                 set = false;
             }
@@ -218,7 +218,7 @@ namespace Fairoots.Wind
     {
         private static bool Prefix(Item item)
         {
-            if (Plugin.Cfg.DisableWindEntirely.Value || !Plugin.Cfg.WindBackpackAlwaysImmune.Value)
+            if (Plugin.Cfg.EffectiveDisableWindEntirely || !Plugin.Cfg.EffectiveWindBackpackAlwaysImmune)
             {
                 return true; // let the original run untouched - no immunity override.
             }

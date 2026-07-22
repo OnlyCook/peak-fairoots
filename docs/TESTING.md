@@ -356,3 +356,69 @@ fog/visibility looked unchanged from vanilla throughout.
 whether a non-wind fall was completely unaffected, and whether 0.35 is a good
 default or needs adjusting (the maintainer's own framing: strong enough to
 let you react, not so strong it removes all sense of falling).
+
+### Host authority (multiplayer — needs a second player/PC, can't be verified solo)
+
+**Pre-req:** debug logging on for both host and at least one non-host client,
+both running the *same* Fairoots build. See ROADMAP.md's "Host authority"
+section for the full rationale/mechanism before testing this.
+
+1. Host sets a distinctive `seed` (e.g. `12345`) and `Custom` preset with an
+   obviously different `Spore-Bombs/cull-fraction` (e.g. `0.9`) than the
+   non-host client has locally configured (e.g. leave the client on `0.25`
+   Balanced). Both load into the same Roots run: the non-host client's spore
+   bomb count/positions should match the *host's* configured cull fraction
+   and seed exactly, not its own local settings - confirms the host's config
+   wins regardless of what the client has set locally.
+2. While both are already in a Roots level, host changes `Wind/force-multiplier`
+   live (e.g. to `0.1`) - the non-host client should feel the *same* weakened
+   wind almost immediately (no reload needed), even though the client never
+   touched their own config.
+3. Host sets `Wind/disable-wind-entirely = true` - wind should stop for
+   **both** players, not just the host. Set it back to `false` - wind
+   resumes for both.
+4. Non-host client changes any of their own local Wind/Spore-Bombs settings
+   (seed, preset, force-multiplier, backpack-always-immune, etc.) - this
+   should have **zero** effect on their actual in-game experience (still
+   matches whatever the host has configured), confirming a client can't
+   unilaterally alter shared gameplay.
+5. (If testable) Have the host disconnect/leave and let Photon promote the
+   non-host to master client - the new host's own config should immediately
+   become authoritative for whoever's left (via `HostAuthoritySync`'s
+   `OnMasterClientSwitched`), without needing a level reload.
+6. Confirm the wind-preceded-fall camera-dampening clamp is the one exception
+   that stays per-client: each player should be able to set their own
+   `fall-camera-dampen-clamp` independently and have it apply to their own
+   camera regardless of what the host or other players have set.
+
+**Report back:** whether the non-host client's spore bombs/wind genuinely
+matched the host's config (not their own), whether live host changes
+propagated to the client promptly, whether disable-wind-entirely affected
+both players, and whether the camera-dampening clamp correctly stayed
+per-player independent.
+
+### Mod-presence enforcement (multiplayer — needs a second player/PC without Fairoots installed)
+
+**Pre-req:** debug logging on. One player has Fairoots installed, one doesn't.
+
+1. Both players join the same lobby (order doesn't matter - host or
+   non-host missing it, either way). The player(s) *with* Fairoots should see
+   a popup within a few seconds: title "Fairoots", body explaining not
+   everyone in the lobby has it installed. No player names in the popup
+   itself.
+2. Check `LogOutput.log` on the modded player(s) for
+   `[ModPresenceCheck] N player(s) in this lobby do not have Fairoots
+   installed: <nickname(s)>` - confirms the specific missing name(s) went to
+   the log, not the popup.
+3. Click "OK" - the popup should close cleanly.
+4. Have the missing player install Fairoots and rejoin (or, if testable,
+   have them install it without leaving) - no further popup should appear
+   once everyone has it.
+5. If a *different* player later leaves and rejoins without the mod, a fresh
+   popup should appear again (confirms the "only warn once per distinct gap"
+   logic resets correctly once a gap clears, rather than staying silent
+   forever after the first warning this session).
+
+**Report back:** whether the popup appeared promptly and looked reasonable
+(not clipped, readable), whether the log line had the correct nickname(s),
+and whether repeat/fresh gaps re-triggered the popup as expected.

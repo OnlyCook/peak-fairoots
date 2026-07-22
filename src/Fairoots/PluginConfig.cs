@@ -1,5 +1,6 @@
 using BepInEx.Configuration;
 using Fairoots.Core.Presets;
+using Fairoots.Networking;
 using UnityEngine;
 
 namespace Fairoots
@@ -24,6 +25,19 @@ namespace Fairoots
     /// spore-bomb removal fraction and the seed are always level-load-only
     /// regardless of this flag - which spore bombs were already removed can't be
     /// undone mid-level, so there's nothing for "live" to mean there.
+    ///
+    /// <b>Host authority (locked in 2026-07-22 - see ROADMAP.md).</b> Every
+    /// <c>Effective*</c> accessor that decides actual shared game logic (what
+    /// gets removed/spawned, how much force applies, whether wind occurs at
+    /// all) additionally runs through <see cref="HostAuthority.Resolve"/>: on
+    /// the host, this is a no-op (the local value already is the authoritative
+    /// one); on any other client, it's overridden by whatever the host has
+    /// published, so an individual client's own local config for these can
+    /// never diverge from the host's. Purely local per-player feel settings -
+    /// <see cref="EffectiveWindFallCameraDampenClamp"/>,
+    /// <see cref="WindRecentForceWindowSeconds"/>, and everything in
+    /// <c>Debug</c> - are deliberately excluded, since they don't affect
+    /// anyone but the player who set them.
     /// </summary>
     public class PluginConfig
     {
@@ -119,12 +133,17 @@ namespace Fairoots
         /// force/duration/item/occlusion scaling to vanilla numbers, which
         /// still let vanilla wind gusts happen; that was wrong). Achieved by
         /// forcing <c>WindChillZone.RPCA_ToggleWind</c>'s incoming "turn wind
-        /// on" signal to false (see <c>WindToggleSuppressionPatch</c>) so this
-        /// client's zone can never go active again, plus forcing
-        /// <c>windActive</c> off immediately for a gust already in progress the
-        /// instant this is flipped on. Off by default; no preset ever sets this
-        /// to true - it's a manual-only override for players who want zero
-        /// wind, full stop. Not folded through the preset/override system
+        /// on" signal to false (see <c>WindToggleSuppressionPatch</c>) so no
+        /// zone can ever go active again, plus forcing <c>windActive</c> off
+        /// immediately for a gust already in progress the instant this is
+        /// flipped on. <b>Host-authoritative</b> (ROADMAP.md's "Host
+        /// authority" section, locked in 2026-07-22): read this via
+        /// <see cref="PluginConfig.EffectiveDisableWindEntirely"/>, never this
+        /// raw entry directly - only the host's value is ever used, an
+        /// individual client's own local value here has no effect on its own.
+        /// Off by default; no preset ever sets this to true - it's a
+        /// manual-only override for a host who wants zero wind for the whole
+        /// lobby, full stop. Not folded through the preset/override system
         /// (deliberately flat, like <see cref="KeepVanillaTriggerRadius"/>) and
         /// always applies immediately regardless of <see cref="ApplyChangesLive"/>,
         /// since a safety switch like this should never wait for a level reload.
@@ -137,7 +156,10 @@ namespace Fairoots
         /// default (ROADMAP.md's "backpack only" is the minimum immunity level
         /// on every preset) - turn off if you want backpacks affected by wind
         /// like any other ground item (scaled by the same item-force
-        /// multiplier as everything else). Not folded through the preset/
+        /// multiplier as everything else). <b>Host-authoritative</b> (same as
+        /// <see cref="DisableWindEntirely"/>): read via
+        /// <see cref="PluginConfig.EffectiveWindBackpackAlwaysImmune"/>, only
+        /// the host's value is ever used. Not folded through the preset/
         /// override system (deliberately flat) - a player override on top of
         /// whatever preset is active, and always applies immediately regardless
         /// of <see cref="ApplyChangesLive"/>, same reasoning as
@@ -239,8 +261,10 @@ namespace Fairoots
                 0,
                 "Deterministic seed for every random decision Fairoots makes (which spore " +
                 "bombs get culled, etc.). Same seed + same Roots level = identical result, " +
-                "every load. Change it to reroll; share it with your lobby so everyone sees " +
-                "the same layout (all clients must run the mod with this same seed).");
+                "every load. HOST-AUTHORITATIVE: everyone in the lobby must have Fairoots " +
+                "installed, but only the HOST's seed is ever actually used - non-host players' " +
+                "own seed value here is ignored entirely, so there's nothing to coordinate " +
+                "manually (see ROADMAP.md's Host authority section).");
 
             ApplyChangesLive = config.Bind(
                 "General",
@@ -262,9 +286,11 @@ namespace Fairoots
                 PresetId.Balanced,
                 "Overall balance preset. Subtle (1) is the lightest touch, Tame (4) the " +
                 "heaviest, Balanced (2) is the default. Custom (5) ignores the hard-coded " +
-                "preset numbers entirely and uses your own Spore-Bombs settings directly " +
+                "preset numbers entirely and uses your own Spore-Bombs/Wind settings directly " +
                 "instead. Under presets 1-4, the per-mechanic settings below are ignored " +
-                "entirely, even if you've changed them - switch to Custom to use them.");
+                "entirely, even if you've changed them - switch to Custom to use them. " +
+                "HOST-AUTHORITATIVE: only the host's preset (and, under Custom, the host's " +
+                "own per-mechanic values) is ever actually used for the whole lobby.");
 
             SporeBombCullFractionOverride = config.Bind(
                 "Spore-Bombs",
@@ -356,20 +382,23 @@ namespace Fairoots
                 "disable-wind-entirely",
                 false,
                 "Master switch: when on, wind should NEVER occur at all - not vanilla-strength " +
-                "wind, genuinely no wind, ever, for you specifically (this is entirely " +
-                "client-side, so it never affects other players in your lobby). Any gust " +
-                "already blowing stops immediately when you turn this on, and none can start " +
-                "again while it stays on. Off by default - no preset ever turns this on " +
-                "automatically. Applies immediately, regardless of apply-changes-live.");
+                "wind, genuinely no wind, ever. HOST-AUTHORITATIVE: if you're not the host, " +
+                "this has no effect at all - only the host's value counts for the whole lobby " +
+                "(same for everyone in the run, no exceptions - see ROADMAP.md's Host " +
+                "authority section). Any gust already blowing stops immediately when the host " +
+                "turns this on, and none can start again while it stays on. Off by default - " +
+                "no preset ever turns this on automatically. Applies immediately, regardless " +
+                "of apply-changes-live.");
 
             WindBackpackAlwaysImmune = config.Bind(
                 "Wind",
                 "backpack-always-immune",
                 true,
                 "Whether backpacks are always fully immune to wind force, regardless of " +
-                "item-force-multiplier/preset. On by default. Turn off to let backpacks be " +
-                "affected by wind like any other ground item. Applies immediately, regardless " +
-                "of apply-changes-live.");
+                "item-force-multiplier/preset. On by default. HOST-AUTHORITATIVE: only the " +
+                "host's value counts for the whole lobby, regardless of what non-host players " +
+                "have set locally. Turn off to let backpacks be affected by wind like any " +
+                "other ground item. Applies immediately, regardless of apply-changes-live.");
 
             WindForceMultiplierOverride = config.Bind(
                 "Wind",
@@ -642,40 +671,83 @@ namespace Fairoots
         /// </summary>
         private bool UseLiveValue => ApplyChangesLive.Value || !_snapshotTaken;
 
-        /// <summary>Game-facing code should read this instead of <see cref="SporeBombCullFraction"/>.</summary>
-        public double EffectiveSporeBombCullFraction => UseLiveValue ? SporeBombCullFraction : _snapCullFraction;
+        /// <summary>
+        /// Game-facing code should read this instead of <see cref="Seed"/>.Value -
+        /// host-authoritative (<see cref="HostAuthority"/>): every client uses
+        /// the HOST's seed, never their own, so the seeded spore-bomb cull is
+        /// guaranteed identical across the whole lobby.
+        /// </summary>
+        public int EffectiveSeed => HostAuthority.Resolve("Seed", Seed.Value);
 
-        /// <summary>Game-facing code should read this instead of <see cref="SporeBombTriggerRadiusMultiplier"/>.</summary>
-        public double EffectiveSporeBombTriggerRadiusMultiplier => UseLiveValue ? SporeBombTriggerRadiusMultiplier : _snapTriggerRadiusMultiplier;
+        /// <summary>Game-facing code should read this instead of <see cref="SporeBombCullFraction"/>. Host-authoritative.</summary>
+        public double EffectiveSporeBombCullFraction =>
+            HostAuthority.Resolve("SporeBombCullFraction", UseLiveValue ? SporeBombCullFraction : _snapCullFraction);
 
-        /// <summary>Game-facing code should read this instead of <see cref="SporeBombKnockbackMultiplier"/>.</summary>
-        public double EffectiveSporeBombKnockbackMultiplier => UseLiveValue ? SporeBombKnockbackMultiplier : _snapKnockbackMultiplier;
+        /// <summary>Game-facing code should read this instead of <see cref="SporeBombTriggerRadiusMultiplier"/>. Host-authoritative.</summary>
+        public double EffectiveSporeBombTriggerRadiusMultiplier =>
+            HostAuthority.Resolve("SporeBombTriggerRadiusMultiplier", UseLiveValue ? SporeBombTriggerRadiusMultiplier : _snapTriggerRadiusMultiplier);
 
-        /// <summary>Game-facing code should read this instead of <see cref="SporeBombScreenshakeRangeCapMeters"/>.</summary>
-        public float EffectiveSporeBombScreenshakeRangeCapMeters => UseLiveValue ? SporeBombScreenshakeRangeCapMeters : _snapScreenshakeRangeCapMeters;
+        /// <summary>Game-facing code should read this instead of <see cref="SporeBombKnockbackMultiplier"/>. Host-authoritative.</summary>
+        public double EffectiveSporeBombKnockbackMultiplier =>
+            HostAuthority.Resolve("SporeBombKnockbackMultiplier", UseLiveValue ? SporeBombKnockbackMultiplier : _snapKnockbackMultiplier);
 
-        /// <summary>Game-facing code should read this instead of <see cref="SporeBombVfxCountMultiplier"/>.</summary>
-        public double EffectiveSporeBombVfxCountMultiplier => UseLiveValue ? SporeBombVfxCountMultiplier : _snapVfxCountMultiplier;
+        /// <summary>Game-facing code should read this instead of <see cref="SporeBombScreenshakeRangeCapMeters"/>. Host-authoritative.</summary>
+        public float EffectiveSporeBombScreenshakeRangeCapMeters =>
+            HostAuthority.Resolve("SporeBombScreenshakeRangeCapMeters", UseLiveValue ? SporeBombScreenshakeRangeCapMeters : _snapScreenshakeRangeCapMeters);
 
-        /// <summary>Game-facing code should read this instead of <see cref="SporeBombMaxTriggerHeightMeters"/>.Value.</summary>
-        public float EffectiveSporeBombMaxTriggerHeightMeters => UseLiveValue ? SporeBombMaxTriggerHeightMeters.Value : _snapMaxTriggerHeightMeters;
+        /// <summary>Game-facing code should read this instead of <see cref="SporeBombVfxCountMultiplier"/>. Host-authoritative.</summary>
+        public double EffectiveSporeBombVfxCountMultiplier =>
+            HostAuthority.Resolve("SporeBombVfxCountMultiplier", UseLiveValue ? SporeBombVfxCountMultiplier : _snapVfxCountMultiplier);
 
-        /// <summary>Game-facing code should read this instead of <see cref="SporeBombSporeAreaRadiusMultiplier"/>.Value.</summary>
-        public double EffectiveSporeBombSporeAreaRadiusMultiplier => UseLiveValue ? SporeBombSporeAreaRadiusMultiplier.Value : _snapSporeAreaRadiusMultiplier;
+        /// <summary>Game-facing code should read this instead of <see cref="SporeBombMaxTriggerHeightMeters"/>.Value. Host-authoritative.</summary>
+        public float EffectiveSporeBombMaxTriggerHeightMeters =>
+            HostAuthority.Resolve("SporeBombMaxTriggerHeightMeters", UseLiveValue ? SporeBombMaxTriggerHeightMeters.Value : _snapMaxTriggerHeightMeters);
 
-        /// <summary>Game-facing code should read this instead of <see cref="WindForceMultiplier"/>.</summary>
-        public double EffectiveWindForceMultiplier => UseLiveValue ? WindForceMultiplier : _snapWindForceMultiplier;
+        /// <summary>Game-facing code should read this instead of <see cref="SporeBombSporeAreaRadiusMultiplier"/>.Value. Host-authoritative.</summary>
+        public double EffectiveSporeBombSporeAreaRadiusMultiplier =>
+            HostAuthority.Resolve("SporeBombSporeAreaRadiusMultiplier", UseLiveValue ? SporeBombSporeAreaRadiusMultiplier.Value : _snapSporeAreaRadiusMultiplier);
 
-        /// <summary>Game-facing code should read this instead of <see cref="WindGustDurationMultiplier"/>.</summary>
-        public double EffectiveWindGustDurationMultiplier => UseLiveValue ? WindGustDurationMultiplier : _snapWindGustDurationMultiplier;
+        /// <summary>Game-facing code should read this instead of <see cref="WindForceMultiplier"/>. Host-authoritative.</summary>
+        public double EffectiveWindForceMultiplier =>
+            HostAuthority.Resolve("WindForceMultiplier", UseLiveValue ? WindForceMultiplier : _snapWindForceMultiplier);
 
-        /// <summary>Game-facing code should read this instead of <see cref="WindItemForceMultiplier"/>.</summary>
-        public double EffectiveWindItemForceMultiplier => UseLiveValue ? WindItemForceMultiplier : _snapWindItemForceMultiplier;
+        /// <summary>Game-facing code should read this instead of <see cref="WindGustDurationMultiplier"/>. Host-authoritative.</summary>
+        public double EffectiveWindGustDurationMultiplier =>
+            HostAuthority.Resolve("WindGustDurationMultiplier", UseLiveValue ? WindGustDurationMultiplier : _snapWindGustDurationMultiplier);
 
-        /// <summary>Game-facing code should read this instead of <see cref="WindObstacleOcclusionRangeMultiplier"/>.</summary>
-        public double EffectiveWindObstacleOcclusionRangeMultiplier => UseLiveValue ? WindObstacleOcclusionRangeMultiplier : _snapWindObstacleOcclusionRangeMultiplier;
+        /// <summary>Game-facing code should read this instead of <see cref="WindItemForceMultiplier"/>. Host-authoritative.</summary>
+        public double EffectiveWindItemForceMultiplier =>
+            HostAuthority.Resolve("WindItemForceMultiplier", UseLiveValue ? WindItemForceMultiplier : _snapWindItemForceMultiplier);
 
-        /// <summary>Game-facing code should read this instead of <see cref="WindFallCameraDampenClamp"/>.</summary>
+        /// <summary>Game-facing code should read this instead of <see cref="WindObstacleOcclusionRangeMultiplier"/>. Host-authoritative.</summary>
+        public double EffectiveWindObstacleOcclusionRangeMultiplier =>
+            HostAuthority.Resolve("WindObstacleOcclusionRangeMultiplier", UseLiveValue ? WindObstacleOcclusionRangeMultiplier : _snapWindObstacleOcclusionRangeMultiplier);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="WindBackpackAlwaysImmune"/>.Value. Host-authoritative -
+        /// flat (not preset/live-snapshot resolved, matching the raw config
+        /// entry itself), but still only the host's value counts.
+        /// </summary>
+        public bool EffectiveWindBackpackAlwaysImmune =>
+            HostAuthority.Resolve("WindBackpackAlwaysImmune", WindBackpackAlwaysImmune.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="DisableWindEntirely"/>.Value. Host-authoritative - if the
+        /// host hasn't disabled wind, an individual client flipping this
+        /// locally has no effect (matches "no client can unilaterally alter
+        /// the game" - see ROADMAP.md).
+        /// </summary>
+        public bool EffectiveDisableWindEntirely =>
+            HostAuthority.Resolve("DisableWindEntirely", DisableWindEntirely.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="WindFallCameraDampenClamp"/>. Deliberately NOT
+        /// host-authoritative - purely local camera-feel/accessibility, doesn't
+        /// affect anyone but the player it's set for (see class remarks).
+        /// </summary>
         public double EffectiveWindFallCameraDampenClamp => UseLiveValue ? WindFallCameraDampenClamp : _snapWindFallCameraDampenClamp;
     }
 }
