@@ -62,11 +62,23 @@ namespace Fairoots.SporeBombs
         private static void ApplyTuning(GameObject spawned)
         {
             double knockbackMultiplier = Plugin.Cfg.EffectiveSporeBombKnockbackMultiplier;
+            double sporeAreaRadiusMultiplier = Plugin.Cfg.EffectiveSporeBombSporeAreaRadiusMultiplier;
             foreach (var aoe in spawned.GetComponentsInChildren<AOE>(true))
             {
                 aoe.knockback = SporeBombExplosionTuning.ScaleKnockback(aoe.knockback, knockbackMultiplier);
                 aoe.itemKnockbackMultiplier =
                     SporeBombExplosionTuning.ScaleKnockback(aoe.itemKnockbackMultiplier, knockbackMultiplier);
+
+                // Runtime-confirmed (2026-07-22 debug probe): the regular Spore Bomb
+                // variants have no StatusEmitter at all - the Spores status is applied
+                // by AOE.statusAmount/statusType, over AOE.range itself (the same
+                // field OverlapSphere uses for the blast). Only rescale range on the
+                // AOE(s) that actually carry the status, so an unrelated pure-knockback
+                // AOE on the same object isn't touched.
+                if (aoe.statusAmount != 0f)
+                {
+                    aoe.range = SporeBombExplosionTuning.ScaleSporeAreaRadius(aoe.range, sporeAreaRadiusMultiplier);
+                }
             }
 
             double vfxMultiplier = Plugin.Cfg.EffectiveSporeBombVfxCountMultiplier;
@@ -86,7 +98,8 @@ namespace Fairoots.SporeBombs
             Diag.V(
                 $"[SporeBombExplosion] tuned detonation @ {spawned.transform.position} " +
                 $"(knockback x{knockbackMultiplier:0.##}, vfx x{vfxMultiplier:0.##}, " +
-                $"shake-cap={(shakeCapMeters <= SporeBombExplosionTuning.NoScreenshakeCap ? "vanilla" : $"{shakeCapMeters:0}m")})");
+                $"shake-cap={(shakeCapMeters <= SporeBombExplosionTuning.NoScreenshakeCap ? "vanilla" : $"{shakeCapMeters:0}m")}, " +
+                $"spore-area-radius x{sporeAreaRadiusMultiplier:0.##})");
         }
     }
 }

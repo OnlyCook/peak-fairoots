@@ -70,6 +70,20 @@ namespace Fairoots.Core
         }
 
         /// <summary>
+        /// Scale a status-carrying spawned AOE's <c>range</c> (which the game
+        /// reuses as both the <c>OverlapSphere</c> radius and the Spores
+        /// status-effect radius - runtime-confirmed 2026-07-22: the "Spore Bomb"/
+        /// "Poison Spore Bomb" detonation prefabs have no <c>StatusEmitter</c> of
+        /// their own, so the temporary spore area is just this same <c>AOE</c>'s
+        /// range) by a preset/override multiplier.
+        /// </summary>
+        public static float ScaleSporeAreaRadius(float vanillaValue, double multiplier)
+        {
+            float scaled = (float)(vanillaValue * multiplier);
+            return scaled < 0f ? 0f : scaled;
+        }
+
+        /// <summary>
         /// True if a player at <paramref name="heightAboveBase"/> meters above a
         /// spore bomb's base should be treated as having jumped over it rather
         /// than actually triggering it - a bug fix for the "Spore Bomb"/"Poison

@@ -67,6 +67,24 @@ namespace Fairoots.Tests
         }
 
         [Fact]
+        public void ScaleSporeAreaRadius_VanillaMultiplier_IsUnchanged()
+        {
+            Assert.Equal(16f, SporeBombExplosionTuning.ScaleSporeAreaRadius(16f, 1.0));
+        }
+
+        [Fact]
+        public void ScaleSporeAreaRadius_AppliesMultiplier()
+        {
+            Assert.Equal(8f, SporeBombExplosionTuning.ScaleSporeAreaRadius(16f, 0.5), 3);
+        }
+
+        [Fact]
+        public void ScaleSporeAreaRadius_ZeroMultiplier_ZerosItOut()
+        {
+            Assert.Equal(0f, SporeBombExplosionTuning.ScaleSporeAreaRadius(16f, 0.0));
+        }
+
+        [Fact]
         public void ShouldSuppressTriggerForHeight_DisabledCutoff_NeverSuppresses()
         {
             Assert.False(SporeBombExplosionTuning.ShouldSuppressTriggerForHeight(heightAboveBase: 100f, maxTriggerHeightMeters: 0f));

@@ -100,6 +100,17 @@ namespace Fairoots
         /// </summary>
         public ConfigEntry<float> SporeBombMaxTriggerHeightMeters { get; }
 
+        /// <summary>
+        /// Multiplier applied to the radius (and proportionally, the inner/outer
+        /// fade) of the temporary spore area a regular "Spore Bomb"/"Poison Spore
+        /// Bomb" creates when triggered - the small AOE that applies the Spores
+        /// status effect, not the "Explosive Spore Bomb" variant, which has no
+        /// spore area of its own. 1.0 = vanilla size. Not currently wired to any
+        /// preset (every preset uses 1.0 as a placeholder) - included so it's
+        /// available to tune later without another round of plumbing.
+        /// </summary>
+        public ConfigEntry<double> SporeBombSporeAreaRadiusMultiplier { get; }
+
         // --- Debug (kept last) --------------------------------------------
         /// <summary>Master switch for verbose diagnostic logging (the whole Debug harness is a no-op unless this is on).</summary>
         public ConfigEntry<bool> EnableDebugLogging { get; }
@@ -237,6 +248,20 @@ namespace Fairoots
                     "cutoff (vanilla behavior).",
                     new AcceptableValueRange<float>(0f, 10f)));
 
+            SporeBombSporeAreaRadiusMultiplier = config.Bind(
+                "Spore-Bombs",
+                "spore-area-radius-multiplier",
+                1.0,
+                new ConfigDescription(
+                    "Multiplier applied to the radius (and proportionally, the inner/outer " +
+                    "fade) of the temporary spore area a regular \"Spore Bomb\"/\"Poison Spore " +
+                    "Bomb\" creates when triggered, e.g. 0.5 halves how far it reaches, 2.0 " +
+                    "doubles it. 1.0 always means vanilla size. Doesn't affect the \"Explosive " +
+                    "Spore Bomb\" variant, which has no spore area. Not currently tied to any " +
+                    "preset - every preset uses 1.0 as a placeholder, so this always applies " +
+                    "regardless of the active preset.",
+                    new AcceptableValueRange<double>(0.0, 5.0)));
+
             // --- Debug section: bound last so it sorts to the bottom of the
             // config file. Everything here is diagnostic-only and off by default.
             EnableDebugLogging = config.Bind(
@@ -360,6 +385,7 @@ namespace Fairoots
         private float _snapScreenshakeRangeCapMeters;
         private double _snapVfxCountMultiplier;
         private float _snapMaxTriggerHeightMeters;
+        private double _snapSporeAreaRadiusMultiplier;
 
         /// <summary>
         /// Freezes every non-Debug resolved setting at its current (live) value.
@@ -375,6 +401,7 @@ namespace Fairoots
             _snapScreenshakeRangeCapMeters = SporeBombScreenshakeRangeCapMeters;
             _snapVfxCountMultiplier = SporeBombVfxCountMultiplier;
             _snapMaxTriggerHeightMeters = SporeBombMaxTriggerHeightMeters.Value;
+            _snapSporeAreaRadiusMultiplier = SporeBombSporeAreaRadiusMultiplier.Value;
             _snapshotTaken = true;
         }
 
@@ -402,5 +429,8 @@ namespace Fairoots
 
         /// <summary>Game-facing code should read this instead of <see cref="SporeBombMaxTriggerHeightMeters"/>.Value.</summary>
         public float EffectiveSporeBombMaxTriggerHeightMeters => UseLiveValue ? SporeBombMaxTriggerHeightMeters.Value : _snapMaxTriggerHeightMeters;
+
+        /// <summary>Game-facing code should read this instead of <see cref="SporeBombSporeAreaRadiusMultiplier"/>.Value.</summary>
+        public double EffectiveSporeBombSporeAreaRadiusMultiplier => UseLiveValue ? SporeBombSporeAreaRadiusMultiplier.Value : _snapSporeAreaRadiusMultiplier;
     }
 }
