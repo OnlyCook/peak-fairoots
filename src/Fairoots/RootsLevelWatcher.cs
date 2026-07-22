@@ -57,9 +57,35 @@ namespace Fairoots
         /// </summary>
         private static Transform _processed;
 
+        /// <summary>
+        /// Whether the last-processed Roots Segment is still believed loaded -
+        /// tracked separately from <see cref="_processed"/> itself because a
+        /// destroyed <see cref="Transform"/> compares equal to Unity's overridden
+        /// `null` (so <c>_processed != null</c> alone can't distinguish "never
+        /// processed anything" from "processed one, and it's since been torn
+        /// down"). Needed so leaving the biome (deactivation *or* destruction, e.g.
+        /// returning to the main menu) is detected as a real transition and not
+        /// just silently falls through to "nothing to do".
+        /// </summary>
+        private static bool _levelLoaded;
+
         internal static void CheckAndRun()
         {
-            if (_processed != null && _processed.gameObject.activeInHierarchy)
+            bool currentlyActive = _processed != null && _processed.gameObject.activeInHierarchy;
+
+            if (_levelLoaded && !currentlyActive)
+            {
+                // The Roots Segment we processed is gone (deactivated or
+                // destroyed) - drop the per-level debug-overlay state with it, or
+                // the "removed spore bomb" markers would keep drawing at stale
+                // world positions in the main menu / next non-Roots biome.
+                _levelLoaded = false;
+                _processed = null;
+                SporeBombCullPatch.RemovedPositions.Clear();
+                SporeBombCullPatch.KeptTriggerColliders.Clear();
+            }
+
+            if (currentlyActive)
             {
                 return;
             }
@@ -78,6 +104,7 @@ namespace Fairoots
             }
 
             _processed = found.transform;
+            _levelLoaded = true;
             Plugin.Cfg.CaptureLevelSnapshot();
             SporeBombCullPatch.Run(found.transform);
 
