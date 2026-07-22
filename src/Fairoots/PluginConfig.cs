@@ -111,6 +111,95 @@ namespace Fairoots
         /// </summary>
         public ConfigEntry<double> SporeBombSporeAreaRadiusMultiplier { get; }
 
+        // --- Wind -----------------------------------------------------------
+        /// <summary>
+        /// Master kill switch for the entire wind mechanic. When on, wind
+        /// should never occur at all - not "vanilla-strength wind," genuinely
+        /// no wind (clarified 2026-07-22: an earlier version only reverted the
+        /// force/duration/item/occlusion scaling to vanilla numbers, which
+        /// still let vanilla wind gusts happen; that was wrong). Achieved by
+        /// forcing <c>WindChillZone.RPCA_ToggleWind</c>'s incoming "turn wind
+        /// on" signal to false (see <c>WindToggleSuppressionPatch</c>) so this
+        /// client's zone can never go active again, plus forcing
+        /// <c>windActive</c> off immediately for a gust already in progress the
+        /// instant this is flipped on. Off by default; no preset ever sets this
+        /// to true - it's a manual-only override for players who want zero
+        /// wind, full stop. Not folded through the preset/override system
+        /// (deliberately flat, like <see cref="KeepVanillaTriggerRadius"/>) and
+        /// always applies immediately regardless of <see cref="ApplyChangesLive"/>,
+        /// since a safety switch like this should never wait for a level reload.
+        /// </summary>
+        public ConfigEntry<bool> DisableWindEntirely { get; }
+
+        /// <summary>
+        /// Whether backpacks are always fully immune to wind force, regardless
+        /// of <see cref="WindItemForceMultiplierOverride"/>/preset. On by
+        /// default (ROADMAP.md's "backpack only" is the minimum immunity level
+        /// on every preset) - turn off if you want backpacks affected by wind
+        /// like any other ground item (scaled by the same item-force
+        /// multiplier as everything else). Not folded through the preset/
+        /// override system (deliberately flat) - a player override on top of
+        /// whatever preset is active, and always applies immediately regardless
+        /// of <see cref="ApplyChangesLive"/>, same reasoning as
+        /// <see cref="DisableWindEntirely"/>.
+        /// </summary>
+        public ConfigEntry<bool> WindBackpackAlwaysImmune { get; }
+
+        /// <summary>
+        /// Custom-preset value for the multiplier applied to
+        /// <c>WindChillZone.windForce</c> only. Split from gust duration/frequency
+        /// (<see cref="WindGustDurationMultiplierOverride"/>) on 2026-07-22 so
+        /// each can be tuned independently. Only takes effect under
+        /// <see cref="PresetId.Custom"/>; see <see cref="SporeBombCullFractionOverride"/>.
+        /// </summary>
+        public ConfigEntry<double> WindForceMultiplierOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for the multiplier applied to gust duration
+        /// (<c>windTimeRangeOn</c>) and, inversely, the calm period between
+        /// gusts (<c>windTimeRangeOff</c> - see
+        /// <see cref="Core.WindTuning.ScaleWindRestDuration"/>). Independent of
+        /// <see cref="WindForceMultiplierOverride"/> - lets you test gust
+        /// timing without changing push strength, and vice versa. Only takes
+        /// effect under <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
+        /// </summary>
+        public ConfigEntry<double> WindGustDurationMultiplierOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for the multiplier applied to non-backpack ground
+        /// items' wind force (backpacks are always fully immune, regardless of
+        /// this value). Only takes effect under <see cref="PresetId.Custom"/>;
+        /// see <see cref="SporeBombCullFractionOverride"/>.
+        /// </summary>
+        public ConfigEntry<double> WindItemForceMultiplierOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for the multiplier applied to the existing
+        /// obstacle-occlusion raycast's min/max distance (already enabled in
+        /// Roots - see <see cref="Core.WindTuning.ScaleRaycastDistance"/>). Only
+        /// takes effect under <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
+        /// </summary>
+        public ConfigEntry<double> WindObstacleOcclusionRangeMultiplierOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for the camera-control floor applied while a fall
+        /// is wind-preceded (0 = off). Only takes effect under
+        /// <see cref="PresetId.Custom"/>; see <see cref="SporeBombCullFractionOverride"/>.
+        /// </summary>
+        public ConfigEntry<double> WindFallCameraDampenClampOverride { get; }
+
+        /// <summary>
+        /// How many seconds after wind force was last applied to the local
+        /// character that a subsequent fall still counts as "wind-preceded" for
+        /// the camera-dampening clamp above. Flat setting (not folded through the
+        /// preset/override system), same reasoning as
+        /// <see cref="SporeBombMaxTriggerHeightMeters"/> - it's a timing window,
+        /// not a balance dial that scales per preset.
+        /// </summary>
+        public ConfigEntry<float> WindRecentForceWindowSeconds { get; }
+
         // --- Debug (kept last) --------------------------------------------
         /// <summary>Master switch for verbose diagnostic logging (the whole Debug harness is a no-op unless this is on).</summary>
         public ConfigEntry<bool> EnableDebugLogging { get; }
@@ -262,6 +351,102 @@ namespace Fairoots
                     "regardless of the active preset.",
                     new AcceptableValueRange<double>(0.0, 5.0)));
 
+            DisableWindEntirely = config.Bind(
+                "Wind",
+                "disable-wind-entirely",
+                false,
+                "Master switch: when on, wind should NEVER occur at all - not vanilla-strength " +
+                "wind, genuinely no wind, ever, for you specifically (this is entirely " +
+                "client-side, so it never affects other players in your lobby). Any gust " +
+                "already blowing stops immediately when you turn this on, and none can start " +
+                "again while it stays on. Off by default - no preset ever turns this on " +
+                "automatically. Applies immediately, regardless of apply-changes-live.");
+
+            WindBackpackAlwaysImmune = config.Bind(
+                "Wind",
+                "backpack-always-immune",
+                true,
+                "Whether backpacks are always fully immune to wind force, regardless of " +
+                "item-force-multiplier/preset. On by default. Turn off to let backpacks be " +
+                "affected by wind like any other ground item. Applies immediately, regardless " +
+                "of apply-changes-live.");
+
+            WindForceMultiplierOverride = config.Bind(
+                "Wind",
+                "force-multiplier",
+                0.80,
+                new ConfigDescription(
+                    "Multiplier applied to wind's push force only (see " +
+                    "gust-duration-multiplier below for timing), e.g. 0.6 cuts it to 60% of " +
+                    "vanilla, 2.0 doubles it, 0 means no push at all. 1.0 always means vanilla " +
+                    "force, no matter what else you change. Only takes effect when preset is " +
+                    "set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 3.0)));
+
+            WindGustDurationMultiplierOverride = config.Bind(
+                "Wind",
+                "gust-duration-multiplier",
+                0.80,
+                new ConfigDescription(
+                    "Multiplier applied to how long a gust lasts once it starts (in the same " +
+                    "direction, the calm period between gusts scales inversely) - independent " +
+                    "of force-multiplier above, so you can test gust timing/frequency without " +
+                    "changing push strength. E.g. 0.6 makes gusts noticeably shorter and less " +
+                    "frequent. 1.0 always means vanilla timing. Gust duration is always floored " +
+                    "at 1 second regardless of how low this goes - a genuinely zero-length gust " +
+                    "breaks the game's own wind on/off timer (confirmed live 2026-07-22). Only " +
+                    "takes effect when preset is set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 3.0)));
+
+            WindItemForceMultiplierOverride = config.Bind(
+                "Wind",
+                "item-force-multiplier",
+                0.70,
+                new ConfigDescription(
+                    "Multiplier applied to wind's push force on dropped items other than " +
+                    "backpacks (backpacks are always fully immune to wind, on every preset), " +
+                    "e.g. 0.4 cuts it to 40% of vanilla, 0.0 makes every item fully immune too. " +
+                    "1.0 always means vanilla force. Only takes effect when preset is set to " +
+                    "Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 3.0)));
+
+            WindObstacleOcclusionRangeMultiplierOverride = config.Bind(
+                "Wind",
+                "obstacle-occlusion-range-multiplier",
+                1.30,
+                new ConfigDescription(
+                    "Multiplier applied to the existing obstacle-occlusion raycast's min/max " +
+                    "distance (already enabled in Roots vanilla) - widening it lets standing " +
+                    "behind an obstacle block wind from further away, e.g. 1.6 widens both " +
+                    "distances by 60%. 1.0 always means vanilla range. Only takes effect when " +
+                    "preset is set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.5, 4.0)));
+
+            WindFallCameraDampenClampOverride = config.Bind(
+                "Wind",
+                "fall-camera-dampen-clamp",
+                0.35,
+                new ConfigDescription(
+                    "Floor applied to camera-control while falling, but only when the fall " +
+                    "was preceded by recent wind force (see fall-camera-dampen-window-seconds " +
+                    "below) - keeps the camera partially player-controlled instead of fully " +
+                    "surrendering to ragdoll-head physics, so you have a chance to grab a wall " +
+                    "or use a Rescue Hook after wind blows you off a ledge. 0 disables it " +
+                    "(vanilla - full ragdoll camera on every fall). An ordinary fall that " +
+                    "wasn't wind-preceded is never affected. Only takes effect when preset is " +
+                    "set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 1.0)));
+
+            WindRecentForceWindowSeconds = config.Bind(
+                "Wind",
+                "fall-camera-dampen-window-seconds",
+                1.5f,
+                new ConfigDescription(
+                    "How many seconds after wind last pushed you that a fall still counts as " +
+                    "wind-preceded for fall-camera-dampen-clamp above. Not tied to any preset - " +
+                    "applies the same regardless of which preset is active.",
+                    new AcceptableValueRange<float>(0.1f, 5f)));
+
             // --- Debug section: bound last so it sorts to the bottom of the
             // config file. Everything here is diagnostic-only and off by default.
             EnableDebugLogging = config.Bind(
@@ -371,6 +556,41 @@ namespace Fairoots
                 SporeBombVfxCountMultiplierOverride.Value,
                 UseCustomOverrides);
 
+        /// <summary>The effective wind-force (and gust-timing) multiplier.</summary>
+        public double WindForceMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.WindForceMultiplier(Preset.Value),
+                WindForceMultiplierOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>The effective gust-duration/frequency multiplier (independent of <see cref="WindForceMultiplier"/>).</summary>
+        public double WindGustDurationMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.WindGustDurationMultiplier(Preset.Value),
+                WindGustDurationMultiplierOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>The effective non-backpack item wind-force multiplier.</summary>
+        public double WindItemForceMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.WindItemForceMultiplier(Preset.Value),
+                WindItemForceMultiplierOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>The effective obstacle-occlusion raycast-distance multiplier.</summary>
+        public double WindObstacleOcclusionRangeMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.WindObstacleOcclusionRangeMultiplier(Preset.Value),
+                WindObstacleOcclusionRangeMultiplierOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>The effective wind-preceded-fall camera-control floor (0 = off).</summary>
+        public double WindFallCameraDampenClamp =>
+            OverrideResolution.Resolve(
+                PresetCatalog.WindFallCameraDampenClamp(Preset.Value),
+                WindFallCameraDampenClampOverride.Value,
+                UseCustomOverrides);
+
         // --- Level-load snapshot (ApplyChangesLive == false) --------------
         // Captured once per Roots level load (RootsLevelWatcher, right before
         // SporeBombCullPatch.Run) so game-facing code has a single, consistent
@@ -386,6 +606,11 @@ namespace Fairoots
         private double _snapVfxCountMultiplier;
         private float _snapMaxTriggerHeightMeters;
         private double _snapSporeAreaRadiusMultiplier;
+        private double _snapWindForceMultiplier;
+        private double _snapWindGustDurationMultiplier;
+        private double _snapWindItemForceMultiplier;
+        private double _snapWindObstacleOcclusionRangeMultiplier;
+        private double _snapWindFallCameraDampenClamp;
 
         /// <summary>
         /// Freezes every non-Debug resolved setting at its current (live) value.
@@ -402,6 +627,11 @@ namespace Fairoots
             _snapVfxCountMultiplier = SporeBombVfxCountMultiplier;
             _snapMaxTriggerHeightMeters = SporeBombMaxTriggerHeightMeters.Value;
             _snapSporeAreaRadiusMultiplier = SporeBombSporeAreaRadiusMultiplier.Value;
+            _snapWindForceMultiplier = WindForceMultiplier;
+            _snapWindGustDurationMultiplier = WindGustDurationMultiplier;
+            _snapWindItemForceMultiplier = WindItemForceMultiplier;
+            _snapWindObstacleOcclusionRangeMultiplier = WindObstacleOcclusionRangeMultiplier;
+            _snapWindFallCameraDampenClamp = WindFallCameraDampenClamp;
             _snapshotTaken = true;
         }
 
@@ -432,5 +662,20 @@ namespace Fairoots
 
         /// <summary>Game-facing code should read this instead of <see cref="SporeBombSporeAreaRadiusMultiplier"/>.Value.</summary>
         public double EffectiveSporeBombSporeAreaRadiusMultiplier => UseLiveValue ? SporeBombSporeAreaRadiusMultiplier.Value : _snapSporeAreaRadiusMultiplier;
+
+        /// <summary>Game-facing code should read this instead of <see cref="WindForceMultiplier"/>.</summary>
+        public double EffectiveWindForceMultiplier => UseLiveValue ? WindForceMultiplier : _snapWindForceMultiplier;
+
+        /// <summary>Game-facing code should read this instead of <see cref="WindGustDurationMultiplier"/>.</summary>
+        public double EffectiveWindGustDurationMultiplier => UseLiveValue ? WindGustDurationMultiplier : _snapWindGustDurationMultiplier;
+
+        /// <summary>Game-facing code should read this instead of <see cref="WindItemForceMultiplier"/>.</summary>
+        public double EffectiveWindItemForceMultiplier => UseLiveValue ? WindItemForceMultiplier : _snapWindItemForceMultiplier;
+
+        /// <summary>Game-facing code should read this instead of <see cref="WindObstacleOcclusionRangeMultiplier"/>.</summary>
+        public double EffectiveWindObstacleOcclusionRangeMultiplier => UseLiveValue ? WindObstacleOcclusionRangeMultiplier : _snapWindObstacleOcclusionRangeMultiplier;
+
+        /// <summary>Game-facing code should read this instead of <see cref="WindFallCameraDampenClamp"/>.</summary>
+        public double EffectiveWindFallCameraDampenClamp => UseLiveValue ? WindFallCameraDampenClamp : _snapWindFallCameraDampenClamp;
     }
 }

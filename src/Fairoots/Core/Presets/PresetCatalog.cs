@@ -135,10 +135,128 @@ namespace Fairoots.Core.Presets
         /// </summary>
         public static bool SporeBombFoliageRemoval(PresetId preset) => true;
 
-        /// <summary>Climb-to-counter-wind counterplay mechanic - on for all presets.</summary>
+        /// <summary>
+        /// Climb-to-counter-wind counterplay mechanic - on for all presets.
+        /// Runtime-confirmed (2026-07-22 decompile pass, RESEARCH.md Q6):
+        /// <c>WindChillZone.AddWindForceToCharacter</c> already returns
+        /// immediately whenever <c>character.data.currentClimbHandle != null</c>
+        /// (i.e. the player is actively gripping a climb handle) - wind force is
+        /// already fully suppressed while climbing/hanging in vanilla, and
+        /// <c>ApplyStatus</c> already raises <c>climbingStamMinimumMultiplier</c>
+        /// (the stamina cost) during wind regardless. This mechanic is therefore
+        /// tune-not-build, like the spore-area wind-dispersal feature turned out
+        /// to be - there's nothing to patch, this flag exists purely so the
+        /// preset table has a row to point at confirming the behavior stays on.
+        /// </summary>
         public static bool ClimbToCounterWind(PresetId preset) => true;
 
         /// <summary>Cover-mouth-vs-spore-areas counterplay mechanic - on for all presets.</summary>
         public static bool CoverMouth(PresetId preset) => true;
+
+        /// <summary>
+        /// Multiplier applied to <c>WindChillZone.windForce</c> and, in the same
+        /// direction, <c>windTimeRangeOn</c>'s duration - see
+        /// <see cref="WindGustDurationMultiplier"/>, a separate dial (split out
+        /// 2026-07-22 at the maintainer's request for independent testing -
+        /// ROADMAP.md's preset table still lists them as one combined "Wind
+        /// force / frequency" row since both use the same numbers per preset
+        /// below, but they're two independent config entries/patches now, not
+        /// one shared multiplier). 1.0 = vanilla (Subtle).
+        /// </summary>
+        public static double WindForceMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 0.90;
+                case PresetId.Balanced: return 0.80;
+                case PresetId.Generous: return 0.60;
+                case PresetId.Tame: return 0.35;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
+        /// Multiplier applied to <c>windTimeRangeOn</c>'s duration (with
+        /// <c>windTimeRangeOff</c> scaled inversely - see
+        /// <see cref="WindTuning.ScaleWindRestDuration"/>), per ROADMAP.md's
+        /// combined "Wind force / frequency" row (-10%/-20%/-40%/-65%) - kept
+        /// as the same numbers as <see cref="WindForceMultiplier"/> per preset
+        /// so presets 1-4 behave identically to before the split, but resolved
+        /// independently so Custom can tune gust duration/frequency without
+        /// also changing push strength (and vice versa). 1.0 = vanilla (Subtle).
+        /// </summary>
+        public static double WindGustDurationMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 0.90;
+                case PresetId.Balanced: return 0.80;
+                case PresetId.Generous: return 0.60;
+                case PresetId.Tame: return 0.35;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
+        /// Multiplier applied to <c>WindChillZone.windItemFactor</c> for every
+        /// non-backpack ground item (backpacks are always fully immune - see
+        /// <see cref="ClimbToCounterWind"/>'s sibling remark on
+        /// <c>WindChillZoneTuningPatch</c>), per ROADMAP.md's "Wind:
+        /// items/backpack immunity" row: Subtle leaves other items untouched,
+        /// Balanced/Generous progressively reduce it, Tame makes every item
+        /// (including backpacks) fully immune.
+        /// </summary>
+        public static double WindItemForceMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.70;
+                case PresetId.Generous: return 0.40;
+                case PresetId.Tame: return 0.00;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
+        /// Multiplier applied to <c>WindChillZone.minRaycastDistance</c>/
+        /// <c>maxRaycastDistance</c>, per ROADMAP.md's "Wind: obstacle occlusion"
+        /// row. Runtime-confirmed (roots-runtime-findings memory) the raycast is
+        /// already enabled in Roots (<c>useRaycast=true</c>, vanilla min=4/max=5) -
+        /// this is a tune-not-build lever widening how far the occlusion check
+        /// reaches, not a toggle. 1.0 = vanilla (Subtle).
+        /// </summary>
+        public static double WindObstacleOcclusionRangeMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 1.30;
+                case PresetId.Generous: return 1.60;
+                case PresetId.Tame: return 2.00;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
+        /// Floor value for <c>CharacterData.GetTargetRagdollControll()</c> while a
+        /// fall is wind-preceded (see <see cref="WindTuning.IsWindForceStillRecent"/>),
+        /// per ROADMAP.md's "Wind-induced fall camera spin dampening" row and the
+        /// maintainer's scoping decision (2026-07-22): dampen only wind-preceded
+        /// falls, not every fall, since an ordinary fall is the player's own doing
+        /// but a wind-off-a-ledge fall is close to pure bad luck. 0 = off (Subtle -
+        /// vanilla, no clamp).
+        /// </summary>
+        public static double WindFallCameraDampenClamp(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 0.00;
+                case PresetId.Balanced: return 0.35;
+                case PresetId.Generous: return 0.55;
+                case PresetId.Tame: return 0.75;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
     }
 }

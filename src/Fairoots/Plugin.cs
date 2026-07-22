@@ -1,6 +1,8 @@
+using System;
 using BepInEx;
 using Fairoots.Diagnostics;
 using Fairoots.SporeBombs;
+using Fairoots.Wind;
 using HarmonyLib;
 using UnityEngine;
 
@@ -57,8 +59,29 @@ namespace Fairoots
             };
             Cfg.Preset.SettingChanged += (s, e) =>
             {
-                if (Cfg.ApplyChangesLive.Value) SporeBombCullPatch.ReapplyTriggerRadiusToAll();
+                if (Cfg.ApplyChangesLive.Value)
+                {
+                    SporeBombCullPatch.ReapplyTriggerRadiusToAll();
+                    WindChillZoneTuningPatch.ReapplyAll();
+                }
             };
+
+            // Same "reapply immediately on a live config change" treatment as the
+            // spore-bomb trigger-radius settings above - a level-load-only refresh
+            // would leave wind mid-storm at whatever the previous config said.
+            EventHandler reapplyWindTuning = (s, e) =>
+            {
+                if (Cfg.ApplyChangesLive.Value) WindChillZoneTuningPatch.ReapplyAll();
+            };
+            Cfg.WindForceMultiplierOverride.SettingChanged += reapplyWindTuning;
+            Cfg.WindGustDurationMultiplierOverride.SettingChanged += reapplyWindTuning;
+            Cfg.WindItemForceMultiplierOverride.SettingChanged += reapplyWindTuning;
+            Cfg.WindObstacleOcclusionRangeMultiplierOverride.SettingChanged += reapplyWindTuning;
+
+            // Master kill switch - always reapplies immediately regardless of
+            // ApplyChangesLive (see its own remarks), same treatment as
+            // KeepVanillaTriggerRadius above.
+            Cfg.DisableWindEntirely.SettingChanged += (s, e) => WindChillZoneTuningPatch.ReapplyAll();
 
             Logger.LogInfo(
                 $"{PluginInfo.Name} {PluginInfo.Version} loaded. " +

@@ -5,8 +5,9 @@ same way `peak-sense-of-direction/CODEBASE.md` and `peak-checkpoint-save`'s
 structure do, so a reader can find where a given mechanic lives without
 re-scanning the whole tree.
 
-**Phase 2 (seed/preset core) and Phase 4 (spore bombs) are in.** Wind, spore
-areas, and creatures are not written yet; see `ROADMAP.md`'s phased plan.
+**Phase 2 (seed/preset core), Phase 4 (spore bombs), and Phase 5 (wind) are
+in.** Spore areas and creatures are not written yet; see `ROADMAP.md`'s phased
+plan.
 
 ## The Core / game-facing split (read this first)
 
@@ -129,6 +130,87 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       always use their own catalog numbers, ignoring the player's config
       entirely; Custom (5) always uses the player's configured value (0
       included). No sentinel/"unset" value to track.
+    - `WindTuning.cs` — pure arithmetic for wind force/gust-duration scaling,
+      non-backpack item-force scaling, and obstacle-occlusion raycast-distance
+      scaling (not seed-gated, same reasoning as `SporeBombExplosionTuning`),
+      plus the wind-preceded-fall camera-dampening decision
+      (`IsWindForceStillRecent` + `ApplyFallCameraDampening`) — the
+      maintainer's scoping call (ROADMAP.md "Open questions"): dampen only
+      falls preceded by recent wind force, not every Roots fall. Deliberately
+      does **not** include fog-density scaling — reverted as a precaution
+      (the actual density/opacity relationship lives in shader code this mod
+      has no way to decompile or verify, so scaling
+      `FogConfig.windFogDensity`/`WindFogTextureDensity` from decompiled-C#-
+      only assumptions isn't safe), even though it later turned out not to be
+      the cause of a live-reported "screen turns solid black" bug — that was
+      actually `ScaleWindActiveDuration` letting the scaled gust duration
+      collapse to zero at a low force multiplier, which broke the *native*
+      wind on/off timer and kept re-triggering the game's own (untouched)
+      fog/storm-blend logic faster than it could decay. Fixed via
+      `MinWindActiveDurationSeconds` — see the file's remarks and
+      `ROADMAP.md`'s "Wind: fog-while-active density" row.
+- **`Wind/`** — the Phase 5 Harmony patches (game-facing, calls into `Core/`
+  for every number):
+  - `WindChillZoneTuningPatch.cs` — on `WindChillZone.Awake`, captures each
+    instance's vanilla field values (`windForce`, `windTimeRangeOn/Off`,
+    `windItemFactor`, `minRaycastDistance`/`maxRaycastDistance`) once, keyed by
+    instance ID, then scales and re-applies them from that cached baseline
+    (never from the field's current, possibly-already-scaled value) — same
+    pattern as `SporeBombCullPatch`'s trigger-radius baseline. `windForce`
+    and `windTimeRangeOn/Off` are scaled by two *independent* multipliers
+    (`force-multiplier` / `gust-duration-multiplier` — split 2026-07-22 at
+    the maintainer's request, so push strength and gust timing/frequency can
+    be tested separately instead of always moving together) even though
+    presets 1-4 still use the same number for both, matching the original
+    combined ROADMAP.md row. `ReapplyAll()` re-applies to every loaded
+    instance on a live config change. **Note:** `windForce` and
+    `windItemFactor` multiply together in the *native* `AddWindForceToItem`
+    formula — if `force-multiplier` is at/near 0, items get zero force
+    regardless of `item-force-multiplier`, which looked like a scaling bug
+    when live-tested (2026-07-22) but is actually how vanilla's own formula
+    always worked; not something this mod can or should decouple further,
+    since force genuinely needs to be a shared base magnitude for both
+    characters and items. A second patch in the same file,
+    `WindBackpackImmunityPatch`, prefixes `AddWindForceToItem` to skip
+    `Backpack` instances entirely — `windItemFactor` alone can't single out
+    one item type since it applies to every ground item alike. On by default
+    on every preset, but now player-toggleable via the flat (non-preset-gated)
+    `Wind/backpack-always-immune` setting requested 2026-07-22.
+  - **`Wind/disable-wind-entirely`** (flat, non-preset-gated, off by default):
+    a master kill switch meaning "wind never happens at all," not just
+    "vanilla-strength wind" (clarified 2026-07-22 — an earlier version only
+    reverted the scaling patches to vanilla numbers, which still let vanilla
+    gusts occur). Two parts: `WindToggleSuppressionPatch` (in the same file
+    as `WindChillZoneTuningPatch`) prefixes `WindChillZone.RPCA_ToggleWind`
+    and forces its incoming `set` parameter to `false` whenever the switch is
+    on, so this client's own zone instance can never go active again —
+    purely client-side (RPCA_ToggleWind is a Photon RPC driven by the host's
+    randomized storm timer, but suppressing it locally doesn't need host
+    cooperation or touch other clients, matching this mod's usual
+    client-side-only architecture); and `WindChillZoneTuningPatch.Apply`
+    additionally forces `windActive = false` immediately, for a gust already
+    in progress the instant the switch is flipped. `WindBackpackImmunityPatch.Prefix`
+    and both patches in `WindFallCameraDampingPatch.cs` also check the switch
+    and no-op entirely while it's on. Wired to reapply immediately in
+    `Plugin.cs`, bypassing `ApplyChangesLive` (same treatment as
+    `KeepVanillaTriggerRadius`).
+  - `WindFallCameraDampingPatch.cs` — two cooperating patches, both scoped to
+    `Character.localCharacter` only (a camera-feel effect, not networked
+    physics): `WindRecentForceTrackerPatch` records a timestamp on
+    `WindChillZone.AddWindForceToCharacter`'s postfix (re-deriving the
+    original method's own early-return checks, since a postfix always fires
+    even when the original bailed out without applying force); the actual
+    dampening patches `CharacterData.GetTargetRagdollControll()` (the method
+    RESEARCH.md Q6 traced as the source of the "0 the instant any fall
+    starts" camera-spin mechanism), raising its floor only when the fall is
+    within the configured recency window of a real wind-force application.
+  - **Note (runtime-confirmed, no patch needed):** the ROADMAP "climb to
+    counter wind" mechanic already exists natively —
+    `WindChillZone.AddWindForceToCharacter` returns immediately whenever
+    `character.data.currentClimbHandle != null` (actively gripping a climb
+    handle), and `ApplyStatus` already raises climbing stamina cost during
+    wind regardless. See `Core/Presets/PresetCatalog.cs`'s
+    `ClimbToCounterWind` remarks.
 - `tests/Fairoots.Tests/` — xUnit project. Links `src/Fairoots/Core/**/*.cs`
   directly (no game/BepInEx dependency, runs anywhere). One test file per Core
   area; see `docs/TESTING.md` for what each covers.
@@ -139,9 +221,9 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
 
 ## Planned structure (fills in as phases land — see ROADMAP.md)
 
-`SporeBombs/` (above) is the first mechanic-group folder; expect one more per
-remaining mechanic group, mirroring `OVERVIEW.md`'s sections: `Wind/`,
-`SporeAreas/`, `Creatures/` — each holding the Harmony patches that scan the
-scene and apply removals/tweaks, delegating every seeded decision to `Core/`.
-New per-mechanic preset values land in `Core/Presets/PresetCatalog.cs` as each
-phase is implemented.
+`SporeBombs/` and `Wind/` (above) are the first two mechanic-group folders;
+expect one more per remaining mechanic group, mirroring `OVERVIEW.md`'s
+sections: `SporeAreas/`, `Creatures/` — each holding the Harmony patches that
+scan the scene and apply removals/tweaks, delegating every seeded decision to
+`Core/`. New per-mechanic preset values land in `Core/Presets/PresetCatalog.cs`
+as each phase is implemented.

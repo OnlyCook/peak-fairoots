@@ -102,10 +102,10 @@ once and left alone).
 |---|---|---|---|---|
 | New: climb-to-counter-wind | ✅ on | ✅ on | ✅ on | ✅ on |
 | New: cover-mouth vs. spore areas | ✅ on | ✅ on | ✅ on | ✅ on |
-| Wind force / frequency | −10% | −20% | −40% | −65% |
-| Wind: items/backpack immunity | backpack only | backpack + reduced item force | backpack immune, items −60% | backpack + items fully immune |
+| Wind force / frequency (two independent config entries as of 2026-07-22 — `force-multiplier` and `gust-duration-multiplier` — but the same numbers per preset below, so presets 1-4 behave identically to the original combined row) | −10% | −20% | −40% | −65% |
+| Wind: items/backpack immunity (backpack immunity itself is now player-toggleable via the flat `Wind/backpack-always-immune` setting, added 2026-07-22 — on by default on every preset, as below) | backpack only | backpack + reduced item force | backpack immune, items −60% | backpack + items fully immune |
 | Wind: obstacle occlusion | off (vanilla) | on, coarse | on, tuned | on, generous radius |
-| Wind: fog-while-active density | vanilla | −25% | −50% | −80% |
+| Wind: fog-while-active density | vanilla | vanilla (reverted — see note) | vanilla (reverted — see note) | vanilla (reverted — see note) |
 | Wind-induced fall camera spin dampening (new — see below) | off | on, mild clamp | on, moderate clamp | on, strong clamp |
 | Spore bomb total removal target (bush/grass removal + seeded cull, combined — see below) | 0% seeded on top of bush removal | 25% | 50% (OVERVIEW's literal ask) | 75% |
 | Spore bomb bush/grass placement removal | ✅ on, all presets (see below) | ✅ on | ✅ on | ✅ on |
@@ -325,10 +325,35 @@ other PEAK mods already use.
    all presets), seeded cull rate budgeted against it (the mechanic the seed
    system primarily exists for), trigger radius, knockback, screenshake
    range, particle count.
-5. **Phase 5:** Wind — force/frequency scaling, backpack/item immunity,
-   obstacle occlusion tuning, fog scaling, the new climb-to-counter-wind
-   mechanic, and the wind-induced-fall camera spin dampening (scoping
-   decision needed first — see "Open questions").
+5. **Phase 5 (done, fog scaling reverted):** Wind — force/frequency scaling,
+   backpack/item immunity, obstacle occlusion tuning, and the wind-induced-
+   fall camera spin dampening (scoped to wind-preceded falls only, per the
+   maintainer's decision below). The climb-to-counter-wind mechanic turned
+   out to already exist natively (`WindChillZone.AddWindForceToCharacter`
+   already fully suppresses wind force while actively gripping a climb
+   handle) — tune-not-build, no patch needed; see `CODEBASE.md`'s `Wind/`
+   section. **Fog-while-active density scaling was implemented and reverted
+   as a precaution (2026-07-22):** scaling `FogConfig.windFogDensity`/
+   `WindFogTextureDensity` relies on decompiled-C#-only assumptions about
+   what those shader globals actually mean, with no way to verify against
+   the real shader code — so it was pulled rather than left in place on a
+   guess, even though it later turned out *not* to be the cause of the
+   "screen turns solid black" bug reported at the time (that turned out to
+   be a separate, now-fixed issue: scaling `windTimeRangeOn` down to a
+   genuinely zero-length gust broke the *native* wind on/off timer, which
+   in turn kept re-triggering the game's own fog/storm-blend logic faster
+   than it could ever decay — see `Core/WindTuning.cs`'s
+   `MinWindActiveDurationSeconds` remarks). This row stays untouched
+   (vanilla) until/unless the fog shader semantics can be confirmed some
+   other way (e.g. AssetRipper pulling the actual shader graph). See
+   `docs/TESTING.md`'s wind test section. **Two follow-up settings added
+   2026-07-22 at the maintainer's request:** `Wind/force-multiplier` and
+   `Wind/gust-duration-multiplier` are now independent config entries (were
+   one shared multiplier at first) so push strength and gust timing/
+   frequency can be tuned separately; and a flat, non-preset-gated
+   `Wind/disable-wind-entirely` master switch (off by default, never enabled by
+   any preset) fully reverts the entire wind mechanic to vanilla for players
+   who don't want it at all.
 6. **Phase 6:** Spore Areas — radius/lethality/opacity scaling, wind
    interaction, the new cover-mouth mechanic.
 7. **Phase 7:** Creatures — zombie deaggro (new logic), zombie/beetle speed
@@ -368,11 +393,14 @@ AssetRipper, not more decompilation). At the design level, still undecided:
   exposed as a standalone toggle independent of presets, given it overlaps
   with the game's own pre-existing (cosmetic-only) `ZombiePhobiaSetting`
   accessibility option.
-- **Wind-induced fall camera-spin dampening scope** (see "Presets" above):
-  dampen for every fall while in Roots (simpler, biome-gated only), or track
-  "was this fall preceded by a recent wind-force application" and only
-  dampen that specific case (closer to the original complaint, needs new
-  state-tracking — a short-lived timestamp/flag set wherever wind force is
-  applied to a character, checked when a fall starts). Leaning toward the
-  simpler biome-gated version unless playtesting shows non-wind falls
-  feeling wrong with it on, but not yet decided.
+- **Wind-induced fall camera-spin dampening scope — RESOLVED (2026-07-22).**
+  The maintainer chose the wind-preceded-only option, not the simpler
+  every-fall version: an ordinary fall is generally the player's own fault,
+  but wind blowing you off a ledge mid-jump is close to pure bad luck and
+  shouldn't be treated the same as a self-inflicted fall. Implemented via a
+  short-lived timestamp set on `WindChillZone.AddWindForceToCharacter`'s
+  postfix, checked against a configurable window
+  (`Wind/fall-camera-dampen-window-seconds`, default 1.5s) when
+  `CharacterData.GetTargetRagdollControll()` is about to return its
+  unconditional 0 for a fall in progress. See `CODEBASE.md`'s `Wind/` section
+  and `Core/WindTuning.cs`'s `IsWindForceStillRecent`/`ApplyFallCameraDampening`.

@@ -16,8 +16,8 @@ Two layers, per ROADMAP.md's testing strategy:
    dotnet test
    ```
 
-   Current coverage (Phase 2 seed/preset core + Phase 4 spore bombs, no game
-   install required):
+   Current coverage (Phase 2 seed/preset core + Phase 4 spore bombs + Phase 5
+   wind, no game install required):
    - **Determinism** (`DeterministicHashTests`): the `(seed, mechanic,
      position) → value` hash is stable for identical inputs, uniform enough to
      use as a probability, and decorrelated across different seeds and
@@ -43,6 +43,15 @@ Two layers, per ROADMAP.md's testing strategy:
      increases with preset strength; Custom (preset 5) uses the player's
      config directly and falls back to Balanced's numbers (not a crash) for a
      setting the player hasn't touched yet under Custom.
+   - **Wind tuning** (`WindTuningTests`): force/gust-duration/item-force/
+     raycast-distance scaling arithmetic (not seed-gated, same reasoning as
+     the spore-bomb explosion tuning above; fog-density scaling was tried and
+     reverted — see below); the
+     wind-preceded-fall camera-dampening decision (`IsWindForceStillRecent` /
+     `ApplyFallCameraDampening`) — a fall with no recorded wind force, or a
+     disabled clamp, is always left at vanilla's value; a wind-preceded fall
+     within the configured window raises the floor but never lowers an
+     already-higher vanilla result (e.g. the carrier/passed-out branches).
 2. **Manual in-game loop** (this doc) — for anything only observable at
    runtime (feel, visual clutter, screen shake, actual spawn positions in a
    real level).
@@ -243,3 +252,107 @@ itself works regardless of debug logging).
 default still feels right against the actual mushroom height (adjust
 `max-trigger-height-meters` and re-test if not), and whether ground-level
 triggering and the Explosive variant are both unaffected.
+
+### Wind force / gust duration / item / backpack immunity / obstacle occlusion
+
+**Pre-req:** debug logging on, in a Roots run during an active wind gust.
+
+> **Two regressions found and fixed during live testing (2026-07-22), plus a
+> follow-up split.**
+> 1. An earlier version of this patch also scaled `FogConfig.windFogDensity`/
+>    `WindFogTextureDensity` during wind. That was pulled entirely (the real
+>    density/opacity relationship for those shader globals lives in shader
+>    code this mod can't decompile or verify) - fog is untouched by this mod.
+> 2. The actual cause of the reported "screen turns solid black" was found
+>    afterward, once it recurred with fog scaling already removed: scaling
+>    gust duration down to a genuinely zero-length gust (at the time, still
+>    tied to the same multiplier as force) made the *native* windActive
+>    on/off timer flip rapidly - and since the *game's own* (untouched by
+>    this mod) fog/storm-blend logic only decays after 0.1s of no
+>    re-trigger, the rapid re-toggling never gave it that gap, so it
+>    ratcheted up to fully opaque and stayed there. Fixed by flooring the
+>    scaled gust duration at `WindTuning.MinWindActiveDurationSeconds` (1s) -
+>    see that constant's remarks.
+> 3. `force-multiplier` and gust duration/frequency were then **split into two
+>    independent config entries** (`Wind/force-multiplier` and
+>    `Wind/gust-duration-multiplier`) at the maintainer's request, so push
+>    strength and gust timing can be A/B-tested separately - presets 1-4 still
+>    use the same number for both (unchanged feel), only `Custom` can diverge
+>    them. Force can still legitimately go to exactly 0 (no push); gust
+>    duration is always floored at 1s regardless of its own multiplier.
+
+1. Load into Roots on Balanced and check the log for `[WindTuning] captured
+   baseline + applied tuning (vanilla windForce=20, ...)` — confirms the
+   vanilla scene value (20, not the class default of 15) was captured and
+   Balanced's 0.8x was applied on top of it, not the class default. Also
+   check for the per-apply `[WindTuning] applied to WindChillZone#... windForce
+   20->16, ...` verbose line (needs debug logging on) if you want to see the
+   exact before/after numbers.
+2. During a gust, drop a non-backpack item (e.g. a rock) and a backpack in the
+   open: the backpack should never budge no matter how strong the wind is;
+   the loose item should still move, but noticeably less forcefully than
+   before this change. **Important:** confirm `Wind/force-multiplier` is
+   genuinely non-zero first (check the F9 diagnostic's `[Wind] ... windForce=`
+   line) - items get *zero* force whenever `windForce` is 0, regardless of
+   `item-force-multiplier`, since the native game formula multiplies
+   `windForce × windItemFactor` together (confirmed 2026-07-22: this looked
+   like a broken item-multiplier at first, but was actually a leftover
+   `force-multiplier=0` from earlier testing).
+3. Stand behind a large obstacle during a gust — wind should stop pushing you
+   noticeably sooner (from further away) than vanilla, confirming the widened
+   raycast-occlusion range.
+4. Confirm fog/visibility during a gust looks exactly like vanilla (no
+   change) — this is the regression check for the fog revert above.
+5. Switch to `Custom`, set `Wind/force-multiplier` to `0` (the extreme case
+   that caused the black-screen regression above) but leave
+   `gust-duration-multiplier` at its default, reload, and wait through at
+   least two full gust cycles: wind should apply zero push (correct - 0 is a
+   legitimate "no wind" ask), gusts should still last a normal (unscaled-by-
+   force) duration, and the screen/fog should stay completely normal the
+   whole time.
+6. Now do the opposite: set `force-multiplier` back to a normal value (e.g.
+   `0.8`) and set `gust-duration-multiplier` to `0` instead - gusts should
+   become very short (floored at 1s) but still push you normally while
+   they're active, confirming the two settings are genuinely independent of
+   each other. Set both back to Balanced's defaults afterward.
+7. Set `Wind/backpack-always-immune` to `false` and repeat step 2 - the
+   backpack should now be pushed by wind just like any other item (scaled by
+   the same `item-force-multiplier`). Set it back to `true` afterward.
+8. Set `Wind/disable-wind-entirely` to `true` (works on every preset, not just
+   Custom) - **wind should stop occurring at all**, not just revert to
+   vanilla strength: if a gust is actively blowing the instant you flip it,
+   it should cut off immediately, and no new gust should ever start again
+   (watch through at least 2-3 minutes, long enough to cover a normal calm
+   period) while the switch stays on. Set it back to `false` and confirm wind
+   resumes normally (Fairoots' tuning returns immediately too, no reload
+   needed).
+
+**Report back:** the logged vanilla baseline vs. tuned values, whether
+backpack immunity held up under a strong gust (and correctly stopped when
+toggled off), whether the occlusion difference was noticeable, whether
+`disable-wind-entirely` genuinely stopped all wind from occurring (not just
+reverted its strength) and resumed cleanly when turned back off, and confirm
+fog/visibility looked unchanged from vanilla throughout.
+
+### Wind-preceded fall camera dampening
+
+**Pre-req:** debug logging on, in a Roots run, default
+`fall-camera-dampen-clamp = 0.35` / `fall-camera-dampen-window-seconds = 1.5`.
+
+1. Get blown off a ledge by wind and immediately try to grab a wall or fire a
+   Rescue Hook while falling — the camera should stay noticeably more
+   player-controlled than before this change (less of the disorienting
+   "spin"), giving you a real chance to react.
+2. Jump off the same ledge deliberately with **no wind active** — the camera
+   should spin exactly like vanilla (full ragdoll-head tracking), confirming
+   the dampening only applies to wind-preceded falls, not every fall.
+3. Get blown off a ledge, then wait *longer than 1.5s* before actually falling
+   (e.g. stand near the edge until the gust passes, then jump on your own) —
+   should also behave like vanilla, confirming the recency window matters.
+4. Set `Custom` preset, `fall-camera-dampen-clamp = 0`, repeat step 1 — should
+   go back to full vanilla spin even immediately after a wind-induced fall.
+
+**Report back:** whether the wind-preceded case felt meaningfully calmer,
+whether a non-wind fall was completely unaffected, and whether 0.35 is a good
+default or needs adjusting (the maintainer's own framing: strong enough to
+let you react, not so strong it removes all sense of falling).
