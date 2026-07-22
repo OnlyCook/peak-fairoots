@@ -140,10 +140,14 @@ questions in one pass.
    visibly fewer particle orbs, and screen-shake should stop being felt past
    ~30m instead of vanilla's much larger range.
 5. Switch `preset` to `Custom` (5), set `Spore-Bombs/knockback-multiplier` to
-   e.g. `0.1` and leave the rest at `-1`, reload, trigger another spore bomb:
-   knockback should be barely noticeable while VFX count/shake cap fall back
-   to Balanced's numbers (report back what you see for each of the four
-   values, since only knockback was explicitly overridden here).
+   e.g. `0.1` and leave the rest at their defaults, reload, trigger another
+   spore bomb: knockback should be barely noticeable while VFX count/shake
+   cap use their own configured (default) values, not Balanced's - Custom
+   never falls back to a preset, it always reads its own config values
+   directly (report back what you see for each of the four values).
+6. Switch `preset` back to `Balanced` (2) without changing the Custom values
+   back: the spore bomb should behave exactly like step 3/4 again, confirming
+   presets 1-4 ignore the `Spore-Bombs` config entries entirely.
 
 **Report back:** preset used, whether the four log lines above showed up,
 and whether the felt in-game effect (distance thrown, particle count, shake

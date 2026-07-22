@@ -27,8 +27,9 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
   - `Plugin.cs` — entry point (`BepInPlugin`); loads config + Harmony, logs.
   - `PluginConfig.cs` — config binding: the `seed` field, the `preset` 1-5
     selector (1-4 are the fixed presets, 5 is Custom — see
-    `Core/Presets/PresetId.cs`), per-mechanic override entries (default to a
-    "follow preset" sentinel), and the `Debug` section (bound last). Exposes
+    `Core/Presets/PresetId.cs`), per-mechanic Custom-only entries (sane numeric
+    defaults, only read when preset is set to Custom — ignored under presets
+    1-4 even if changed), and the `Debug` section (bound last). Exposes
     *resolved* accessors (e.g. `SporeBombCullFraction`,
     `SporeBombKnockbackMultiplier`) that fold preset + override together via
     `Core/Presets/OverrideResolution`.
@@ -114,10 +115,12 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       screen-shake-cap/VFX-count multipliers, and always-on mechanic flags;
       grows one entry per mechanic as its phase lands. Custom (`PresetId.Custom`)
       isn't a real row in this catalog — every method maps it to Balanced's
-      numbers internally, purely as a fallback for a setting the player hasn't
-      touched yet under Custom (not "Custom follows Balanced").
-    - `Presets/OverrideResolution.cs` — non-destructive preset resolution
-      (sentinel pattern): a player-set value always wins over the preset.
+      numbers internally, purely so a catalog lookup never throws (it's still
+      called as an unused argument under Custom — see `OverrideResolution.cs`).
+    - `Presets/OverrideResolution.cs` — preset-vs-Custom resolution: presets 1-4
+      always use their own catalog numbers, ignoring the player's config
+      entirely; Custom (5) always uses the player's configured value (0
+      included). No sentinel/"unset" value to track.
 - `tests/Fairoots.Tests/` — xUnit project. Links `src/Fairoots/Core/**/*.cs`
   directly (no game/BepInEx dependency, runs anywhere). One test file per Core
   area; see `docs/TESTING.md` for what each covers.

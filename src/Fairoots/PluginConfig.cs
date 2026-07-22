@@ -28,36 +28,42 @@ namespace Fairoots
 
         // --- Spore-Bombs ---------------------------------------------------
         /// <summary>
-        /// Per-mechanic override for the spore-bomb total removal target. Defaults
-        /// to the follow-preset sentinel; a value in [0, 1] overrides the preset.
+        /// Custom-preset value for the spore-bomb total removal target. Only takes
+        /// effect when <see cref="Preset"/> is set to <see cref="PresetId.Custom"/>
+        /// (5) - ignored under presets 1-4, which always use their own catalog
+        /// numbers regardless of this value. Defaults to Balanced's number.
         /// </summary>
         public ConfigEntry<double> SporeBombCullFractionOverride { get; }
 
         /// <summary>
-        /// Per-mechanic override for the trigger-hitbox radius multiplier applied
-        /// to every kept spore bomb (1.0 = vanilla size, lower = smaller/harder to
-        /// set off accidentally). Defaults to the follow-preset sentinel.
+        /// Custom-preset value for the trigger-hitbox radius multiplier applied to
+        /// every kept spore bomb (1.0 = vanilla size, lower = smaller/harder to set
+        /// off accidentally, higher = larger than vanilla). Only takes effect under
+        /// <see cref="PresetId.Custom"/>; see <see cref="SporeBombCullFractionOverride"/>.
         /// </summary>
         public ConfigEntry<double> SporeBombTriggerRadiusMultiplierOverride { get; }
 
         /// <summary>
-        /// Per-mechanic override for the knockback/explosion-force multiplier
-        /// applied when a spore bomb detonates (1.0 = vanilla force). Defaults to
-        /// the follow-preset sentinel.
+        /// Custom-preset value for the knockback/explosion-force multiplier applied
+        /// when a spore bomb detonates (1.0 = vanilla force). Only takes effect
+        /// under <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
         /// </summary>
         public ConfigEntry<double> SporeBombKnockbackMultiplierOverride { get; }
 
         /// <summary>
-        /// Per-mechanic override for the screen-shake distance cap, in meters, on
-        /// a spore-bomb detonation. 0 leaves the vanilla range uncapped; a positive
-        /// value caps it. Defaults to the follow-preset sentinel.
+        /// Custom-preset value for the screen-shake distance cap, in meters, on a
+        /// spore-bomb detonation. 0 leaves the vanilla range uncapped; a positive
+        /// value caps it. Only takes effect under <see cref="PresetId.Custom"/>;
+        /// see <see cref="SporeBombCullFractionOverride"/>.
         /// </summary>
         public ConfigEntry<double> SporeBombScreenshakeRangeCapOverride { get; }
 
         /// <summary>
-        /// Per-mechanic override for the particle/VFX-orb-count multiplier applied
-        /// to a spore-bomb detonation (1.0 = vanilla orb count). Defaults to the
-        /// follow-preset sentinel.
+        /// Custom-preset value for the particle/VFX-orb-count multiplier applied to
+        /// a spore-bomb detonation (1.0 = vanilla orb count). Only takes effect
+        /// under <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
         /// </summary>
         public ConfigEntry<double> SporeBombVfxCountMultiplierOverride { get; }
 
@@ -125,60 +131,66 @@ namespace Fairoots
                 "Overall balance preset. Subtle (1) is the lightest touch, Tame (4) the " +
                 "heaviest, Balanced (2) is the default. Custom (5) ignores the hard-coded " +
                 "preset numbers entirely and uses your own Spore-Bombs settings directly " +
-                "instead. Under presets 1-4, any per-mechanic setting you change yourself " +
-                "still overrides the preset for that mechanic and is never overwritten when " +
-                "you switch presets.");
+                "instead. Under presets 1-4, the per-mechanic settings below are ignored " +
+                "entirely, even if you've changed them - switch to Custom to use them.");
 
             SporeBombCullFractionOverride = config.Bind(
                 "Spore-Bombs",
                 "cull-fraction",
-                OverrideResolution.FollowPreset,
+                0.25,
                 new ConfigDescription(
                     "Fraction of spore bombs to remove overall (foliage removal + seeded cull " +
-                    "combined), e.g. 0.5 cuts them in half. Leave at -1 to follow the active " +
-                    "preset; set 0-1 to override it.",
-                    new AcceptableValueRange<double>(OverrideResolution.FollowPreset, 1.0)));
+                    "combined), e.g. 0.5 cuts them in half. Only takes effect when preset is " +
+                    "set to Custom (5) - ignored under presets 1-4. 0 = remove none beyond " +
+                    "the always-on foliage pass (vanilla-equivalent).",
+                    new AcceptableValueRange<double>(0.0, 1.0)));
 
             SporeBombTriggerRadiusMultiplierOverride = config.Bind(
                 "Spore-Bombs",
                 "trigger-radius-multiplier",
-                OverrideResolution.FollowPreset,
+                0.75,
                 new ConfigDescription(
                     "Multiplier applied to every kept spore bomb's trigger hitbox, e.g. 0.7 " +
-                    "shrinks it to 70% of vanilla size. Leave at -1 to follow the active " +
-                    "preset; set 0-1 to override it (1.0 = vanilla size).",
-                    new AcceptableValueRange<double>(OverrideResolution.FollowPreset, 1.0)));
+                    "shrinks it to 70% of vanilla size, 2.0 doubles it. 1.0 always means " +
+                    "vanilla size, no matter what else you change - handy for A/B-testing " +
+                    "against unmodified behavior. Only takes effect when preset is set to " +
+                    "Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 3.0)));
 
             SporeBombKnockbackMultiplierOverride = config.Bind(
                 "Spore-Bombs",
                 "knockback-multiplier",
-                OverrideResolution.FollowPreset,
+                0.80,
                 new ConfigDescription(
                     "Multiplier applied to a spore bomb's knockback/explosion force on " +
-                    "detonation, e.g. 0.6 cuts it to 60% of vanilla. Leave at -1 to follow the " +
-                    "active preset; set 0-1 to override it (1.0 = vanilla force).",
-                    new AcceptableValueRange<double>(OverrideResolution.FollowPreset, 1.0)));
+                    "detonation, e.g. 0.6 cuts it to 60% of vanilla, 2.0 doubles it. 1.0 " +
+                    "always means vanilla force, no matter what else you change - handy for " +
+                    "A/B-testing against unmodified behavior. Only takes effect when preset " +
+                    "is set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 5.0)));
 
             SporeBombScreenshakeRangeCapOverride = config.Bind(
                 "Spore-Bombs",
                 "screenshake-range-cap-meters",
-                OverrideResolution.FollowPreset,
+                30.0,
                 new ConfigDescription(
                     "Caps how far away (in meters) a spore-bomb detonation's screen-shake can " +
                     "still be felt. 0 leaves the vanilla range (~75m, uncapped) alone; a " +
-                    "positive value caps it, e.g. 20 means no shake past 20m. Leave at -1 to " +
-                    "follow the active preset.",
-                    new AcceptableValueRange<double>(OverrideResolution.FollowPreset, 100.0)));
+                    "positive value caps it, e.g. 20 means no shake past 20m. Only takes " +
+                    "effect when preset is set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 100.0)));
 
             SporeBombVfxCountMultiplierOverride = config.Bind(
                 "Spore-Bombs",
                 "vfx-count-multiplier",
-                OverrideResolution.FollowPreset,
+                0.75,
                 new ConfigDescription(
                     "Multiplier applied to a spore bomb's particle/VFX orb count on " +
-                    "detonation, e.g. 0.5 halves it. Leave at -1 to follow the active preset; " +
-                    "set 0-1 to override it (1.0 = vanilla count).",
-                    new AcceptableValueRange<double>(OverrideResolution.FollowPreset, 1.0)));
+                    "detonation, e.g. 0.5 halves it, 2.0 doubles it. 1.0 always means vanilla " +
+                    "count, no matter what else you change - handy for A/B-testing against " +
+                    "unmodified behavior. Only takes effect when preset is set to Custom (5) " +
+                    "- ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 5.0)));
 
             SporeBombMaxTriggerHeightMeters = config.Bind(
                 "Spore-Bombs",
@@ -260,39 +272,46 @@ namespace Fairoots
                 "the debug-logging master switch above. Off by default.");
         }
 
+        /// <summary>True when the active preset is Custom - the only preset where the player's own config values apply.</summary>
+        private bool UseCustomOverrides => Preset.Value == PresetId.Custom;
+
         /// <summary>
-        /// The effective spore-bomb removal fraction: the player's override if set,
-        /// otherwise the active preset's value (or, under <see cref="PresetId.Custom"/>,
-        /// the Balanced fallback if the player hasn't set this one yet - see
-        /// <see cref="PresetCatalog"/>'s remarks).
+        /// The effective spore-bomb removal fraction: the player's Custom-preset
+        /// value if Custom is active, otherwise the active preset's own catalog
+        /// value regardless of what the player has configured.
         /// </summary>
         public double SporeBombCullFraction =>
             OverrideResolution.Resolve(
                 PresetCatalog.SporeBombCullFraction(Preset.Value),
-                SporeBombCullFractionOverride.Value);
+                SporeBombCullFractionOverride.Value,
+                UseCustomOverrides);
 
         /// <summary>The effective trigger-hitbox radius multiplier for kept spore bombs.</summary>
         public double SporeBombTriggerRadiusMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.SporeBombTriggerRadiusMultiplier(Preset.Value),
-                SporeBombTriggerRadiusMultiplierOverride.Value);
+                SporeBombTriggerRadiusMultiplierOverride.Value,
+                UseCustomOverrides);
 
         /// <summary>The effective knockback/explosion-force multiplier for a spore-bomb detonation.</summary>
         public double SporeBombKnockbackMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.SporeBombKnockbackMultiplier(Preset.Value),
-                SporeBombKnockbackMultiplierOverride.Value);
+                SporeBombKnockbackMultiplierOverride.Value,
+                UseCustomOverrides);
 
         /// <summary>The effective screen-shake distance cap, in meters (0 = uncapped).</summary>
         public float SporeBombScreenshakeRangeCapMeters =>
             (float)OverrideResolution.Resolve(
                 PresetCatalog.SporeBombScreenshakeRangeCapMeters(Preset.Value),
-                SporeBombScreenshakeRangeCapOverride.Value);
+                SporeBombScreenshakeRangeCapOverride.Value,
+                UseCustomOverrides);
 
         /// <summary>The effective particle/VFX-orb-count multiplier for a spore-bomb detonation.</summary>
         public double SporeBombVfxCountMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.SporeBombVfxCountMultiplier(Preset.Value),
-                SporeBombVfxCountMultiplierOverride.Value);
+                SporeBombVfxCountMultiplierOverride.Value,
+                UseCustomOverrides);
     }
 }

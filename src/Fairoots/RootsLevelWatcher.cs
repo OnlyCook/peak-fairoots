@@ -16,9 +16,30 @@ namespace Fairoots
     /// to appear works regardless of how the level was reached (fresh generation,
     /// a save resume, whatever) since it only depends on the scene actually being
     /// there.
+    ///
+    /// Two perf guards, both load-bearing (an earlier version without them caused a
+    /// severe, mod-wide framerate drop - worst in non-Roots biomes, where "Roots
+    /// Segment" never appears so the unguarded scan below never stopped running):
+    /// polled at <see cref="ScanIntervalSeconds"/> rather than every single
+    /// <c>Update()</c> tick, and searching via <see cref="GameObject.Find(string)"/>
+    /// (a targeted named lookup) instead of <c>Object.FindObjectsOfType&lt;Transform&gt;</c>
+    /// (which allocates an array of literally every Transform in every loaded
+    /// scene, active or not, and did so unconditionally every frame).
     /// </summary>
     internal static class RootsLevelWatcher
     {
+        /// <summary>
+        /// How often to poll for "Roots Segment" appearing/disappearing. Small
+        /// enough that a level transition is picked up within a fraction of a
+        /// second (nothing here is latency-sensitive - the cull pass only needs to
+        /// run once per level, not on the exact frame the segment activates), large
+        /// enough to keep this a non-issue for framerate even in the worst case
+        /// (polling indefinitely in a non-Roots biome).
+        /// </summary>
+        private const float ScanIntervalSeconds = 0.5f;
+
+        private static float _nextScanTime;
+
         /// <summary>
         /// The Roots Segment instance already processed this load. Checked via
         /// <c>gameObject.activeInHierarchy</c>, not a bare `!= null` - an earlier
@@ -43,23 +64,21 @@ namespace Fairoots
                 return;
             }
 
-            Transform found = null;
-            foreach (var t in Object.FindObjectsOfType<Transform>(true))
-            {
-                if (t.name == "Roots Segment" && t.gameObject.activeInHierarchy)
-                {
-                    found = t;
-                    break;
-                }
-            }
-
-            if (found == null)
+            if (Time.unscaledTime < _nextScanTime)
             {
                 return;
             }
 
-            _processed = found;
-            SporeBombCullPatch.Run(found);
+            _nextScanTime = Time.unscaledTime + ScanIntervalSeconds;
+
+            var found = GameObject.Find("Roots Segment");
+            if (found == null || !found.activeInHierarchy)
+            {
+                return;
+            }
+
+            _processed = found.transform;
+            SporeBombCullPatch.Run(found.transform);
 
             if (Plugin.Cfg.EnableDebugLogging.Value && Plugin.Cfg.LogSceneScanOnLoad.Value)
             {

@@ -5,61 +5,56 @@ using Xunit;
 namespace Fairoots.Tests
 {
     /// <summary>
-    /// Preset non-destructiveness (ROADMAP.md "Testing strategy"): applying or
-    /// switching a preset must never overwrite a value the player explicitly set,
-    /// tested at the resolution-logic level, not through the UI. Also pins the
-    /// preset scale's ordering so a future edit can't silently flip it.
+    /// Preset vs. Custom resolution (ROADMAP.md "Testing strategy"): presets 1-4
+    /// always use their own catalog numbers, ignoring whatever the player has
+    /// configured; Custom (5) always uses the player's configured value, 0
+    /// included, tested at the resolution-logic level, not through the UI. Also
+    /// pins the preset scale's ordering so a future edit can't silently flip it.
     /// </summary>
     public class PresetResolutionTests
     {
         [Fact]
-        public void UntouchedSetting_FollowsPreset()
+        public void NonCustomPreset_IgnoresConfiguredValue()
         {
             double resolved = OverrideResolution.Resolve(
                 presetValue: 0.5,
-                configuredValue: OverrideResolution.FollowPreset);
+                configuredValue: 0.9,
+                useOverride: false);
             Assert.Equal(0.5, resolved);
         }
 
         [Fact]
-        public void ExplicitSetting_OverridesPreset()
+        public void CustomPreset_UsesConfiguredValue()
         {
             double resolved = OverrideResolution.Resolve(
                 presetValue: 0.5,
-                configuredValue: 0.9);
+                configuredValue: 0.9,
+                useOverride: true);
             Assert.Equal(0.9, resolved);
         }
 
         [Fact]
-        public void ExplicitZero_IsRespected_NotTreatedAsUnset()
+        public void CustomPreset_ExplicitZero_IsRespected()
         {
-            // 0 is a legitimate value (cull nothing) and must not be confused with
-            // the -1 "follow preset" sentinel.
             double resolved = OverrideResolution.Resolve(
                 presetValue: 0.5,
-                configuredValue: 0.0);
+                configuredValue: 0.0,
+                useOverride: true);
             Assert.Equal(0.0, resolved);
         }
 
         [Fact]
-        public void SwitchingPreset_DoesNotClobberExplicitValue()
+        public void SwitchingAwayFromCustom_DiscardsConfiguredValue()
         {
-            // Player pinned 0.33. Whatever preset is active, resolution returns 0.33.
-            const double pinned = 0.33;
+            // Player set 0.33 under Custom. Any non-Custom preset ignores it and
+            // returns its own catalog value instead.
+            const double configured = 0.33;
             foreach (PresetId p in new[] { PresetId.Subtle, PresetId.Balanced, PresetId.Generous, PresetId.Tame })
             {
                 double resolved = OverrideResolution.Resolve(
-                    PresetCatalog.SporeBombCullFraction(p), pinned);
-                Assert.Equal(pinned, resolved);
+                    PresetCatalog.SporeBombCullFraction(p), configured, useOverride: false);
+                Assert.Equal(PresetCatalog.SporeBombCullFraction(p), resolved);
             }
-        }
-
-        [Fact]
-        public void GenericResolve_WorksForEnums()
-        {
-            // configured wins unless it's the sentinel.
-            Assert.Equal(PresetId.Tame,
-                OverrideResolution.Resolve(PresetId.Balanced, PresetId.Tame, sentinel: PresetId.Subtle));
         }
 
         [Fact]
@@ -133,26 +128,12 @@ namespace Fairoots.Tests
         }
 
         [Fact]
-        public void CustomPreset_ExplicitConfigValue_Wins()
-        {
-            double resolved = OverrideResolution.Resolve(
-                PresetCatalog.SporeBombCullFraction(PresetId.Custom), configuredValue: 0.9);
-            Assert.Equal(0.9, resolved);
-        }
-
-        [Fact]
-        public void CustomPreset_UntouchedSetting_FallsBackToBalancedNumber_NotACrash()
-        {
-            double resolved = OverrideResolution.Resolve(
-                PresetCatalog.SporeBombCullFraction(PresetId.Custom), OverrideResolution.FollowPreset);
-            Assert.Equal(PresetCatalog.SporeBombCullFraction(PresetId.Balanced), resolved);
-        }
-
-        [Fact]
         public void CustomPreset_CatalogLookup_FallsBackToBalancedNumbers()
         {
-            // Custom has no numbers of its own - every catalog method must fall
-            // back to Balanced's value rather than throwing or returning garbage.
+            // Custom has no catalog numbers of its own - every catalog method must
+            // fall back to Balanced's value rather than throwing or returning
+            // garbage (used as PluginConfig's presetValue argument even when
+            // useOverride discards it, so it must never blow up).
             Assert.Equal(PresetCatalog.SporeBombCullFraction(PresetId.Balanced), PresetCatalog.SporeBombCullFraction(PresetId.Custom));
             Assert.Equal(PresetCatalog.SporeBombTriggerRadiusMultiplier(PresetId.Balanced), PresetCatalog.SporeBombTriggerRadiusMultiplier(PresetId.Custom));
             Assert.Equal(PresetCatalog.SporeBombKnockbackMultiplier(PresetId.Balanced), PresetCatalog.SporeBombKnockbackMultiplier(PresetId.Custom));

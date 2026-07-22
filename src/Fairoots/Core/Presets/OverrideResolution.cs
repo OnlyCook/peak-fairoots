@@ -1,49 +1,25 @@
-using System.Collections.Generic;
-
 namespace Fairoots.Core.Presets
 {
     /// <summary>
-    /// Non-destructive preset resolution (ROADMAP.md "Presets" - "any per-mechanic
-    /// setting the player has explicitly touched always overrides whatever the
-    /// active preset would otherwise set"). Switching presets must never silently
-    /// clobber a hand-tuned value.
-    ///
-    /// The mechanism is a sentinel default: each per-mechanic config entry defaults
-    /// to a "follow preset" sentinel. If the live config value still equals the
-    /// sentinel, the player never touched it, so the preset value applies; any other
-    /// value means the player set it explicitly and it wins. This is deliberately a
-    /// pure function of (preset value, configured value, sentinel) so it is
-    /// unit-testable at the config-resolution level with no BepInEx/UI involved.
+    /// Preset vs. Custom resolution (ROADMAP.md "Presets"). Presets 1-4 are fixed
+    /// catalog numbers - a player's per-mechanic config entries are read but
+    /// ignored while one of them is active, so there's no sentinel value to
+    /// remember and no risk of a stray override silently bending a "vanilla"
+    /// preset. <see cref="PresetId.Custom"/> (5) is the only preset where the
+    /// player's own config values apply, and every value the player can type in
+    /// (0 included) is used exactly as configured - no "unset" state to detect.
     /// </summary>
     public static class OverrideResolution
     {
         /// <summary>
-        /// Sentinel for numeric per-mechanic settings. Negative so it can never
-        /// collide with a legitimate value: every real Fairoots numeric knob
-        /// (fractions, radii, force multipliers) is >= 0.
+        /// Resolve a numeric setting: <paramref name="configuredValue"/> applies
+        /// only when <paramref name="useOverride"/> (i.e. the active preset is
+        /// <see cref="PresetId.Custom"/>); otherwise the preset's own catalog
+        /// value always wins, regardless of what the player has configured.
         /// </summary>
-        public const double FollowPreset = -1.0;
-
-        /// <summary>
-        /// Resolve a numeric setting: the configured value wins unless it is still
-        /// the <see cref="FollowPreset"/> sentinel, in which case the preset value
-        /// applies.
-        /// </summary>
-        public static double Resolve(double presetValue, double configuredValue, double sentinel = FollowPreset)
+        public static double Resolve(double presetValue, double configuredValue, bool useOverride)
         {
-            return configuredValue == sentinel ? presetValue : configuredValue;
-        }
-
-        /// <summary>
-        /// Generic resolution for non-numeric settings (enums, bools exposed as a
-        /// nullable/tri-state, etc.): configured value wins unless it equals the
-        /// given sentinel.
-        /// </summary>
-        public static T Resolve<T>(T presetValue, T configuredValue, T sentinel)
-        {
-            return EqualityComparer<T>.Default.Equals(configuredValue, sentinel)
-                ? presetValue
-                : configuredValue;
+            return useOverride ? configuredValue : presetValue;
         }
     }
 }
