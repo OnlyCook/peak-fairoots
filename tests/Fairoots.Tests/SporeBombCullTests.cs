@@ -156,6 +156,68 @@ namespace Fairoots.Tests
         }
 
         [Fact]
+        public void SeededCull_PrefersClusteredCandidatesOverIsolatedOnes()
+        {
+            // Two tight pairs (1 unit apart) plus two far-flung loners. Culling one
+            // from the budget should always take from a clustered pair, never one
+            // of the isolated candidates - clustered spore bombs are the whole
+            // point of this pass, not a fair per-object lottery.
+            var pos = new List<GridPos>
+            {
+                new GridPos(0, 0, 0),     // clustered pair A
+                new GridPos(1, 0, 0),     // clustered pair A
+                new GridPos(1000, 0, 0),  // clustered pair B
+                new GridPos(1001, 0, 0),  // clustered pair B
+                new GridPos(5000, 0, 0),  // isolated
+                new GridPos(-5000, 0, 0), // isolated
+            };
+            var fol = new List<bool> { false, false, false, false, false, false };
+
+            for (int seed = 0; seed < 20; seed++)
+            {
+                var outcomes = SporeBombCull.Decide(pos, fol, cullFraction: 1.0 / 6.0, userSeed: seed);
+                var s = SporeBombCull.Summarize(outcomes);
+                Assert.Equal(1, s.SeededRemoved);
+
+                int culledIndex = outcomes.ToList().FindIndex(o => o == CullOutcome.RemovedSeededCull);
+                Assert.True(culledIndex is 0 or 1 or 2 or 3, $"seed {seed} culled isolated candidate {culledIndex}");
+            }
+        }
+
+        [Fact]
+        public void SeededCull_TakesOneFromEachPairInsteadOfBothAtOnce()
+        {
+            // Two tight pairs (1 unit apart) and one isolated loner. Budget of 2
+            // must take exactly one from *each* pair, never both from a single
+            // pair while the loner and the other pair's second member survive -
+            // that would mean the cull re-ranked once and gutted the first
+            // cluster it found instead of moving on after thinning it.
+            var pos = new List<GridPos>
+            {
+                new GridPos(0, 0, 0),     // pair A
+                new GridPos(1, 0, 0),     // pair A
+                new GridPos(1000, 0, 0),  // pair B
+                new GridPos(1001, 0, 0),  // pair B
+                new GridPos(5000, 0, 0),  // isolated
+            };
+            var fol = new List<bool> { false, false, false, false, false };
+
+            for (int seed = 0; seed < 20; seed++)
+            {
+                var outcomes = SporeBombCull.Decide(pos, fol, cullFraction: 2.0 / 5.0, userSeed: seed);
+                var s = SporeBombCull.Summarize(outcomes);
+                Assert.Equal(2, s.SeededRemoved);
+
+                // Loner always survives - it's never the closest pair.
+                Assert.Equal(CullOutcome.Kept, outcomes[4]);
+
+                // Exactly one of each pair is removed, one kept.
+                Assert.Equal(1, new[] { outcomes[0], outcomes[1] }.Count(o => o == CullOutcome.RemovedSeededCull));
+                Assert.Equal(1, new[] { outcomes[2], outcomes[3] }.Count(o => o == CullOutcome.RemovedSeededCull));
+            }
+        }
+
+        [Fact]
         public void MismatchedLengths_Throws()
         {
             Assert.Throws<ArgumentException>(() =>
