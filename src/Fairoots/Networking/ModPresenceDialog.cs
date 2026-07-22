@@ -7,20 +7,22 @@ using UnityEngine.UI;
 namespace Fairoots.Networking
 {
     /// <summary>
-    /// A minimal runtime-built popup (dim background + panel + title + body +
-    /// "OK" button), shown once per newly-detected gap by
-    /// <see cref="ModPresenceCheck"/> to warn that not everyone in the lobby
-    /// has Fairoots installed. Deliberately generic/short - no player names
-    /// (per the maintainer's request: with several missing players that could
-    /// clip or bloat the dialog) - the specific names go to the log instead
-    /// (<see cref="ModPresenceCheck"/> logs them via <see cref="Diag"/>).
+    /// A minimal runtime-built confirm popup (dim background + panel + title +
+    /// body + Cancel/Start-Anyway buttons), shown by
+    /// <see cref="BoardingPassStartGatePatch"/> when a player clicks Start on
+    /// the Boarding Pass while someone in the lobby is missing Fairoots.
+    /// Deliberately generic/short - no player names (per the maintainer's
+    /// request: with several missing players that could clip or bloat the
+    /// dialog) - the specific names go to the log instead
+    /// (<see cref="ModPresenceCheck"/>/<see cref="BoardingPassStartGatePatch"/>
+    /// log them via <see cref="Diag"/>).
     ///
     /// Built from plain uGUI primitives at runtime rather than reusing an
     /// existing native <c>MenuWindow</c> instance (e.g. the pause menu's own
     /// confirm dialog, which peak-checkpoint-save's <c>PauseMenuPatch</c>
     /// reuses) - that dialog only exists while the pause menu itself is open,
-    /// but this needs to appear proactively during normal gameplay. Reuses the
-    /// game's own font (<c>Resources.FindObjectsOfTypeAll&lt;TMP_FontAsset&gt;</c>)
+    /// and this needs to appear over the Boarding Pass screen instead. Reuses
+    /// the game's own font (<c>Resources.FindObjectsOfTypeAll&lt;TMP_FontAsset&gt;</c>)
     /// for visual consistency, same technique peak-checkpoint-save's
     /// <c>SavePicker.FindGameFont</c> uses.
     /// </summary>
@@ -35,20 +37,27 @@ namespace Fairoots.Networking
         private static readonly Color PanelColor = new Color(0.08f, 0.08f, 0.09f, 0.96f);
         private static readonly Color TitleColor = new Color(0.95f, 0.85f, 0.4f);
         private static readonly Color BodyColor = new Color(0.92f, 0.92f, 0.92f);
-        private static readonly Color ButtonColor = new Color(0.2f, 0.2f, 0.22f, 1f);
+        private static readonly Color CancelButtonColor = new Color(0.2f, 0.2f, 0.22f, 1f);
+        private static readonly Color ConfirmButtonColor = new Color(0.45f, 0.18f, 0.16f, 1f);
 
         private static GameObject _root;
 
-        /// <summary>True while the dialog is currently up - <see cref="ModPresenceCheck"/> uses this to avoid stacking duplicates.</summary>
+        /// <summary>True while the dialog is currently up - prevents stacking duplicates.</summary>
         internal static bool IsOpen => _root != null;
 
-        internal static void Show()
+        /// <summary>
+        /// Shows the Cancel / Start Anyway confirmation. No-op (does not
+        /// re-open or replace) if the dialog is already up. Exactly one of
+        /// <paramref name="onConfirm"/>/<paramref name="onDecline"/> fires,
+        /// whichever button is clicked, and the dialog closes itself either way.
+        /// </summary>
+        internal static void ShowStartConfirm(Action onConfirm, Action onDecline)
         {
             try
             {
                 if (IsOpen)
                 {
-                    return; // already up - ModPresenceCheck only calls Show() for a newly-changed gap anyway.
+                    return;
                 }
 
                 var font = FindGameFont();
@@ -76,7 +85,7 @@ namespace Fairoots.Networking
                 panelRect.anchorMin = new Vector2(0.5f, 0.5f);
                 panelRect.anchorMax = new Vector2(0.5f, 0.5f);
                 panelRect.pivot = new Vector2(0.5f, 0.5f);
-                panelRect.sizeDelta = new Vector2(560, 260);
+                panelRect.sizeDelta = new Vector2(600, 280);
 
                 var title = MakeText(panelGo.transform, "Title", 26, FontStyles.Bold, TitleColor, TextAlignmentOptions.Center, font);
                 title.text = ModPresenceLocalization.Get(ModPresenceMsgKey.DialogTitle);
@@ -93,31 +102,34 @@ namespace Fairoots.Networking
                 var bodyRect = (RectTransform)body.transform;
                 bodyRect.anchorMin = new Vector2(0f, 0f);
                 bodyRect.anchorMax = new Vector2(1f, 1f);
-                bodyRect.offsetMin = new Vector2(28f, 64f);
+                bodyRect.offsetMin = new Vector2(28f, 74f);
                 bodyRect.offsetMax = new Vector2(-28f, -66f);
 
-                var buttonGo = new GameObject("OkButton", typeof(RectTransform));
-                buttonGo.transform.SetParent(panelGo.transform, false);
-                var buttonImage = buttonGo.AddComponent<Image>();
-                buttonImage.color = ButtonColor;
-                var button = buttonGo.AddComponent<Button>();
-                var buttonRect = (RectTransform)buttonGo.transform;
-                buttonRect.anchorMin = new Vector2(0.5f, 0f);
-                buttonRect.anchorMax = new Vector2(0.5f, 0f);
-                buttonRect.pivot = new Vector2(0.5f, 0f);
-                buttonRect.anchoredPosition = new Vector2(0f, 20f);
-                buttonRect.sizeDelta = new Vector2(140f, 40f);
+                var cancelButton = MakeButton(
+                    panelGo.transform, "CancelButton", new Vector2(-90f, 20f), CancelButtonColor,
+                    ModPresenceLocalization.Get(ModPresenceMsgKey.CancelButton), font);
+                cancelButton.onClick.AddListener(() =>
+                {
+                    Close();
+                    onDecline?.Invoke();
+                });
 
-                var buttonText = MakeText(buttonGo.transform, "Text", 18, FontStyles.Normal, BodyColor, TextAlignmentOptions.Center, font);
-                buttonText.text = ModPresenceLocalization.Get(ModPresenceMsgKey.OkButton);
-                StretchFull((RectTransform)buttonText.transform);
-
-                button.onClick.AddListener(Close);
+                var confirmButton = MakeButton(
+                    panelGo.transform, "ConfirmButton", new Vector2(90f, 20f), ConfirmButtonColor,
+                    ModPresenceLocalization.Get(ModPresenceMsgKey.ConfirmButton), font);
+                confirmButton.onClick.AddListener(() =>
+                {
+                    Close();
+                    onConfirm?.Invoke();
+                });
             }
             catch (Exception e)
             {
-                Diag.Error($"[ModPresenceDialog] Show threw: {e.GetType().Name}: {e.Message}");
+                Diag.Error($"[ModPresenceDialog] ShowStartConfirm threw: {e.GetType().Name}: {e.Message}");
                 Close();
+                // Fail open - a bug in our own dialog should never permanently
+                // block the player from starting the game at all.
+                onConfirm?.Invoke();
             }
         }
 
@@ -128,6 +140,27 @@ namespace Fairoots.Networking
                 UnityEngine.Object.Destroy(_root);
                 _root = null;
             }
+        }
+
+        private static Button MakeButton(Transform parent, string name, Vector2 anchoredPosition, Color color, string text, TMP_FontAsset font)
+        {
+            var buttonGo = new GameObject(name, typeof(RectTransform));
+            buttonGo.transform.SetParent(parent, false);
+            var buttonImage = buttonGo.AddComponent<Image>();
+            buttonImage.color = color;
+            var button = buttonGo.AddComponent<Button>();
+            var buttonRect = (RectTransform)buttonGo.transform;
+            buttonRect.anchorMin = new Vector2(0.5f, 0f);
+            buttonRect.anchorMax = new Vector2(0.5f, 0f);
+            buttonRect.pivot = new Vector2(0.5f, 0f);
+            buttonRect.anchoredPosition = anchoredPosition;
+            buttonRect.sizeDelta = new Vector2(170f, 40f);
+
+            var buttonText = MakeText(buttonGo.transform, "Text", 17, FontStyles.Normal, BodyColor, TextAlignmentOptions.Center, font);
+            buttonText.text = text;
+            StretchFull((RectTransform)buttonText.transform);
+
+            return button;
         }
 
         private static TextMeshProUGUI MakeText(

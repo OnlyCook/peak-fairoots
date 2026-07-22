@@ -399,26 +399,39 @@ per-player independent.
 
 ### Mod-presence enforcement (multiplayer — needs a second player/PC without Fairoots installed)
 
-**Pre-req:** debug logging on. One player has Fairoots installed, one doesn't.
+**Pre-req:** debug logging on. One player has Fairoots installed, one doesn't,
+both in the same lobby (order doesn't matter — host or non-host missing it).
 
-1. Both players join the same lobby (order doesn't matter - host or
-   non-host missing it, either way). The player(s) *with* Fairoots should see
-   a popup within a few seconds: title "Fairoots", body explaining not
-   everyone in the lobby has it installed. No player names in the popup
-   itself.
-2. Check `LogOutput.log` on the modded player(s) for
-   `[ModPresenceCheck] N player(s) in this lobby do not have Fairoots
-   installed: <nickname(s)>` - confirms the specific missing name(s) went to
-   the log, not the popup.
-3. Click "OK" - the popup should close cleanly.
-4. Have the missing player install Fairoots and rejoin (or, if testable,
-   have them install it without leaving) - no further popup should appear
-   once everyone has it.
-5. If a *different* player later leaves and rejoins without the mod, a fresh
-   popup should appear again (confirms the "only warn once per distinct gap"
-   logic resets correctly once a gap clears, rather than staying silent
-   forever after the first warning this session).
+1. Have a modded player open the Gate Kiosk (Boarding Pass) and click
+   **Start**. Since someone in the lobby is missing Fairoots, the click
+   should be blocked and a confirm popup should appear immediately: title
+   "Fairoots", body ending in "Start anyway?", two buttons (Cancel / Start
+   Anyway). No player names anywhere in the popup.
+2. Check `LogOutput.log` on the modded player for
+   `[BoardingPassStartGatePatch] Start blocked pending confirmation - N
+   player(s) missing Fairoots: <nickname(s)>` — confirms the specific missing
+   name(s) went to the log, not the popup.
+3. Click **Cancel** — the popup should close, the run should NOT start, and
+   you should still be sitting at the Boarding Pass exactly as before
+   clicking Start (nothing skipped or half-started).
+4. Click **Start** again, this time click **Start Anyway** — the run should
+   start normally (same as vanilla), confirming Confirm genuinely bypasses
+   the check rather than looping back into another popup.
+5. Have the missing player install Fairoots (no need to rejoin — just having
+   it running should update their player property next time anything
+   rechecks), then click Start again — it should now proceed with zero popup
+   (everyone modded, no gap).
+6. With everyone modded, confirm clicking Start behaves exactly like vanilla
+   — no popup, no delay, no logged warning at all.
+7. Switch the current language (`LocalizedText`'s in-game language setting)
+   to a couple of the 14 translated languages and repeat step 1 — confirm the
+   popup text actually changes (not stuck on English) and doesn't look
+   obviously broken/cut off for at least one non-Latin-script language (e.g.
+   Japanese, Korean, or Simplified Chinese) and one Cyrillic one (Russian or
+   Ukrainian).
 
-**Report back:** whether the popup appeared promptly and looked reasonable
-(not clipped, readable), whether the log line had the correct nickname(s),
-and whether repeat/fresh gaps re-triggered the popup as expected.
+**Report back:** whether the popup appeared right on the Start click (not
+before/after), whether the log line had the correct nickname(s), whether
+Cancel genuinely left the Boarding Pass untouched, whether Start Anyway
+correctly bypassed the check on the same click without looping, and how the
+non-English text looked.

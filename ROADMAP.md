@@ -155,23 +155,34 @@ world state) and the entire `Debug` section (diagnostics/overlays, never
 gameplay-affecting). Everything else that decides what spawns, what gets
 removed, or how much force applies is host-authoritative.
 
-**Enforcement (added 2026-07-22): every client must actually have Fairoots
-installed, and this is checked, not just documented.** A client missing the
-mod isn't merely "not tuned" — it silently breaks the shared-experience
-premise for itself (full vanilla spore bombs/wind while everyone else sees
-the host's configured version), so `Networking/ModPresenceCheck.cs` warns as
-soon as a gap is detected rather than leaving it to be discovered by a
-confused player mid-run. Every Fairoots client marks itself via a Photon
-player custom property on join; every client (not just the host) then checks
-every other player in the room for that same property. A gap logs the
-specific missing player nicknames (`Diag.Warn`) and shows a short, generic
-popup (`ModPresenceDialog.cs`) — deliberately no player names in the popup
-itself (would clip/bloat with several missing players), only in the log. The
-popup only reappears when the *specific set* of missing players changes, not
-on every routine re-check. Text is localized the same way
-peak-checkpoint-save's `MessagesLocalization` is (falls back to English for
-any language not yet translated) — English-only for now, by request, pending
-review of the wording before other languages are added.
+**Enforcement (added 2026-07-22, refined 2026-07-22): every client must
+actually have Fairoots installed, and this is checked, not just
+documented.** A client missing the mod isn't merely "not tuned" — it
+silently breaks the shared-experience premise for itself (full vanilla spore
+bombs/wind while everyone else sees the host's configured version). Every
+Fairoots client marks itself via a Photon player custom property on join
+(`Networking/ModPresenceCheck.cs`) — already fully replicated to every other
+client by Photon itself, no extra networking needed to check it.
+
+The actual player-facing gate lives at the one moment it matters: clicking
+**Start on the Boarding Pass** (opened via the Gate Kiosk) —
+`BoardingPassStartGatePatch.cs` prefixes `BoardingPass.StartGame()`
+(confirmed via decompile to be callable by *any* player, not just the host,
+since it just sends an RPC to whoever the MasterClient is — so the check has
+to run client-side on whoever clicks it, not host-exclusive). If everyone in
+the room has Fairoots installed, this is a complete no-op — vanilla
+behavior, unchanged. If not, the click is suppressed and a confirm dialog
+(`ModPresenceDialog.cs`) appears: **Cancel** leaves the Boarding Pass
+untouched (nothing starts); **Start Anyway** re-invokes `StartGame()` for
+real. The dialog never shows player names (would clip/bloat with several
+missing players) — those go to the log only
+(`[BoardingPassStartGatePatch] Start blocked pending confirmation - N
+player(s) missing Fairoots: ...`). Text is fully localized into all 14
+languages the game ships with (`LocalizedText.Language`), following
+peak-checkpoint-save's `MessagesLocalization`/`LocalizationHelper` convention
+exactly (falls back to English for any language an entry doesn't cover —
+used here only for TraditionalChinese, since the game's own
+`LocalizedText.LANGUAGE_COUNT` is 14, one less than the 15-value enum).
 
 ## Presets
 

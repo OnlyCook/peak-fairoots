@@ -75,34 +75,46 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       directly: one config-file-wide `Config.SettingChanged` hook in
       `Plugin.cs`, plus a call in `RootsLevelWatcher` right after
       `CaptureLevelSnapshot`.
-    - `ModPresenceCheck.cs` — enforces the "every client needs Fairoots
-      installed" requirement (ROADMAP.md's Host authority section): every
-      client marks itself via a Photon player custom property
-      (`Fairoots.Installed`) on `OnJoinedRoom`, then checks every player in
-      the room for that same property on join/player-entered/player-left.
-      A gap (any player missing it) logs the specific missing nicknames via
-      `Diag.Warn` and shows `ModPresenceDialog` once per newly-changed gap
-      (tracked by a signature of missing actor numbers, cleared once nobody's
-      missing, so a *repeat* gap warns again rather than staying silent
-      forever after the first warning).
+    - `ModPresenceCheck.cs` — tracks who in the lobby has Fairoots installed,
+      backing the "every client needs Fairoots installed" requirement
+      (ROADMAP.md's Host authority section): every client marks itself via a
+      Photon player custom property (`Fairoots.Installed`) on `OnJoinedRoom`
+      (already fully replicated to every other client by Photon itself, no
+      extra networking needed). `GetMissingPlayers()` is the shared query
+      both this file's own passive `Diag.Warn` logging (on
+      join/player-entered/player-left, informational only) and
+      `BoardingPassStartGatePatch` (the actual player-facing gate) both call.
+    - `BoardingPassStartGatePatch.cs` — the actual enforcement point: a
+      Harmony prefix on `BoardingPass.StartGame()` (confirmed via decompile -
+      callable by *any* player, not just the host, since it just sends an RPC
+      to whoever the MasterClient is - so this has to be checked client-side
+      on whoever clicks it). A no-op (original runs immediately) if
+      `ModPresenceCheck.GetMissingPlayers()` is empty; otherwise suppresses
+      the click and shows `ModPresenceDialog.ShowStartConfirm` - Cancel
+      leaves the Boarding Pass untouched, Confirm re-invokes `StartGame()` for
+      real via a one-shot bypass flag (so the same click doesn't loop back
+      into another confirmation).
     - `ModPresenceDialog.cs` — the actual popup: a minimal runtime-built uGUI
-      overlay (dim background + panel + title + word-wrapped body + "OK"
-      button), reusing the game's own font
+      overlay (dim background + panel + title + word-wrapped body + Cancel/
+      Start-Anyway buttons), reusing the game's own font
       (`Resources.FindObjectsOfTypeAll<TMP_FontAsset>()`, same technique as
       peak-checkpoint-save's `SavePicker.FindGameFont`) rather than an
       existing native `MenuWindow` instance (e.g. the pause menu's own
       confirm dialog) — that only exists while the pause menu itself is open,
-      but this needs to appear proactively during normal gameplay. Never
+      and this needs to appear over the Boarding Pass screen instead. Never
       shows player names (would clip/bloat with several missing players) —
       those go to the log only.
     - `ModPresenceLocalization.cs` / `LocalizationHelper.cs` — the dialog's
-      text, English-only for now (the maintainer wants to review the wording
-      before other languages are added). Mirrors peak-checkpoint-save's
+      text, fully localized into all 14 languages the game ships with (per
+      the maintainer's request) - "Fairoots" itself stays untranslated
+      everywhere (a proper name, same as how peak-checkpoint-save leaves mod
+      names alone). Mirrors peak-checkpoint-save's
       `MessagesLocalization`/`LocalizationHelper` convention exactly (a
       `Dictionary<Key, string[]>` indexed by `LocalizedText.Language`'s
       declaration order, falling back to index 0/English for any language a
-      given entry's array doesn't cover) so extending to other languages
-      later is a drop-in.
+      given entry's array doesn't cover - used here only for
+      TraditionalChinese, matching that same convention since the game's own
+      `LANGUAGE_COUNT` is 14, one less than the 15-value enum).
   - `PluginInfo.cs` — GUID/name/version constants.
   - `RootsLevelWatcher.cs` — detects a freshly-loaded Roots level (Roots prop
     placement is baked into the scene at author time, not regenerated at
