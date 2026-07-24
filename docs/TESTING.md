@@ -356,3 +356,82 @@ fog/visibility looked unchanged from vanilla throughout.
 whether a non-wind fall was completely unaffected, and whether 0.35 is a good
 default or needs adjusting (the maintainer's own framing: strong enough to
 let you react, not so strong it removes all sense of falling).
+
+### Host authority (multiplayer — needs a second player/PC, can't be verified solo)
+
+**Pre-req:** debug logging on for both host and at least one non-host client,
+both running the *same* Fairoots build. See ROADMAP.md's "Host authority"
+section for the full rationale/mechanism before testing this.
+
+1. Host sets a distinctive `seed` (e.g. `12345`) and `Custom` preset with an
+   obviously different `Spore-Bombs/cull-fraction` (e.g. `0.9`) than the
+   non-host client has locally configured (e.g. leave the client on `0.25`
+   Balanced). Both load into the same Roots run: the non-host client's spore
+   bomb count/positions should match the *host's* configured cull fraction
+   and seed exactly, not its own local settings - confirms the host's config
+   wins regardless of what the client has set locally.
+2. While both are already in a Roots level, host changes `Wind/force-multiplier`
+   live (e.g. to `0.1`) - the non-host client should feel the *same* weakened
+   wind almost immediately (no reload needed), even though the client never
+   touched their own config.
+3. Host sets `Wind/disable-wind-entirely = true` - wind should stop for
+   **both** players, not just the host. Set it back to `false` - wind
+   resumes for both.
+4. Non-host client changes any of their own local Wind/Spore-Bombs settings
+   (seed, preset, force-multiplier, backpack-always-immune, etc.) - this
+   should have **zero** effect on their actual in-game experience (still
+   matches whatever the host has configured), confirming a client can't
+   unilaterally alter shared gameplay.
+5. (If testable) Have the host disconnect/leave and let Photon promote the
+   non-host to master client - the new host's own config should immediately
+   become authoritative for whoever's left (via `HostAuthoritySync`'s
+   `OnMasterClientSwitched`), without needing a level reload.
+6. Confirm the wind-preceded-fall camera-dampening clamp is the one exception
+   that stays per-client: each player should be able to set their own
+   `fall-camera-dampen-clamp` independently and have it apply to their own
+   camera regardless of what the host or other players have set.
+
+**Report back:** whether the non-host client's spore bombs/wind genuinely
+matched the host's config (not their own), whether live host changes
+propagated to the client promptly, whether disable-wind-entirely affected
+both players, and whether the camera-dampening clamp correctly stayed
+per-player independent.
+
+### Mod-presence enforcement (multiplayer — needs a second player/PC without Fairoots installed)
+
+**Pre-req:** debug logging on. One player has Fairoots installed, one doesn't,
+both in the same lobby (order doesn't matter — host or non-host missing it).
+
+1. Have a modded player open the Gate Kiosk (Boarding Pass) and click
+   **Start**. Since someone in the lobby is missing Fairoots, the click
+   should be blocked and a confirm popup should appear immediately: title
+   "Fairoots", body ending in "Start anyway?", two buttons (Cancel / Start
+   Anyway). No player names anywhere in the popup.
+2. Check `LogOutput.log` on the modded player for
+   `[BoardingPassStartGatePatch] Start blocked pending confirmation - N
+   player(s) missing Fairoots: <nickname(s)>` — confirms the specific missing
+   name(s) went to the log, not the popup.
+3. Click **Cancel** — the popup should close, the run should NOT start, and
+   you should still be sitting at the Boarding Pass exactly as before
+   clicking Start (nothing skipped or half-started).
+4. Click **Start** again, this time click **Start Anyway** — the run should
+   start normally (same as vanilla), confirming Confirm genuinely bypasses
+   the check rather than looping back into another popup.
+5. Have the missing player install Fairoots (no need to rejoin — just having
+   it running should update their player property next time anything
+   rechecks), then click Start again — it should now proceed with zero popup
+   (everyone modded, no gap).
+6. With everyone modded, confirm clicking Start behaves exactly like vanilla
+   — no popup, no delay, no logged warning at all.
+7. Switch the current language (`LocalizedText`'s in-game language setting)
+   to a couple of the 14 translated languages and repeat step 1 — confirm the
+   popup text actually changes (not stuck on English) and doesn't look
+   obviously broken/cut off for at least one non-Latin-script language (e.g.
+   Japanese, Korean, or Simplified Chinese) and one Cyrillic one (Russian or
+   Ukrainian).
+
+**Report back:** whether the popup appeared right on the Start click (not
+before/after), whether the log line had the correct nickname(s), whether
+Cancel genuinely left the Boarding Pass untouched, whether Start Anyway
+correctly bypassed the check on the same click without looping, and how the
+non-English text looked.

@@ -1,6 +1,7 @@
 using System;
 using BepInEx;
 using Fairoots.Diagnostics;
+using Fairoots.Networking;
 using Fairoots.SporeBombs;
 using Fairoots.Wind;
 using HarmonyLib;
@@ -82,6 +83,25 @@ namespace Fairoots
             // ApplyChangesLive (see its own remarks), same treatment as
             // KeepVanillaTriggerRadius above.
             Cfg.DisableWindEntirely.SettingChanged += (s, e) => WindChillZoneTuningPatch.ReapplyAll();
+
+            // Host authority (ROADMAP.md, locked in 2026-07-22): whenever ANY
+            // setting changes, republish to the room's custom properties so
+            // every other client picks it up immediately - a no-op on any
+            // client that isn't the host (HostAuthority.PublishAll checks
+            // that itself). One config-file-wide hook instead of one per
+            // entry; cheap enough (a handful of already-resolved property
+            // reads plus one batched network write) to not need finer-grained
+            // filtering by which specific setting changed.
+            Config.SettingChanged += (s, e) => HostAuthority.PublishAll();
+
+            var networkingObject = new GameObject("FairootsNetworking");
+            UnityEngine.Object.DontDestroyOnLoad(networkingObject);
+            networkingObject.AddComponent<HostAuthoritySync>();
+
+            // Enforces "every client needs Fairoots installed" (ROADMAP.md's
+            // Host authority section) - warns (log + a one-time popup per
+            // newly-detected gap) if anyone in the lobby is missing the mod.
+            networkingObject.AddComponent<ModPresenceCheck>();
 
             Logger.LogInfo(
                 $"{PluginInfo.Name} {PluginInfo.Version} loaded. " +

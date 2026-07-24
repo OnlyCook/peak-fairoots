@@ -40,7 +40,7 @@ namespace Fairoots.Wind
 
         private static void Postfix(Character character)
         {
-            if (Plugin.Cfg.DisableWindEntirely.Value)
+            if (Plugin.Cfg.EffectiveDisableWindEntirely)
             {
                 return;
             }
@@ -70,7 +70,7 @@ namespace Fairoots.Wind
         {
             try
             {
-                if (Plugin.Cfg.DisableWindEntirely.Value)
+                if (Plugin.Cfg.EffectiveDisableWindEntirely)
                 {
                     return;
                 }

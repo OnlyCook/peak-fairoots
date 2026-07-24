@@ -9,6 +9,12 @@ re-scanning the whole tree.
 in.** Spore areas and creatures are not written yet; see `ROADMAP.md`'s phased
 plan.
 
+**Host authority (locked in 2026-07-22 — read `ROADMAP.md`'s "Host authority"
+section before touching `PluginConfig.cs` or anything under `Wind/`/
+`SporeBombs/`).** Every client needs the mod installed, but only the host's
+config is ever actually used for anything that changes shared gameplay — see
+`Networking/` below.
+
 ## The Core / game-facing split (read this first)
 
 The single most important structural rule: **all of the mod's actual decision
@@ -41,7 +47,86 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
     called by `RootsLevelWatcher` right before `SporeBombCullPatch.Run`), so
     every non-Debug setting only changes on the next Roots load instead of
     mid-level. The spore-bomb removal fraction and the seed are level-load-only
-    either way — which bombs got removed can't un-happen mid-level.
+    either way — which bombs got removed can't un-happen mid-level. **Almost
+    every `Effective*` accessor is also host-authoritative** (wrapped in
+    `Networking/HostAuthority.Resolve` — see that folder below): a no-op on
+    the host, but overridden by the host's published value on every other
+    client. The only accessors deliberately excluded (stay purely per-client)
+    are `EffectiveWindFallCameraDampenClamp` and the flat
+    `WindRecentForceWindowSeconds`/`Debug` section entries.
+  - **`Networking/`** — host authority (game-facing, Photon-dependent;
+    `ROADMAP.md`'s "Host authority" section is the full rationale):
+    - `HostAuthority.cs` — `Resolve(key, localValue)` (typed overloads for
+      `int`/`float`/`double`/`bool`): returns `localValue` unchanged on the
+      host, or on any other client, whatever the host last published to the
+      Photon room's custom properties (falling back to `localValue` if
+      nothing's been published yet — solo play, or the brief window before
+      the host's first publish). `PublishAll()` — host-only, writes every
+      host-authoritative resolved value from `Plugin.Cfg` to the room's
+      custom properties in one batched `SetCustomProperties` call; a no-op
+      for anyone who isn't currently the master client.
+    - `HostAuthoritySync.cs` — a tiny always-present
+      `MonoBehaviourPunCallbacks` component (instantiated once,
+      `DontDestroyOnLoad`, in `Plugin.Awake`) that calls `PublishAll()` on
+      `OnJoinedRoom`/`OnMasterClientSwitched` — the two cases where *who's*
+      authoritative changes without any config value itself changing (a late
+      joiner, or a host migration after the previous host disconnects).
+      Every other publish trigger (an actual config value changing) is wired
+      directly: one config-file-wide `Config.SettingChanged` hook in
+      `Plugin.cs`, plus a call in `RootsLevelWatcher` right after
+      `CaptureLevelSnapshot`. Also handles `OnRoomPropertiesUpdate` on every
+      non-host client: wind-force/gust-timing/item-force/occlusion tuning and
+      spore-bomb trigger-radius shrink are each computed once (at scene load
+      or on a local config change) and cached onto live fields, not re-read
+      every frame, so a client whose own level load raced ahead of the host's
+      first `PublishAll` would otherwise stay stuck on its local fallback
+      value for the rest of that level; this re-runs
+      `WindChillZoneTuningPatch.ReapplyAll()` /
+      `SporeBombCullPatch.ReapplyTriggerRadiusToAll()` whenever a fresh
+      room-property write actually lands, closing that race regardless of who
+      wins it. The spore-bomb detonation tuning (knockback/VFX/screen-shake
+      cap) doesn't need this - it already reads `Plugin.Cfg.Effective*` fresh
+      at the moment of each detonation.
+    - `ModPresenceCheck.cs` — tracks who in the lobby has Fairoots installed,
+      backing the "every client needs Fairoots installed" requirement
+      (ROADMAP.md's Host authority section): every client marks itself via a
+      Photon player custom property (`Fairoots.Installed`) on `OnJoinedRoom`
+      (already fully replicated to every other client by Photon itself, no
+      extra networking needed). `GetMissingPlayers()` is the shared query
+      both this file's own passive `Diag.Warn` logging (on
+      join/player-entered/player-left, informational only) and
+      `BoardingPassStartGatePatch` (the actual player-facing gate) both call.
+    - `BoardingPassStartGatePatch.cs` — the actual enforcement point: a
+      Harmony prefix on `BoardingPass.StartGame()` (confirmed via decompile -
+      callable by *any* player, not just the host, since it just sends an RPC
+      to whoever the MasterClient is - so this has to be checked client-side
+      on whoever clicks it). A no-op (original runs immediately) if
+      `ModPresenceCheck.GetMissingPlayers()` is empty; otherwise suppresses
+      the click and shows `ModPresenceDialog.ShowStartConfirm` - Cancel
+      leaves the Boarding Pass untouched, Confirm re-invokes `StartGame()` for
+      real via a one-shot bypass flag (so the same click doesn't loop back
+      into another confirmation).
+    - `ModPresenceDialog.cs` — the actual popup: a minimal runtime-built uGUI
+      overlay (dim background + panel + title + word-wrapped body + Cancel/
+      Start-Anyway buttons), reusing the game's own font
+      (`Resources.FindObjectsOfTypeAll<TMP_FontAsset>()`, same technique as
+      peak-checkpoint-save's `SavePicker.FindGameFont`) rather than an
+      existing native `MenuWindow` instance (e.g. the pause menu's own
+      confirm dialog) — that only exists while the pause menu itself is open,
+      and this needs to appear over the Boarding Pass screen instead. Never
+      shows player names (would clip/bloat with several missing players) —
+      those go to the log only.
+    - `ModPresenceLocalization.cs` / `LocalizationHelper.cs` — the dialog's
+      text, fully localized into all 14 languages the game ships with (per
+      the maintainer's request) - "Fairoots" itself stays untranslated
+      everywhere (a proper name, same as how peak-checkpoint-save leaves mod
+      names alone). Mirrors peak-checkpoint-save's
+      `MessagesLocalization`/`LocalizationHelper` convention exactly (a
+      `Dictionary<Key, string[]>` indexed by `LocalizedText.Language`'s
+      declaration order, falling back to index 0/English for any language a
+      given entry's array doesn't cover - used here only for
+      TraditionalChinese, matching that same convention since the game's own
+      `LANGUAGE_COUNT` is 14, one less than the 15-value enum).
   - `PluginInfo.cs` — GUID/name/version constants.
   - `RootsLevelWatcher.cs` — detects a freshly-loaded Roots level (Roots prop
     placement is baked into the scene at author time, not regenerated at

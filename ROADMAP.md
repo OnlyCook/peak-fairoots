@@ -79,6 +79,111 @@ desyncing anything the base game does downstream.
    install** (pure `(seed, mechanic, position) → decision` function, no
    `MonoBehaviour`/Unity types involved — see "Testing strategy" below).
 
+## Host authority (locked in 2026-07-22 — read this before touching any config or Wind/SporeBombs code)
+
+**Every client in the lobby must have Fairoots installed, but only the
+host's config is ever actually used for anything that changes shared
+gameplay.** An individual (non-host) client's own local seed/preset/per-
+mechanic settings are never used for those mechanics — no matter what they
+set locally, they get the host's values instead. This is deliberate, not a
+limitation to work around: the maintainer's explicit reasoning is that a
+client having the power to unilaterally alter shared game balance (wind
+strength, which spore bombs exist, etc.) hands too much control to any one
+player without a central authority. This is the locked-in interpretation of
+`OVERVIEW.md`'s original "host-only (probably)" framing — the "probably"
+was about a few things not being possible to make host-only at all (purely
+local camera-feel/UI/diagnostics), not about whether it's *desirable* to
+default to client authority where technically convenient.
+
+**Why "only the host needs the mod installed" (the more literal reading of
+"host-only") is not achievable for most of this mod's mechanics — a real
+networking constraint, confirmed 2026-07-22, not a design choice:**
+
+- Wind force/item-force/obstacle-occlusion are computed **per-client, from
+  each client's own local `WindChillZone` field values** — vanilla's own
+  `AddWindForceToCharacter` even explicitly checks
+  `character.photonView.IsMine` before applying anything, confirming each
+  client only ever simulates force for characters/items *it* owns. There is
+  no existing native RPC that lets the host override another client's local
+  computation for these fields.
+- Spore-bomb culling deactivates a **static, scene-baked GameObject** (Roots
+  prop placement is baked into the level scene at author time, not
+  network-instantiated — see `SporeBombCullPatch`'s remarks) — every client
+  has its own independent local copy, so the host calling `SetActive(false)`
+  only ever affects what the host itself sees/can trigger.
+- A **custom** Photon RPC or room property broadcasting the host's tuned
+  values would only work on clients that have code to *receive and act on*
+  it — Photon does not invent behavior on a receiver with no matching code,
+  so a non-modded client would simply ignore it entirely (at best a silent
+  no-op, matching normal Photon behavior for an unrecognized RPC).
+
+The one mechanic that genuinely *is* host-only "for free," with zero custom
+networking needed: **wind gust timing/frequency.** Vanilla's own
+`WindChillZone.HandleTime()` only calls `GetNextWindTime()` when
+`PhotonNetwork.IsMasterClient` is true, and broadcasts the result to every
+client (modded or not) via the existing native `RPCA_ToggleWind` RPC. Since
+only the host's `GetNextWindTime()` call ever matters, scaling the host's
+own `windTimeRangeOn`/`windTimeRangeOff` fields propagates correctly to
+everyone automatically — this is the one place the mod doesn't need any of
+the machinery described below.
+
+**The actual mechanism (everything else): host publishes, every client
+reads.** See `Core`-adjacent `Fairoots/Networking/`:
+
+- `HostAuthority.Resolve(key, localValue)` — called from every host-
+  authoritative `Effective*` accessor in `PluginConfig.cs`. On the host, a
+  no-op (the local value already *is* authoritative). On any other client,
+  overridden by whatever the host last published to the Photon room's custom
+  properties, falling back to the local value only if nothing's been
+  published yet (solo play, or the brief window before the host's first
+  publish).
+- `HostAuthority.PublishAll()` — the host writes every host-authoritative
+  resolved value (seed, every spore-bomb/wind multiplier, the backpack-
+  immunity and disable-wind-entirely flags) to the room's custom properties
+  in one batched write. Wired to fire on every relevant `SettingChanged` (via
+  a single config-file-wide hook, not one per entry), on every Roots level
+  load (`RootsLevelWatcher`), and via `HostAuthoritySync` (a small
+  `MonoBehaviourPunCallbacks` component) on joining a room already in
+  progress or a host migration (Photon promoting a new master client after
+  the previous host disconnects).
+
+**What stays purely client-local, deliberately excluded from host
+authority:** the wind-preceded-fall camera-dampening clamp/window (a
+camera-feel/accessibility setting — it only affects how *your own* camera
+reacts to *your own* fall, never anyone else's experience or the shared
+world state) and the entire `Debug` section (diagnostics/overlays, never
+gameplay-affecting). Everything else that decides what spawns, what gets
+removed, or how much force applies is host-authoritative.
+
+**Enforcement (added 2026-07-22, refined 2026-07-22): every client must
+actually have Fairoots installed, and this is checked, not just
+documented.** A client missing the mod isn't merely "not tuned" — it
+silently breaks the shared-experience premise for itself (full vanilla spore
+bombs/wind while everyone else sees the host's configured version). Every
+Fairoots client marks itself via a Photon player custom property on join
+(`Networking/ModPresenceCheck.cs`) — already fully replicated to every other
+client by Photon itself, no extra networking needed to check it.
+
+The actual player-facing gate lives at the one moment it matters: clicking
+**Start on the Boarding Pass** (opened via the Gate Kiosk) —
+`BoardingPassStartGatePatch.cs` prefixes `BoardingPass.StartGame()`
+(confirmed via decompile to be callable by *any* player, not just the host,
+since it just sends an RPC to whoever the MasterClient is — so the check has
+to run client-side on whoever clicks it, not host-exclusive). If everyone in
+the room has Fairoots installed, this is a complete no-op — vanilla
+behavior, unchanged. If not, the click is suppressed and a confirm dialog
+(`ModPresenceDialog.cs`) appears: **Cancel** leaves the Boarding Pass
+untouched (nothing starts); **Start Anyway** re-invokes `StartGame()` for
+real. The dialog never shows player names (would clip/bloat with several
+missing players) — those go to the log only
+(`[BoardingPassStartGatePatch] Start blocked pending confirmation - N
+player(s) missing Fairoots: ...`). Text is fully localized into all 14
+languages the game ships with (`LocalizedText.Language`), following
+peak-checkpoint-save's `MessagesLocalization`/`LocalizationHelper` convention
+exactly (falls back to English for any language an entry doesn't cover —
+used here only for TraditionalChinese, since the game's own
+`LocalizedText.LANGUAGE_COUNT` is 14, one less than the 15-value enum).
+
 ## Presets
 
 Four presets, numbered 1 (lightest touch) through 4 (heaviest). **Preset 2 is
@@ -378,17 +483,12 @@ obstacle-occlusion tuning, spore-area wind interaction, zombie speed field,
 honeycomb/stove spawn weights — that need a runtime logging pass or
 AssetRipper, not more decompilation). At the design level, still undecided:
 
-- **Host-only vs. every-client-installs.** Unlike the maintainer's
-  checkpoint-save mod (explicitly host-only) or sense-of-direction
-  (explicitly client-side-only), Fairoots sits in between: since spore-bomb
-  culling happens per-client against already-placed objects (see "Seed &
-  determinism" above), it technically *can* run client-side-only and still
-  be internally consistent for that client — but for a *shared, consistent*
-  experience across a whole lobby, every client needs the mod installed with
-  the same seed. `OVERVIEW.md` tentatively frames this as "host-only
-  (probably)" — needs a decision before Phase 2's config plumbing is
-  finalized, since it affects whether the mod needs any networking code at
-  all (if fully client-side-only is acceptable, it needs none).
+- **Host-only vs. every-client-installs — RESOLVED (2026-07-22), see "Host
+  authority" section below.** Every client must have Fairoots installed, but
+  only the host's config is ever actually used for anything that affects
+  shared gameplay — an individual client's own local config for those
+  settings is always overridden. `OVERVIEW.md`'s original "host-only
+  (probably)" framing is now locked in with that clarification.
 - Whether the "full zombie disable" option (Preset 4 default) should also be
   exposed as a standalone toggle independent of presets, given it overlaps
   with the game's own pre-existing (cosmetic-only) `ZombiePhobiaSetting`

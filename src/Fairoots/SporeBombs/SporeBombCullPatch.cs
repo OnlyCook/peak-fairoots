@@ -167,7 +167,7 @@ namespace Fairoots.SporeBombs
                     positions,
                     inFoliage,
                     Plugin.Cfg.EffectiveSporeBombCullFraction,
-                    Plugin.Cfg.Seed.Value);
+                    Plugin.Cfg.EffectiveSeed);
 
                 int removed = 0;
                 int shrunk = 0;
