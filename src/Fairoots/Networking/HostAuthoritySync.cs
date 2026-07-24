@@ -1,3 +1,7 @@
+using ExitGames.Client.Photon;
+using Fairoots.Diagnostics;
+using Fairoots.SporeBombs;
+using Fairoots.Wind;
 using Photon.Pun;
 
 namespace Fairoots.Networking
@@ -28,6 +32,36 @@ namespace Fairoots.Networking
         public override void OnMasterClientSwitched(Photon.Realtime.Player newMasterClient)
         {
             HostAuthority.PublishAll();
+        }
+
+        /// <summary>
+        /// Fires on every client (including the host, who ignores it below)
+        /// whenever the room's custom properties actually change - i.e. right
+        /// after the host's <see cref="HostAuthority.PublishAll"/> write lands.
+        /// Without this, a non-host client whose <c>WindChillZone</c>/spore-bomb
+        /// trigger-radius tuning was already applied once (at their own Roots
+        /// level load, from <c>Core/Presets</c> onward these are only computed
+        /// at scene-load/config-change time, not read fresh every frame) would
+        /// stay stuck on whatever it resolved to at that moment - typically its
+        /// own local fallback value, since the host's very first publish (on
+        /// <see cref="OnJoinedRoom"/>) and this client's own level load can race
+        /// in either order. Re-running both reapply passes here closes that gap
+        /// regardless of who won the race. The screen-shake/knockback/VFX
+        /// spore-bomb-detonation tuning doesn't need this - those already read
+        /// <c>Plugin.Cfg.Effective*</c> fresh at the moment of each detonation
+        /// (<see cref="SporeBombs.SporeBombExplosionPatch"/>), so they self-heal
+        /// the instant a property arrives with no caching to invalidate.
+        /// </summary>
+        public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
+        {
+            if (HostAuthority.IsHost)
+            {
+                return; // our own local values are already authoritative - nothing to refresh.
+            }
+
+            Diag.V("[HostAuthoritySync] room properties updated - reapplying cached wind/trigger-radius tuning.");
+            WindChillZoneTuningPatch.ReapplyAll();
+            SporeBombCullPatch.ReapplyTriggerRadiusToAll();
         }
     }
 }

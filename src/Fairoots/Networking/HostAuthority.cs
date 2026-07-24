@@ -1,4 +1,5 @@
 using ExitGames.Client.Photon;
+using Fairoots.Diagnostics;
 using Photon.Pun;
 
 namespace Fairoots.Networking
@@ -44,8 +45,14 @@ namespace Fairoots.Networking
 
         internal static int Resolve(string key, int localValue)
         {
-            if (IsHost || !TryGetRoomProperty(key, out object value) || !(value is int i))
+            if (IsHost)
             {
+                return localValue;
+            }
+
+            if (!TryGetRoomProperty(key, out object value) || !(value is int i))
+            {
+                LogFallback(key, value, localValue);
                 return localValue;
             }
 
@@ -54,8 +61,14 @@ namespace Fairoots.Networking
 
         internal static float Resolve(string key, float localValue)
         {
-            if (IsHost || !TryGetRoomProperty(key, out object value) || !(value is float f))
+            if (IsHost)
             {
+                return localValue;
+            }
+
+            if (!TryGetRoomProperty(key, out object value) || !(value is float f))
+            {
+                LogFallback(key, value, localValue);
                 return localValue;
             }
 
@@ -64,8 +77,14 @@ namespace Fairoots.Networking
 
         internal static double Resolve(string key, double localValue)
         {
-            if (IsHost || !TryGetRoomProperty(key, out object value) || !(value is double d))
+            if (IsHost)
             {
+                return localValue;
+            }
+
+            if (!TryGetRoomProperty(key, out object value) || !(value is double d))
+            {
+                LogFallback(key, value, localValue);
                 return localValue;
             }
 
@@ -74,12 +93,39 @@ namespace Fairoots.Networking
 
         internal static bool Resolve(string key, bool localValue)
         {
-            if (IsHost || !TryGetRoomProperty(key, out object value) || !(value is bool b))
+            if (IsHost)
             {
                 return localValue;
             }
 
+            if (!TryGetRoomProperty(key, out object value) || !(value is bool b))
+            {
+                LogFallback(key, value, localValue);
+                return localValue;
+            }
+
             return b;
+        }
+
+        /// <summary>
+        /// Verbose-only trail for why a non-host client fell back to its own
+        /// local value instead of the host's published one - either nothing has
+        /// been published yet under this key (<paramref name="rawValue"/> is
+        /// <c>null</c>), or something was published but under an unexpected CLR
+        /// type (logs the actual type so a Photon serialization mismatch is
+        /// visible instead of silently masquerading as "solo play fallback").
+        /// </summary>
+        private static void LogFallback(string key, object rawValue, object localValue)
+        {
+            if (!Diag.Enabled)
+            {
+                return;
+            }
+
+            string reason = rawValue == null
+                ? "no room property published yet"
+                : $"unexpected type {rawValue.GetType().Name} (value={rawValue})";
+            Diag.V($"[HostAuthority] Resolve(\"{key}\") fell back to local value {localValue} - {reason}");
         }
 
         private static bool TryGetRoomProperty(string key, out object value)
@@ -102,12 +148,14 @@ namespace Fairoots.Networking
         {
             if (!IsHost)
             {
+                Diag.V("[HostAuthority] PublishAll skipped - not the master client.");
                 return;
             }
 
             var room = PhotonNetwork.CurrentRoom;
             if (room == null)
             {
+                Diag.V("[HostAuthority] PublishAll skipped - not in a Photon room.");
                 return;
             }
 
@@ -130,6 +178,10 @@ namespace Fairoots.Networking
                 { KeyPrefix + "DisableWindEntirely", cfg.EffectiveDisableWindEntirely },
             };
             room.SetCustomProperties(props);
+            Diag.V(
+                $"[HostAuthority] PublishAll wrote {props.Count} propert(y/ies) to room " +
+                $"\"{room.Name}\": windForce={cfg.EffectiveWindForceMultiplier:0.###}, " +
+                $"shakeCap={cfg.EffectiveSporeBombScreenshakeRangeCapMeters:0.#}");
         }
     }
 }

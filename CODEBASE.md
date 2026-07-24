@@ -74,7 +74,19 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       Every other publish trigger (an actual config value changing) is wired
       directly: one config-file-wide `Config.SettingChanged` hook in
       `Plugin.cs`, plus a call in `RootsLevelWatcher` right after
-      `CaptureLevelSnapshot`.
+      `CaptureLevelSnapshot`. Also handles `OnRoomPropertiesUpdate` on every
+      non-host client: wind-force/gust-timing/item-force/occlusion tuning and
+      spore-bomb trigger-radius shrink are each computed once (at scene load
+      or on a local config change) and cached onto live fields, not re-read
+      every frame, so a client whose own level load raced ahead of the host's
+      first `PublishAll` would otherwise stay stuck on its local fallback
+      value for the rest of that level; this re-runs
+      `WindChillZoneTuningPatch.ReapplyAll()` /
+      `SporeBombCullPatch.ReapplyTriggerRadiusToAll()` whenever a fresh
+      room-property write actually lands, closing that race regardless of who
+      wins it. The spore-bomb detonation tuning (knockback/VFX/screen-shake
+      cap) doesn't need this - it already reads `Plugin.Cfg.Effective*` fresh
+      at the moment of each detonation.
     - `ModPresenceCheck.cs` — tracks who in the lobby has Fairoots installed,
       backing the "every client needs Fairoots installed" requirement
       (ROADMAP.md's Host authority section): every client marks itself via a
