@@ -3,53 +3,34 @@ using System.Collections.Generic;
 namespace Fairoots.Networking
 {
     /// <summary>
-    /// Translations for the Boarding Pass Start-confirmation dialog
-    /// (<see cref="ModPresenceDialog"/>, gated by
-    /// <see cref="BoardingPassStartGatePatch"/>). Array order matches
-    /// <c>LocalizedText.Language</c>'s declaration order (English, French,
-    /// Italian, German, SpanishSpain, SpanishLatam, BRPortuguese, Russian,
-    /// Ukrainian, SimplifiedChinese, TraditionalChinese, Japanese, Korean,
-    /// Polish, Turkish) - <see cref="LocalizationHelper"/> falls back to
-    /// English (index 0) for any entry a language doesn't cover.
-    /// TraditionalChinese is left blank, matching peak-checkpoint-save's
-    /// <c>MessagesLocalization</c> convention (the game's own
-    /// <c>LocalizedText.LANGUAGE_COUNT</c> is 14, one less than the 15-value
-    /// enum, so this mirrors that precedent rather than guessing a
-    /// translation for a language slot the game itself doesn't actually use).
-    /// "Fairoots" (the mod's name) is left untranslated everywhere, same as
-    /// how peak-checkpoint-save leaves its own and other mod names alone. No
-    /// em dashes anywhere, per the maintainer's request.
+    /// Translation for the Boarding Pass Start-confirmation dialog's body
+    /// text (<see cref="ModPresenceDialog"/>, gated by
+    /// <see cref="BoardingPassStartGatePatch"/>) - the dialog itself is the
+    /// native game's own reused <c>Peak.UI.ConfirmPage</c>, so only the
+    /// prompt text is ours; the OK/Cancel button labels are the game's own.
+    /// Array order matches <c>LocalizedText.Language</c>'s declaration order
+    /// (English, French, Italian, German, SpanishSpain, SpanishLatam,
+    /// BRPortuguese, Russian, Ukrainian, SimplifiedChinese,
+    /// TraditionalChinese, Japanese, Korean, Polish, Turkish) -
+    /// <see cref="LocalizationHelper"/> falls back to English (index 0) for
+    /// any entry a language doesn't cover. TraditionalChinese is left blank,
+    /// matching peak-checkpoint-save's <c>MessagesLocalization</c> convention
+    /// (the game's own <c>LocalizedText.LANGUAGE_COUNT</c> is 14, one less
+    /// than the 15-value enum, so this mirrors that precedent rather than
+    /// guessing a translation for a language slot the game itself doesn't
+    /// actually use). "Fairoots" (the mod's name) is left untranslated
+    /// everywhere, same as how peak-checkpoint-save leaves its own and other
+    /// mod names alone. No em dashes anywhere, per the maintainer's request.
     /// </summary>
     internal enum ModPresenceMsgKey
     {
-        DialogTitle,
         DialogBody,
-        ConfirmButton,
-        CancelButton,
     }
 
     internal static class ModPresenceLocalization
     {
         private static readonly Dictionary<ModPresenceMsgKey, string[]> Table = new Dictionary<ModPresenceMsgKey, string[]>
         {
-            [ModPresenceMsgKey.DialogTitle] = new[]
-            {
-                "Fairoots",
-                "Fairoots",
-                "Fairoots",
-                "Fairoots",
-                "Fairoots",
-                "Fairoots",
-                "Fairoots",
-                "Fairoots",
-                "Fairoots",
-                "Fairoots",
-                "",
-                "Fairoots",
-                "Fairoots",
-                "Fairoots",
-                "Fairoots",
-            },
             [ModPresenceMsgKey.DialogBody] = new[]
             {
                 "Not everyone in this lobby has Fairoots installed. This will create issues in the Roots biome for those clients (check LogOutput.log for more details). Start anyway?",
@@ -67,42 +48,6 @@ namespace Fairoots.Networking
                 "이 로비의 모든 플레이어가 Fairoots를 설치한 것은 아닙니다. 이는 해당 클라이언트의 Roots 바이옴에서 문제를 일으킵니다 (자세한 내용은 LogOutput.log를 확인하세요). 그래도 시작하시겠습니까?",
                 "Nie wszyscy w tym lobby mają zainstalowany Fairoots. Spowoduje to problemy w biomie Roots u tych klientów (sprawdź LogOutput.log, aby uzyskać więcej informacji). Rozpocząć mimo to?",
                 "Bu lobideki herkeste Fairoots yüklü değil. Bu, o istemcilerde Roots biyomunda sorunlara yol açacaktır (daha fazla ayrıntı için LogOutput.log dosyasına bakın). Yine de başlansın mı?",
-            },
-            [ModPresenceMsgKey.ConfirmButton] = new[]
-            {
-                "Start Anyway",
-                "Démarrer quand même",
-                "Avvia comunque",
-                "Trotzdem starten",
-                "Iniciar de todos modos",
-                "Iniciar de todos modos",
-                "Iniciar mesmo assim",
-                "Всё равно начать",
-                "Все одно почати",
-                "仍要开始",
-                "",
-                "それでも開始",
-                "그래도 시작",
-                "Rozpocznij mimo to",
-                "Yine de başlat",
-            },
-            [ModPresenceMsgKey.CancelButton] = new[]
-            {
-                "Cancel",
-                "Annuler",
-                "Annulla",
-                "Abbrechen",
-                "Cancelar",
-                "Cancelar",
-                "Cancelar",
-                "Отмена",
-                "Скасувати",
-                "取消",
-                "",
-                "キャンセル",
-                "취소",
-                "Anuluj",
-                "İptal",
             },
         };
 
