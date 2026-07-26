@@ -188,8 +188,12 @@ namespace Fairoots.SporeBombs
                         if (outcomes[i] == CullOutcome.RemovedFoliage)
                         {
                             var (dist, owner, count, maxHeightAbove) = NearestFoliageVertex(candidates[i].position);
-                            why = $", nearestFoliageVertex={dist:0.00}m countWithinRadius={count} " +
-                                  $"maxHeightAbove={maxHeightAbove:0.00}m owner=[{owner}]";
+                            // Both are raw world-space distances; the foliage-proximity
+                            // thresholds themselves are deliberately kept in world units
+                            // (they were tuned against mesh geometry, not meters), so only
+                            // the display is converted - see Core/WorldUnits.cs.
+                            why = $", nearestFoliageVertex={GameUnits.ToMeters(dist):0.00}m countWithinRadius={count} " +
+                                  $"maxHeightAbove={GameUnits.ToMeters(maxHeightAbove):0.00}m owner=[{owner}]";
                         }
                         Diag.V($"[SporeBombCull]   removed \"{candidates[i].name}\" @ {positions[i]} ({outcomes[i]}{why})");
                     }

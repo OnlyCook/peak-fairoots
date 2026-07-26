@@ -90,15 +90,44 @@ namespace Fairoots.SporeBombs
             }
 
             float shakeCapMeters = Plugin.Cfg.EffectiveSporeBombScreenshakeRangeCapMeters;
+
+            // Register before touching the shakes: the components below fire their
+            // own Shake() from Start() on the next frame, and DetonationScreenshakePatch
+            // needs this detonation on record by then (as do the explosion orbs
+            // ExplosionEffect spawns over the following second, which don't exist yet).
+            DetonationScreenshakeRegistry.Record(spawned.transform.position);
+
+            bool forcePositional = SporeBombExplosionTuning.ShouldForcePositionalScreenshake(shakeCapMeters);
+
+            // AddScreenshake.range is world units, the setting is meters, and the two
+            // differ by CharacterStats.unitsToMeters (1.6) - see Core/WorldUnits.cs.
+            float shakeCapUnits = GameUnits.MetersToUnits(shakeCapMeters);
+            int shakeCount = 0;
             foreach (var shake in spawned.GetComponentsInChildren<AddScreenshake>(true))
             {
-                shake.range = SporeBombExplosionTuning.CapScreenshakeRange(shake.range, shakeCapMeters);
+                shakeCount++;
+                bool wasPositional = shake.positional;
+                shake.range = SporeBombExplosionTuning.ResolveScreenshakeRange(
+                    shake.range, wasPositional, shakeCapUnits);
+
+                // A non-positional shake ignores range entirely and shakes every
+                // player's camera globally, so the cap only bites once it's positional.
+                if (forcePositional)
+                {
+                    shake.positional = true;
+                }
+
+                Diag.V(
+                    $"[SporeBombExplosion] shake '{shake.name}': positional {wasPositional}->" +
+                    $"{shake.positional}, range ->{GameUnits.ToMeters(shake.range):0.#}m " +
+                    $"({shake.range:0.#} world units)");
             }
 
             Diag.V(
                 $"[SporeBombExplosion] tuned detonation @ {spawned.transform.position} " +
                 $"(knockback x{knockbackMultiplier:0.##}, vfx x{vfxMultiplier:0.##}, " +
-                $"shake-cap={(shakeCapMeters <= SporeBombExplosionTuning.NoScreenshakeCap ? "vanilla" : $"{shakeCapMeters:0}m")}, " +
+                $"shake-cap={(shakeCapMeters <= SporeBombExplosionTuning.NoScreenshakeCap ? "vanilla" : $"{shakeCapMeters:0}m")} " +
+                $"across {shakeCount} AddScreenshake, " +
                 $"spore-area-radius x{sporeAreaRadiusMultiplier:0.##})");
         }
     }

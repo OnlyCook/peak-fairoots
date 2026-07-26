@@ -70,6 +70,73 @@ namespace Fairoots.Core
         }
 
         /// <summary>
+        /// The distance-cap setting only means anything if the shake is actually
+        /// distance-attenuated. The game's <c>AddScreenshake</c> only consults its
+        /// <c>range</c> field when <c>positional</c> is set - a non-positional shake
+        /// calls <c>GamefeelHandler.AddPerlinShake</c>, which is global and shakes
+        /// every player's camera at full strength no matter how far away the
+        /// detonation was. So whenever a cap is configured, Fairoots forces the
+        /// detonation's shakes positional; this returns true exactly then.
+        /// </summary>
+        public static bool ShouldForcePositionalScreenshake(float capMeters)
+        {
+            return capMeters > NoScreenshakeCap;
+        }
+
+        /// <summary>
+        /// The <c>AddScreenshake.range</c> to actually write, given whether the
+        /// component was positional to begin with.
+        ///
+        /// <paramref name="capUnits"/> is in **world units**, not the meters the
+        /// setting is denominated in - the caller converts via
+        /// <see cref="WorldUnits.MetersToUnits"/> first, because the vanilla range
+        /// it's compared against (and the field it's written to) are world units.
+        ///
+        /// If it already was, <see cref="CapScreenshakeRange"/> applies (take
+        /// whichever of vanilla/cap is tighter). If it wasn't, its <c>range</c> is a
+        /// dead field the game never read - the serialized value is meaningless
+        /// (typically the 15m component default) and clamping against it would
+        /// silently produce a far tighter falloff than the player asked for, so the
+        /// configured cap is used verbatim.
+        /// </summary>
+        public static float ResolveScreenshakeRange(float vanillaRange, bool vanillaPositional, float capUnits)
+        {
+            if (capUnits <= NoScreenshakeCap)
+            {
+                return vanillaRange;
+            }
+
+            return vanillaPositional ? CapScreenshakeRange(vanillaRange, capUnits) : capUnits;
+        }
+
+        /// <summary>
+        /// How long after a spore-bomb detonation (seconds) and how far from it
+        /// (meters) a screen shake is still attributed to that detonation. The
+        /// explosion VFX spawns its orbs on a staggered coroutine *after* the
+        /// detonation prefab is instantiated, so those orbs' own
+        /// <c>AddScreenshake</c> components don't exist yet when the spawn-time
+        /// tuning pass runs and have to be caught as they fire instead. The window
+        /// is deliberately tight so unrelated shakes (a fall, a rockfall, another
+        /// player's item) are never mistaken for detonation shakes.
+        /// </summary>
+        public const float DetonationScreenshakeWindowSeconds = 4f;
+
+        /// <inheritdoc cref="DetonationScreenshakeWindowSeconds"/>
+        public const float DetonationScreenshakeRadiusMeters = 20f;
+
+        /// <summary>
+        /// True if a screen shake <paramref name="ageSeconds"/> after and
+        /// <paramref name="distanceMeters"/> away from a known spore-bomb detonation
+        /// belongs to that detonation.
+        /// </summary>
+        public static bool IsDetonationScreenshake(float ageSeconds, float distanceMeters)
+        {
+            return ageSeconds >= 0f
+                && ageSeconds <= DetonationScreenshakeWindowSeconds
+                && distanceMeters <= DetonationScreenshakeRadiusMeters;
+        }
+
+        /// <summary>
         /// Scale a status-carrying spawned AOE's <c>range</c> (which the game
         /// reuses as both the <c>OverlapSphere</c> radius and the Spores
         /// status-effect radius - runtime-confirmed 2026-07-22: the "Spore Bomb"/

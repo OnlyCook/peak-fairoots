@@ -356,11 +356,44 @@ namespace Fairoots.Diagnostics
             });
         }
 
+        /// <summary>
+        /// Dump what a spore bomb's <c>TriggerEvent.triggerEvent</c> actually
+        /// invokes on detonation. The list is a serialized <c>UnityEvent</c>, so it's
+        /// invisible in a decompile - but <c>SpawnGameObject.Go</c> (the seam the
+        /// explosion tuning patches) may well not be the only listener, and anything
+        /// else in there is a detonation side effect Fairoots currently doesn't see.
+        /// </summary>
+        private static void LogTriggerEventListeners(GameObject go)
+        {
+            var trigger = go.GetComponent<TriggerEvent>();
+            if (trigger == null || trigger.triggerEvent == null)
+            {
+                return;
+            }
+
+            int count = trigger.triggerEvent.GetPersistentEventCount();
+            if (count == 0)
+            {
+                Diag.Info("[SporeBombs]     TriggerEvent listeners: none persistent (runtime-added only)");
+                return;
+            }
+
+            for (int i = 0; i < count; i++)
+            {
+                var target = trigger.triggerEvent.GetPersistentTarget(i);
+                Diag.Info(
+                    $"[SporeBombs]     TriggerEvent listener[{i}]: " +
+                    $"{(target != null ? target.GetType().Name + " on \"" + target.name + "\"" : "<null target>")}" +
+                    $".{trigger.triggerEvent.GetPersistentMethodName(i)}()");
+            }
+        }
+
         private static void ProbeSporeBombStructure(Transform t, string kind)
         {
             var go = t.gameObject;
             Diag.Info($"[SporeBombs]   probe {kind} @ {Fmt(t.position)} name=\"{t.name}\"");
             Diag.Info($"[SporeBombs]     self components: {ComponentNames(go)}");
+            LogTriggerEventListeners(go);
 
             // Walk up to the root, logging each ancestor's components.
             int depth = 0;

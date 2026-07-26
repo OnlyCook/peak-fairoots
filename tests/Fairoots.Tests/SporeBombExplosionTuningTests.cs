@@ -66,6 +66,70 @@ namespace Fairoots.Tests
             Assert.Equal(10f, SporeBombExplosionTuning.CapScreenshakeRange(10f, 30f));
         }
 
+        [Theory]
+        [InlineData(0f, false)]
+        [InlineData(-5f, false)]
+        [InlineData(0.5f, true)]
+        [InlineData(75f, true)]
+        public void ShouldForcePositionalScreenshake_OnlyWhenACapIsConfigured(float capMeters, bool expected)
+        {
+            Assert.Equal(expected, SporeBombExplosionTuning.ShouldForcePositionalScreenshake(capMeters));
+        }
+
+        [Fact]
+        public void ResolveScreenshakeRange_NoCap_LeavesVanillaRangeAlone()
+        {
+            Assert.Equal(15f, SporeBombExplosionTuning.ResolveScreenshakeRange(
+                15f, vanillaPositional: false, SporeBombExplosionTuning.NoScreenshakeCap));
+            Assert.Equal(15f, SporeBombExplosionTuning.ResolveScreenshakeRange(
+                15f, vanillaPositional: true, SporeBombExplosionTuning.NoScreenshakeCap));
+        }
+
+        [Fact]
+        public void ScreenshakeCap_InMeters_ConvertsToATighterWorldUnitRange()
+        {
+            // The regression this guards: a 75m cap written straight into
+            // AddScreenshake.range (world units) reached 75 * 1.6 = 120m in-game, so a
+            // detonation ~104m away still shook the camera. 75m is 46.9 world units.
+            float capUnits = WorldUnits.MetersToUnits(75f, WorldUnits.DefaultUnitsToMeters);
+            Assert.Equal(46.875f, capUnits, 3);
+
+            float written = SporeBombExplosionTuning.ResolveScreenshakeRange(
+                15f, vanillaPositional: false, capUnits);
+            Assert.Equal(75f, WorldUnits.UnitsToMeters(written, WorldUnits.DefaultUnitsToMeters), 3);
+        }
+
+        [Fact]
+        public void ResolveScreenshakeRange_NonPositionalVanilla_UsesTheCapVerbatim()
+        {
+            // A non-positional AddScreenshake never had its range read by the game, so
+            // the serialized value (here the 15m component default) is meaningless -
+            // clamping against it would give a 15m falloff for a player who asked for 75m.
+            Assert.Equal(75f, SporeBombExplosionTuning.ResolveScreenshakeRange(
+                15f, vanillaPositional: false, 75f));
+        }
+
+        [Fact]
+        public void ResolveScreenshakeRange_PositionalVanilla_ClampsAgainstIt()
+        {
+            Assert.Equal(20f, SporeBombExplosionTuning.ResolveScreenshakeRange(
+                75f, vanillaPositional: true, 20f));
+            Assert.Equal(10f, SporeBombExplosionTuning.ResolveScreenshakeRange(
+                10f, vanillaPositional: true, 30f));
+        }
+
+        [Theory]
+        [InlineData(0f, 0f, true)]              // the detonation's own shake, same frame
+        [InlineData(1.2f, 6f, true)]            // a staggered explosion orb nearby
+        [InlineData(-0.5f, 1f, false)]          // "before" the detonation - not ours
+        [InlineData(10f, 1f, false)]            // long after the detonation finished
+        [InlineData(0.5f, 200f, false)]         // simultaneous but across the map
+        public void IsDetonationScreenshake_OnlyMatchesInsideTheWindow(
+            float ageSeconds, float distanceMeters, bool expected)
+        {
+            Assert.Equal(expected, SporeBombExplosionTuning.IsDetonationScreenshake(ageSeconds, distanceMeters));
+        }
+
         [Fact]
         public void ScaleSporeAreaRadius_VanillaMultiplier_IsUnchanged()
         {

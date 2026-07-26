@@ -64,7 +64,10 @@ namespace Fairoots.SporeBombs
                 return true; // not a player - let vanilla logic decide (nothing else sets these off anyway).
             }
 
-            float heightAboveBase = character.Center.y - __instance.transform.position.y;
+            // Transform y is world units, the cutoff setting is meters - convert the
+            // measured height rather than the setting, so the log reads in meters too
+            // (see Core/WorldUnits.cs; they differ by 1.6x).
+            float heightAboveBase = GameUnits.ToMeters(character.Center.y - __instance.transform.position.y);
             if (SporeBombExplosionTuning.ShouldSuppressTriggerForHeight(heightAboveBase, maxHeight))
             {
                 Diag.V($"[SporeBombHeightGate] suppressed trigger on \"{name}\" - player {heightAboveBase:0.00}m above base (cutoff {maxHeight:0.00}m)");

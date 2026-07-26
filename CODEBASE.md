@@ -170,7 +170,20 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       until this fires). Only acts when the *triggering* object matches the
       spore-bomb name check; otherwise the original method runs untouched.
       Scales knockback, particle/VFX-orb count, and caps the screen-shake
-      range via `Core/SporeBombExplosionTuning.cs`.
+      range via `Core/SporeBombExplosionTuning.cs`, and records the detonation
+      in `DetonationScreenshakeRegistry` for the shake patch below.
+    - `DetonationScreenshakePatch.cs` + `DetonationScreenshakeRegistry.cs` —
+      the other half of the screen-shake distance cap. `AddScreenshake` only
+      honours its `range` when its `positional` flag is set; otherwise it calls
+      the *global* `AddPerlinShake`, which shakes every player's camera at full
+      strength regardless of distance, so setting `range` alone does nothing.
+      The patch is a prefix on `AddScreenshake.Shake()` that forces positional +
+      the configured range on any shake firing inside a recent detonation's
+      space/time window (the registry — a fixed-size ring of recent detonation
+      positions), which also catches the shakes on `ExplosionEffect`'s
+      explosion orbs, since those are instantiated on a staggered coroutine
+      *after* the spawn-time tuning pass has already run. Every shake outside
+      that window (falls, rockfalls, items, creatures) is untouched.
     - `SporeBombHeightGatePatch.cs` — a bug fix, not a preset dial: a Harmony
       prefix on the generic `TriggerEvent.OnTriggerEnter`, scoped to spore
       bombs by name, that suppresses the trigger entirely when the player is
@@ -181,6 +194,18 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       via `TriggerRadiusOverlay`'s wireframe), which made jumping over one
       impossible. Left alone for the round "Explosive Spore Bomb" variant.
   - **`Core/`** — the pure, Unity-free decision layer (see split rule above):
+    - `WorldUnits.cs` (+ the game-facing `GameUnits.cs` wrapper in the project
+      root) — **read this before adding any `*-meters` setting.** PEAK's world
+      units are not meters: the game keeps a static
+      `CharacterStats.unitsToMeters` (1.6 in the current build) and multiplies
+      by it everywhere it shows a player a distance or height. So a meters
+      setting must be divided by that factor before it's compared against, or
+      written into, anything positional (`Vector3.Distance`, a transform `y`,
+      `AddScreenshake.range`), and a raw distance must be multiplied by it
+      before being *logged* as meters. It's a 60% error, not a rounding one —
+      it's what made a "75m" screen-shake cap actually reach 120m.
+      `GameUnits` reads the live factor off the game; `WorldUnits` is the pure,
+      tested arithmetic that takes it as a parameter.
     - `GridPos.cs` — a world position rounded to an integer grid; the stable
       per-object identity every seeded decision keys off. `GridPos.Round(...)`
       is the one rounding definition the whole mod uses.

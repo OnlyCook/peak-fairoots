@@ -212,7 +212,8 @@ namespace Fairoots.Diagnostics
                 return null;
             }
 
-            return sphere.transform.position.y + maxHeight;
+            // maxHeight is meters; the returned y is a world-space coordinate.
+            return sphere.transform.position.y + GameUnits.MetersToUnits(maxHeight);
         }
 
         private static float MaxAbsAxis(Vector3 v) =>

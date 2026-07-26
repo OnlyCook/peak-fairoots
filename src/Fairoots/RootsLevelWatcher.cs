@@ -107,6 +107,7 @@ namespace Fairoots
             _levelLoaded = true;
             Plugin.Cfg.CaptureLevelSnapshot();
             Networking.HostAuthority.PublishAll();
+            DetonationScreenshakeRegistry.Clear();
             SporeBombCullPatch.Run(found.transform);
 
             if (Plugin.Cfg.EnableDebugLogging.Value && Plugin.Cfg.LogSceneScanOnLoad.Value)

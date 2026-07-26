@@ -232,6 +232,14 @@ namespace Fairoots
         /// <summary>Hotkey to dump a scene diagnostics report on demand while playing.</summary>
         public ConfigEntry<KeyCode> SceneScanHotkey { get; }
 
+        /// <summary>
+        /// Log every camera shake the game queues, with the call stack that asked for
+        /// it. Diagnostic only, and separately gated because it's far noisier than the
+        /// rest of the Debug harness (a stack trace per shake, and the game shakes the
+        /// camera constantly while climbing).
+        /// </summary>
+        public ConfigEntry<bool> LogScreenshakeSources { get; }
+
         /// <summary>Hotkey to probe the nearest spore-bomb candidate for a foliage-detection method (Phase 4 research, not shipped functionality).</summary>
         public ConfigEntry<KeyCode> FoliageProbeHotkey { get; }
 
@@ -353,7 +361,12 @@ namespace Fairoots
             SporeBombMaxTriggerHeightMeters = config.Bind(
                 "Spore-Bombs",
                 "max-trigger-height-meters",
-                1.75f,
+                // 2.8m == the 1.75 this shipped as before the units fix: that value was
+                // being compared against a raw world-space height, and one world unit is
+                // 1.6 meters (Core/WorldUnits.cs). Rebased rather than left at 1.75 so
+                // the in-game behavior that was actually tuned against the mushroom mesh
+                // is unchanged and the number now honestly means meters.
+                2.8f,
                 new ConfigDescription(
                     "Max height, in meters above its base, a player can be at and still set " +
                     "off a \"Spore Bomb\" or \"Poison Spore Bomb\" (not the round \"Explosive " +
@@ -494,6 +507,16 @@ namespace Fairoots
                 "When debug logging is on, automatically dump a scene diagnostics report " +
                 "each time a level finishes generating. Turn this off if you only want to " +
                 "trigger the report manually with the hotkey below.");
+
+            LogScreenshakeSources = config.Bind(
+                "Debug",
+                "log-screenshake-sources",
+                false,
+                "When debug logging is on, log every camera shake the game queues along " +
+                "with the code that asked for it, and how far away the source was. Use " +
+                "this to work out why a shake you expected to be distance-capped still " +
+                "happened. Very noisy (the game shakes the camera constantly while " +
+                "climbing) - leave off unless you're chasing a specific shake.");
 
             SceneScanHotkey = config.Bind(
                 "Debug",
