@@ -151,9 +151,12 @@ reads.** See `Core`-adjacent `Fairoots/Networking/`:
 authority:** the wind-preceded-fall camera-dampening clamp/window (a
 camera-feel/accessibility setting — it only affects how *your own* camera
 reacts to *your own* fall, never anyone else's experience or the shared
-world state) and the entire `Debug` section (diagnostics/overlays, never
-gameplay-affecting). Everything else that decides what spawns, what gets
-removed, or how much force applies is host-authoritative.
+world state), the spore-bomb recolor (`General/recolor-spore-bombs`, added
+2026-07-26 — purely cosmetic, see the spore-bomb mechanic note below), and
+the entire `Debug` section (diagnostics/overlays, never gameplay-affecting;
+this is also where `apply-changes-live` lives, since freezing values
+mid-run is a comparison-testing tool). Everything else that decides what
+spawns, what gets removed, or how much force applies is host-authoritative.
 
 **Enforcement (added 2026-07-22, refined 2026-07-22): every client must
 actually have Fairoots installed, and this is checked, not just
@@ -316,6 +319,46 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   base (`Spore-Bombs/max-trigger-height-meters`, default 1.75m -
   playtest-confirmed by the maintainer as "perfect" - 0 = vanilla). Left
   untouched for the "Explosive Spore Bomb" variant, which is genuinely round.
+
+  **Recolor (implemented 2026-07-26, not in the preset table above - a
+  readability fix, not a balance dial):** vanilla spore bombs are green
+  hazards sitting on green grass and green ground, so they camouflage into
+  the terrain even when they aren't literally buried inside a fern (that
+  separate, physical case is what the bush/grass placement removal above
+  handles). `General/recolor-spore-bombs` (on by default) recolors both the
+  mushroom-cluster variants and the explosive one to the magenta/pink the
+  game's own Spores status effect uses — the target hue is read live off
+  `CharacterAfflictions.colorSpores`, the same field the game pulses the
+  player's own body with when spores are applied, so the hazard's color and
+  the status it inflicts match by construction rather than by a guessed
+  hex value.
+
+  **Magenta specifically, not "some warm color."** The mechanism is a hue
+  replacement (adopt the target hue, blend saturation toward it, then rescale
+  onto the original's Rec. 709 luminance so shading survives and the object
+  doesn't get darker), not a multiplicative tint, and
+  that choice is an accessibility requirement rather than an implementation
+  detail. Multiplying can only ever scale channels that are already present:
+  the explosive variant's authored color `(0.717, 0.252, 0)` has **zero
+  blue**, so no gain could push it past pure red — and red against green
+  foliage is exactly the pair a red-green colorblind player cannot separate,
+  which would defeat the whole feature. Replacing the hue puts real blue into
+  the result, and blue is the channel red-green colorblindness leaves intact.
+  Every color slot the shader declares is recolored, not a subset:
+  `W/Peak_Standard` drives its stylized look from several at once, and doing
+  only some of them recolors the crevices and shading bands independently of
+  the surface (confirmed in-game — it looks like pink veins over a green
+  mushroom).
+
+  This is **the one setting in the mod that is deliberately not
+  host-authoritative** (see the Host authority section above). The rule
+  there is that no client may unilaterally alter shared gameplay; a color
+  changes nothing shared, only what one player sees on their own screen, so
+  there is nothing to keep consistent and no reason a host should get to
+  dictate it — the same reasoning that already exempts the wind-fall camera
+  dampening clamp. It's also always immediate, ignoring
+  `Debug/apply-changes-live`: a cosmetic toggle that waits for a level
+  reload would just read as broken.
 - **Spore areas** (the status-effect gas clouds — a different hazard from
   spore bombs, despite the similar name) run through a single generic
   radius-based hazard-zone component with public radius/lethality/falloff

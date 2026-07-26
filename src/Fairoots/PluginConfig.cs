@@ -15,11 +15,16 @@ namespace Fairoots
     /// PascalCase. Section names follow the maintainer's other PEAK mods
     /// (Capitalized-Hyphenated, or a plain word where there's nothing to hyphenate).
     ///
+    /// Sections, in bind (and therefore file) order: <c>General</c> (seed,
+    /// preset, and the client-side spore-bomb recolor), the per-mechanic
+    /// Custom-only sections, then <c>Debug</c> last.
+    ///
     /// Resolved accessors (e.g. <see cref="SporeBombCullFraction"/>) fold preset +
     /// override together so callers never re-implement that logic. Every
-    /// non-Debug setting is live by default (edits made in-game, e.g. via
+    /// gameplay setting is live by default (edits made in-game, e.g. via
     /// PEAKLib.ModConfig, take effect immediately) - <see cref="ApplyChangesLive"/>
-    /// turns that off, in which case game-facing code should read the
+    /// (in <c>Debug</c>, since freezing values mid-run is a comparison-testing
+    /// tool) turns that off, in which case game-facing code should read the
     /// <c>Effective*</c> accessors (snapshotted once per Roots level load via
     /// <see cref="CaptureLevelSnapshot"/>) instead of the raw resolved ones. The
     /// spore-bomb removal fraction and the seed are always level-load-only
@@ -35,28 +40,37 @@ namespace Fairoots
     /// published, so an individual client's own local config for these can
     /// never diverge from the host's. Purely local per-player feel settings -
     /// <see cref="EffectiveWindFallCameraDampenClamp"/>,
-    /// <see cref="WindRecentForceWindowSeconds"/>, and everything in
-    /// <c>Debug</c> - are deliberately excluded, since they don't affect
-    /// anyone but the player who set them.
+    /// <see cref="WindRecentForceWindowSeconds"/>,
+    /// <see cref="RecolorSporeBombs"/> (purely cosmetic - see its own remarks),
+    /// and everything in <c>Debug</c> - are deliberately excluded, since they
+    /// don't affect anyone but the player who set them.
     /// </summary>
     public class PluginConfig
     {
         // --- General -------------------------------------------------------
         public ConfigEntry<int> Seed { get; }
 
-        /// <summary>
-        /// When on (default), every setting below (except <c>Debug</c> section
-        /// ones, which always apply immediately) takes effect the instant you
-        /// change it in-game - e.g. via PEAKLib.ModConfig. When off, changes are
-        /// only picked up the next time you load into a Roots biome; whatever was
-        /// configured at that moment stays in effect for the whole level,
-        /// regardless of what you change afterward. Useful for A/B-testing a
-        /// mechanic without values shifting under you mid-run.
-        /// </summary>
-        public ConfigEntry<bool> ApplyChangesLive { get; }
-
-        // --- Presets -------------------------------------------------------
         public ConfigEntry<PresetId> Preset { get; }
+
+        /// <summary>
+        /// Whether spore bombs are tinted toward the game's own Spores status
+        /// color (pink/red) instead of their vanilla green - see
+        /// <see cref="Core.SporeBombRecolor"/> for the reasoning and the math,
+        /// and <c>SporeBombs/SporeBombRecolorPatch</c> for how it's applied.
+        /// On by default.
+        ///
+        /// <b>The one deliberately client-side setting in this mod.</b> Every
+        /// other non-Debug setting here is host-authoritative (see the class
+        /// remarks) because it changes shared gameplay; this one changes
+        /// nothing but what the player looking at their own screen sees, so
+        /// there's no consistency to enforce and no reason a host should get to
+        /// dictate it. Read the raw entry directly - there's deliberately no
+        /// <c>Effective*</c> accessor, since there's neither a host lookup nor a
+        /// level-load snapshot to apply (it always takes effect immediately,
+        /// regardless of <see cref="ApplyChangesLive"/> - a cosmetic toggle
+        /// waiting for a level reload would just be confusing).
+        /// </summary>
+        public ConfigEntry<bool> RecolorSporeBombs { get; }
 
         // --- Spore-Bombs ---------------------------------------------------
         /// <summary>
@@ -223,6 +237,26 @@ namespace Fairoots
         public ConfigEntry<float> WindRecentForceWindowSeconds { get; }
 
         // --- Debug (kept last) --------------------------------------------
+        /// <summary>
+        /// When on (default), every gameplay setting takes effect the instant
+        /// you change it in-game - e.g. via PEAKLib.ModConfig. When off, changes
+        /// are only picked up the next time you load into a Roots biome;
+        /// whatever was configured at that moment stays in effect for the whole
+        /// level, regardless of what you change afterward. Useful for
+        /// A/B-testing a mechanic without values shifting under you mid-run,
+        /// which is why it lives in <c>Debug</c> alongside the other
+        /// comparison-testing tools rather than in <c>General</c>.
+        ///
+        /// Like <see cref="KeepVanillaTriggerRadius"/>, this is a behavior
+        /// override rather than a diagnostic, so it applies regardless of
+        /// <see cref="EnableDebugLogging"/>. It doesn't gate anything else in
+        /// this section (those always apply immediately), nor the settings that
+        /// are flat by design - <see cref="DisableWindEntirely"/>,
+        /// <see cref="WindBackpackAlwaysImmune"/> and
+        /// <see cref="RecolorSporeBombs"/>.
+        /// </summary>
+        public ConfigEntry<bool> ApplyChangesLive { get; }
+
         /// <summary>Master switch for verbose diagnostic logging (the whole Debug harness is a no-op unless this is on).</summary>
         public ConfigEntry<bool> EnableDebugLogging { get; }
 
@@ -242,6 +276,16 @@ namespace Fairoots
 
         /// <summary>Hotkey to probe the nearest spore-bomb candidate for a foliage-detection method (Phase 4 research, not shipped functionality).</summary>
         public ConfigEntry<KeyCode> FoliageProbeHotkey { get; }
+
+        /// <summary>
+        /// Hotkey to dump the material/shader setup of whatever the player is
+        /// standing next to (<see cref="Diagnostics.MaterialProbe"/>) - which
+        /// color slots the shader actually declares and which ones Fairoots is
+        /// overriding. Research tool for the spore-bomb recolor; shaders are
+        /// assets rather than code, so this is the only way to find out what a
+        /// prop's albedo slot is really called.
+        /// </summary>
+        public ConfigEntry<KeyCode> MaterialProbeHotkey { get; }
 
         /// <summary>Draw a 2D screen-space label over every spore bomb removed this level load, tagged by why (foliage/seeded). Off by default.</summary>
         public ConfigEntry<bool> ShowRemovedSporeBombMarkers { get; }
@@ -274,22 +318,8 @@ namespace Fairoots
                 "own seed value here is ignored entirely, so there's nothing to coordinate " +
                 "manually (see ROADMAP.md's Host authority section).");
 
-            ApplyChangesLive = config.Bind(
-                "General",
-                "apply-changes-live",
-                true,
-                "When on (default), every setting below - except the Debug section, which " +
-                "always applies immediately - takes effect the instant you change it in-game " +
-                "(e.g. via PEAKLib.ModConfig): kept spore bombs resize live, the next " +
-                "detonation uses the new knockback/VFX/shake numbers, and the jump-over-height " +
-                "cutoff updates immediately. Turn this off to freeze all of that at whatever it " +
-                "was the moment you loaded into Roots - further changes only take effect the " +
-                "next time you load into a Roots biome. The spore-bomb removal fraction and the " +
-                "seed are always level-load-only either way, since which spore bombs were " +
-                "already removed can't be undone mid-level.");
-
             Preset = config.Bind(
-                "Presets",
+                "General",
                 "preset",
                 PresetId.Balanced,
                 "Overall balance preset. Subtle (1) is the lightest touch, Tame (4) the " +
@@ -299,6 +329,19 @@ namespace Fairoots
                 "entirely, even if you've changed them - switch to Custom to use them. " +
                 "HOST-AUTHORITATIVE: only the host's preset (and, under Custom, the host's " +
                 "own per-mechanic values) is ever actually used for the whole lobby.");
+
+            RecolorSporeBombs = config.Bind(
+                "General",
+                "recolor-spore-bombs",
+                true,
+                "Tints spore bombs (and explosive spore bombs) toward the pink/red the game's " +
+                "own Spores status effect uses, instead of leaving them vanilla green - a green " +
+                "hazard on green grass camouflages into the terrain, which is exactly what a " +
+                "hazard shouldn't do. Purely cosmetic and PER-PLAYER: unlike every other " +
+                "gameplay setting here, this one is NOT host-authoritative - it only changes " +
+                "what you see on your own screen, so set it however you like regardless of what " +
+                "the host or anyone else in the lobby has. Applies immediately, regardless of " +
+                "apply-changes-live.");
 
             SporeBombCullFractionOverride = config.Bind(
                 "Spore-Bombs",
@@ -490,7 +533,27 @@ namespace Fairoots
                     new AcceptableValueRange<float>(0.1f, 5f)));
 
             // --- Debug section: bound last so it sorts to the bottom of the
-            // config file. Everything here is diagnostic-only and off by default.
+            // config file. Everything here is diagnostic or comparison-testing
+            // tooling; the two behavior overrides in it (apply-changes-live,
+            // keep-vanilla-trigger-radius) apply regardless of the debug-logging
+            // master switch, everything else is a no-op without it.
+            ApplyChangesLive = config.Bind(
+                "Debug",
+                "apply-changes-live",
+                true,
+                "When on (default), every gameplay setting takes effect the instant you change " +
+                "it in-game (e.g. via PEAKLib.ModConfig): kept spore bombs resize live, the next " +
+                "detonation uses the new knockback/VFX/shake numbers, and the jump-over-height " +
+                "cutoff updates immediately. Turn this off to freeze all of that at whatever it " +
+                "was the moment you loaded into Roots - further changes only take effect the " +
+                "next time you load into a Roots biome, which is useful for A/B-testing a " +
+                "mechanic without values shifting under you mid-run. The spore-bomb removal " +
+                "fraction and the seed are always level-load-only either way, since which spore " +
+                "bombs were already removed can't be undone mid-level; the wind kill switch, " +
+                "backpack immunity and the spore-bomb recolor are always immediate either way. " +
+                "This is a behavior override, not a diagnostic, so it works regardless of the " +
+                "debug-logging switch below.");
+
             EnableDebugLogging = config.Bind(
                 "Debug",
                 "enable-debug-logging",
@@ -535,6 +598,16 @@ namespace Fairoots
                 "method (grass-blade density, nearby colliders/renderers). Research tool for " +
                 "Phase 4 (ROADMAP.md); not part of the shipped cull feature. Set to None to " +
                 "disable the hotkey.");
+
+            MaterialProbeHotkey = config.Bind(
+                "Debug",
+                "material-probe-hotkey",
+                KeyCode.F11,
+                "When debug logging is on, look at something and press this key to dump its material " +
+                "and shader setup: every color slot the shader declares, its value, and whether " +
+                "Fairoots is currently overriding it. Use it to work out why something looks " +
+                "miscolored - the report says outright whether the mod touched a given object " +
+                "or not. Set to None to disable the hotkey.");
 
             ShowRemovedSporeBombMarkers = config.Bind(
                 "Debug",

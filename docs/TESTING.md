@@ -36,6 +36,27 @@ Two layers, per ROADMAP.md's testing strategy:
      (`ShouldSuppressTriggerForHeight`): disabled (0) never suppresses, below
      the configured height never suppresses, above it does, and the exact
      boundary height still counts as "touching it."
+   - **Spore-bomb recolor** (`SporeBombRecolorTests`): the hue-replacement
+     math that shifts spore bombs out of "looks like grass" green (not
+     seed-gated, same reasoning as the explosion tuning above). Asserted
+     against the **real** material colors read off a live Roots level — the
+     regular variant's `(0.24, 0.406, 0.109)` green and the explosive's
+     `(0.717, 0.252, 0)` orange — not invented samples, so the tests fail if
+     the math stops working on actual game data. Both variants come out with
+     **real blue content, blue above green** (the accessibility crux: red-green
+     colorblindness leaves the blue channel intact, so magenta separates from
+     foliage where pure red does not — and the explosive variant's zero blue is
+     precisely why a multiplicative tint could never get there), adopt the
+     target hue exactly, keep their original **luminance** (not HSV value — a
+     regression guard asserts the trap directly: an equal-value magenta really
+     does lose ~half a green's perceived brightness, which is what made the
+     first hue-replacement build look near-black in-game), don't desaturate,
+     and stay distinguishable from each other. The luminance rescale is capped
+     so an LDR color never clips past white while an HDR one keeps its
+     headroom. Plus the guards: black stays black
+     (unused shader slots must not be switched on), an unreadable status color
+     leaves the original untouched, the target's HDR intensity doesn't change
+     the result, and HSV round-trips exactly including HDR values.
    - **Preset resolution** (`PresetResolutionTests`): a hand-set config value
      always wins over the active preset and is never clobbered by switching
      presets; every spore-bomb preset row (cull fraction, trigger radius,
@@ -89,6 +110,11 @@ menu if PEAKLib.ModConfig is installed):
   finishes generating.
 - `scene-scan-hotkey = F9` — press in-game to dump a report on demand (e.g.
   while standing next to a spore bomb). Set to `None` to disable.
+- `material-probe-hotkey = F11` — **look at** something and press this to dump
+  its material/shader setup: every color slot the shader declares, its value,
+  and whether Fairoots is overriding it. The tool for diagnosing anything that
+  looks miscolored. Your own body is excluded from the report. Set to `None` to
+  disable.
 - `show-removed-spore-bomb-markers = true` — 2D on-screen label over every
   spot a spore bomb was removed this level load, tagged by why (foliage vs.
   seeded cull). Off by default even with debug logging on.
@@ -162,7 +188,50 @@ questions in one pass.
 and whether the felt in-game effect (distance thrown, particle count, shake
 range) matched the logged multipliers.
 
-### Live vs. level-load-only setting updates (`General/apply-changes-live`)
+### Spore-bomb recolor (`General/recolor-spore-bombs`)
+
+**Pre-req:** in a Roots run. Debug logging optional (it adds a
+`[SporeBombRecolor]` line with the resolved tint and the Spores status color it
+was derived from).
+
+1. With the setting at its default (`true`), find a spore bomb sitting in
+   grass. It should read as clearly pink/red against the green ground rather
+   than blending into it — noticeably more saturated than vanilla, not just
+   desaturated or muddy brown. Check both kinds: the mushroom clusters
+   (`SporeFungus`/`SporeMushroom`) and the round explosive variant
+   (`SporeMushroomExplo`).
+2. Toggle it to `false` **without leaving the run** — every spore bomb in the
+   level should snap back to its exact vanilla green immediately (this is the
+   restore path, so look for any bomb left tinted or, worse, tinted *twice*).
+3. Toggle it back to `true` — they should re-tint immediately, to the same
+   shade as step 1 (not progressively darker, which would mean the vanilla
+   baseline wasn't cached correctly).
+4. Confirm nothing else in the level changed color — grass, ferns, the ground,
+   other props.
+5. Multiplayer check: this is the one setting that is deliberately **not**
+   host-authoritative. With two clients in the same run, set it differently on
+   each — each player should see their own choice, and neither should override
+   the other.
+
+**Report back:** whether it reads as magenta/pink rather than red or orange,
+whether the recolor is uniform across the whole prop, and whether it's too
+strong or too subtle (one constant, `Core/SporeBombRecolor.cs`'s
+`SaturationBlend`), plus whether steps 2-3 restored/re-applied cleanly.
+
+**If it looks wrong — patchy, veined, banded, or the wrong object entirely —
+use the material probe (`Debug/material-probe-hotkey`, default F11) rather
+than guessing.** Stand next to the object in question and press it: the log
+names every color slot that object's shader declares, its value, and whether
+Fairoots is overriding it. That distinguishes the two failure modes that look
+alike from a screenshot — "the mod recolored the wrong subset of color slots
+on the right object" (the classic veined/blotchy result; fix
+`SporeBombRecolorPatch`'s `ExcludedProperties`) versus "the mod touched an
+object it shouldn't have"
+(the report shows an override on something that isn't a spore bomb at all).
+A report showing *no* overrides means the mod isn't involved and whatever
+looks off is vanilla.
+
+### Live vs. level-load-only setting updates (`Debug/apply-changes-live`)
 
 **Pre-req:** debug logging on, in a Roots run, preset set to `Custom` (5) so
 the `Spore-Bombs` entries are actually in effect.
@@ -181,8 +250,10 @@ the `Spore-Bombs` entries are actually in effect.
    `Custom` isn't required here, an actual level load is): the new
    `knockback-multiplier`/`trigger-radius-multiplier` values should now be in
    effect, confirming the freeze only lasts until the next Roots load.
-4. Confirm `Debug` section settings (e.g. `keep-vanilla-trigger-radius`) still
-   apply immediately regardless of `apply-changes-live`'s value.
+4. Confirm the rest of the `Debug` section (e.g. `keep-vanilla-trigger-radius`)
+   and the flat settings that are always immediate by design
+   (`disable-wind-entirely`, `backpack-always-immune`, `recolor-spore-bombs`)
+   still apply instantly regardless of `apply-changes-live`'s value.
 
 **Report back:** whether step 1's changes applied instantly, whether step 2's
 changes were correctly ignored until step 3's reload, and whether step 4's

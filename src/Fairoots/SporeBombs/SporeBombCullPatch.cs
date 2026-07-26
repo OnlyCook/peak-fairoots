@@ -172,6 +172,8 @@ namespace Fairoots.SporeBombs
                 int removed = 0;
                 int shrunk = 0;
                 double triggerRadiusMultiplier = ResolveTriggerRadiusMultiplier();
+                bool recolor = Plugin.Cfg.RecolorSporeBombs.Value;
+                Core.Rgb sporeColor = SporeBombRecolorPatch.ResolveSporeColor();
                 if (Plugin.Cfg.KeepVanillaTriggerRadius.Value)
                 {
                     Diag.Info("[SporeBombCull] keep-vanilla-trigger-radius is ON - trigger hitboxes left at vanilla size (for before/after comparison screenshots)");
@@ -197,10 +199,22 @@ namespace Fairoots.SporeBombs
                         }
                         Diag.V($"[SporeBombCull]   removed \"{candidates[i].name}\" @ {positions[i]} ({outcomes[i]}{why})");
                     }
-                    else if (ShrinkTriggerRadius(candidates[i], triggerRadiusMultiplier, out Collider triggerCollider))
+                    else
                     {
-                        shrunk++;
-                        KeptTriggerColliders.Add(triggerCollider);
+                        if (ShrinkTriggerRadius(candidates[i], triggerRadiusMultiplier, out Collider triggerCollider))
+                        {
+                            shrunk++;
+                            KeptTriggerColliders.Add(triggerCollider);
+                        }
+
+                        // Only the "on" direction here - restoring vanilla colors
+                        // is ReapplyToAll's job when the setting is toggled off,
+                        // so a level loaded with the setting already off doesn't
+                        // pay for 400+ pointless property-block writes.
+                        if (recolor)
+                        {
+                            SporeBombRecolorPatch.Apply(candidates[i], sporeColor, enabled: true);
+                        }
                     }
                 }
 
@@ -208,7 +222,8 @@ namespace Fairoots.SporeBombs
                 Diag.Info(
                     $"[SporeBombCull] {summary.Total} candidate(s): removed {removed} " +
                     $"(foliage={summary.FoliageRemoved}, seeded={summary.SeededRemoved}), kept {summary.Kept}, " +
-                    $"trigger-radius shrunk on {shrunk} (multiplier={triggerRadiusMultiplier:0.##})");
+                    $"trigger-radius shrunk on {shrunk} (multiplier={triggerRadiusMultiplier:0.##}), " +
+                    $"recolor={(recolor ? $"ON target={sporeColor}" : "OFF")}");
             }
             catch (Exception e)
             {

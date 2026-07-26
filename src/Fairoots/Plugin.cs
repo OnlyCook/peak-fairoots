@@ -84,6 +84,12 @@ namespace Fairoots
             // KeepVanillaTriggerRadius above.
             Cfg.DisableWindEntirely.SettingChanged += (s, e) => WindChillZoneTuningPatch.ReapplyAll();
 
+            // Cosmetic, client-side, and always immediate (see its remarks in
+            // PluginConfig) - a scene-wide repaint in both directions, so
+            // turning it off restores the vanilla green right away rather than
+            // waiting for the objects to be reloaded.
+            Cfg.RecolorSporeBombs.SettingChanged += (s, e) => SporeBombRecolorPatch.ReapplyToAll();
+
             // Host authority (ROADMAP.md, locked in 2026-07-22): whenever ANY
             // setting changes, republish to the room's custom properties so
             // every other client picks it up immediately - a no-op on any
@@ -139,6 +145,12 @@ namespace Fairoots
             if (foliageKey != KeyCode.None && Input.GetKeyDown(foliageKey))
             {
                 SceneDiagnostics.ProbeFoliageNearestSporeBomb();
+            }
+
+            var materialKey = Cfg.MaterialProbeHotkey.Value;
+            if (materialKey != KeyCode.None && Input.GetKeyDown(materialKey))
+            {
+                MaterialProbe.DumpLookedAt();
             }
         }
 

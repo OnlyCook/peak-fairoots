@@ -32,11 +32,16 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
 
 - `src/Fairoots/` — the BepInEx plugin project (game-facing).
   - `Plugin.cs` — entry point (`BepInPlugin`); loads config + Harmony, logs.
-  - `PluginConfig.cs` — config binding: the `seed` field, `apply-changes-live`
-    (see below), the `preset` 1-5 selector (1-4 are the fixed presets, 5 is
-    Custom — see `Core/Presets/PresetId.cs`), per-mechanic Custom-only entries
-    (sane numeric defaults, only read when preset is set to Custom — ignored
-    under presets 1-4 even if changed), and the `Debug` section (bound last).
+  - `PluginConfig.cs` — config binding. Sections in bind (and file) order:
+    `General` — the `seed` field, the `preset` 1-5 selector (1-4 are the fixed
+    presets, 5 is Custom — see `Core/Presets/PresetId.cs`), and
+    `recolor-spore-bombs` (the one client-side setting, see below); then the
+    per-mechanic Custom-only sections (sane numeric defaults, only read when
+    preset is set to Custom — ignored under presets 1-4 even if changed); then
+    `Debug`, bound last, which also holds `apply-changes-live` (see below —
+    it's in `Debug` because freezing values mid-run is a comparison-testing
+    tool, and like `keep-vanilla-trigger-radius` it's a behavior override that
+    works regardless of the debug-logging master switch).
     Exposes *resolved* accessors (e.g. `SporeBombCullFraction`,
     `SporeBombKnockbackMultiplier`) that fold preset + override together via
     `Core/Presets/OverrideResolution`, plus a parallel set of `Effective*`
@@ -53,7 +58,11 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
     the host, but overridden by the host's published value on every other
     client. The only accessors deliberately excluded (stay purely per-client)
     are `EffectiveWindFallCameraDampenClamp` and the flat
-    `WindRecentForceWindowSeconds`/`Debug` section entries.
+    `WindRecentForceWindowSeconds`/`Debug` section entries — plus
+    `recolor-spore-bombs`, which has no `Effective*` accessor at all: it's
+    purely cosmetic (what one player sees on their own screen), so there's
+    neither a host lookup nor a level-load snapshot to apply, and game-facing
+    code reads `Plugin.Cfg.RecolorSporeBombs.Value` directly.
   - **`Networking/`** — host authority (game-facing, Photon-dependent;
     `ROADMAP.md`'s "Host authority" section is the full rationale):
     - `HostAuthority.cs` — `Resolve(key, localValue)` (typed overloads for
@@ -141,6 +150,20 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       creatures). This is the Phase 3 tool for confirming the RESEARCH.md open
       questions from a real Roots level. Triggered by a postfix on
       `PropGrouper.RunAll` (auto, after level gen) and by a config hotkey.
+    - `MaterialProbe.cs` — dumps the real material/shader setup of everything
+      within ~5m of the player (hotkey, default F11): every color slot each
+      shader declares, its value, and whether Fairoots is currently overriding
+      it via a property block. Exists because shaders are *assets, not code* —
+      nothing in the decompiled C# says what a prop's albedo slot is called, and
+      PEAK's stylized prop shaders carry several color slots at once, so the
+      spore-bomb recolor's first two versions guessed and recolored shading
+      bands and crevices instead of surfaces. Also answers "did the mod do this
+      to that object, or does it just look like that?" outright, per property.
+      Targets whatever the player is **looking at** (ray vs. renderer bounds,
+      not a physics raycast — the meshes that matter here are often
+      colliderless, and a spore bomb's only collider is its invisible trigger
+      volume), excluding the local player's own body, which otherwise sits at
+      0.00m and crowds out the entire report.
     - `PingRadiusProbePatch.cs` / `RemovedMarkerOverlay.cs` — dev-only probes
       for the foliage-detection and cull-removal debug loop.
     - `TriggerRadiusOverlay.cs` — draws a red 3D wireframe (via `GL` immediate-
@@ -193,6 +216,30 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       sphere reaching absurdly far above the actual mushroom mesh (confirmed
       via `TriggerRadiusOverlay`'s wireframe), which made jumping over one
       impossible. Left alone for the round "Explosive Spore Bomb" variant.
+    - `SporeBombRecolorPatch.cs` — the visual-readability fix: tints every spore
+      bomb (both the mushroom-cluster variants and the explosive one) toward the
+      pink/magenta of the game's own Spores status effect, so a green hazard
+      stops camouflaging into green grass and green ground. Not actually a Harmony
+      patch despite the folder's naming convention — the scene objects are just
+      already there, so it's driven the same way the trigger-radius shrink is
+      (once per level from `SporeBombCullPatch.Run`, plus a scene-wide
+      `ReapplyToAll()` on the setting changing). Reads the target hue live off
+      `CharacterAfflictions.colorSpores` (the same field the game pulses the
+      player with) and gets the recolored value from `Core/SporeBombRecolor.cs`.
+      Recolors **every** `Color`-typed property the shader declares (minus a
+      short exclusion list: specular/rim/emission and the character-only
+      status/skin slots), enumerated live off the shader rather than guessed by
+      name — `W/Peak_Standard` drives its stylized look from several color slots
+      at once, and recoloring a subset desynchronizes them into pink veins over
+      an otherwise-green mushroom, which is exactly what the first two versions
+      shipped. Uniformity requires all of them or none. Writes through a `MaterialPropertyBlock`, never
+      `Renderer.material` — with 400+ spore bombs per level the latter would mean
+      400+ material instantiations and a broken batch each — and caches every
+      renderer/submaterial slot's vanilla color the first time it's seen so
+      toggling the setting off restores the true original, the same
+      baseline-caching pattern as `SporeBombCullPatch`'s vanilla trigger radii.
+      **The only client-side, non-host-authoritative gameplay-adjacent feature in
+      the mod** (it's cosmetic — see `PluginConfig.cs` above).
   - **`Core/`** — the pure, Unity-free decision layer (see split rule above):
     - `WorldUnits.cs` (+ the game-facing `GameUnits.cs` wrapper in the project
       root) — **read this before adding any `*-meters` setting.** PEAK's world
@@ -226,6 +273,31 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       there's no per-instance decision here, just scaling/thresholding).
       `SporeBombExplosionPatch`/`SporeBombCullPatch`/`SporeBombHeightGatePatch`
       call into this for the numbers.
+    - `SporeBombRecolor.cs` — the pure color math behind the spore-bomb recolor
+      (plus `Rgb`, a Unity-free color triple so this can live in `Core/` at
+      all, and HSV conversion): replaces each material color's **hue** with the
+      Spores status color's, blends saturation toward it, then rescales the
+      result onto the original's **Rec. 709 luminance** so the artist's
+      per-slot lightness differences — which is what reads as shading — survive
+      instead of flattening. Luminance, not HSV value: value is just the
+      largest channel, while perceived brightness is ~72% green, so an
+      equal-value magenta loses about half a green's brightness. That's not
+      theoretical — the first hue-replacement build shipped with it and came
+      back from in-game testing as a near-black maroon lump. Not seed-gated (every spore bomb gets the identical flat
+      treatment), same as `SporeBombExplosionTuning.cs`.
+
+      **Why hue replacement and not a multiplicative tint** (the first version
+      tried that, see git history): runtime probing showed PEAK's props use a
+      `W/Peak_Standard` shader whose color slots hold genuine authored colors
+      — the regular spore bomb's is `(0.24, 0.406, 0.109)` green, the explosive
+      one's `(0.717, 0.252, 0)` orange — not a neutral white multiplier over a
+      texture. That matters beyond convenience: **multiplication can never add
+      a channel that isn't already there**, and the explosive variant has zero
+      blue, so no gain could make it magenta — only pure red. Pure red against
+      green foliage is exactly the pair a red-green colorblind player cannot
+      separate, which would defeat the feature. Adopting the hue outright puts
+      real blue in the result, and blue is the channel red-green colorblindness
+      leaves intact.
     - `Presets/PresetId.cs` — the preset enum: 1-4 are the fixed presets
       (Balanced is default), 5 is Custom (ignores the catalog and uses the
       player's own config directly).
