@@ -665,8 +665,14 @@ is currently the only feedback that it engaged.
    immediately, cancelling any cover in progress. A non-host setting it has no
    effect; a player setting their own `cover-mouth-key = None` opts out regardless
    of the host.
-10. Spore *bombs* should still hit you normally while covering (a setting to
-    include their temporary mini areas is planned, not built).
+10. Spore *bombs*: with `Spore-Bombs/cover-mouth-blocks-spore-bombs` off (the
+    default) a bomb should still give you spores while covering. Turn it on and
+    set one off while covered — no spores at all, though the blast should still
+    knock you around. Then keep covering, and uncover/re-cover several times over
+    the following ten seconds or so: still no spores. That last part is the real
+    test — the cloud is one AOE re-exploding on a timer, and an earlier version
+    blocked only its first few seconds. Any `[SporeSource]` line in the log means
+    a spore got through while covered, which should be impossible.
 
 11. **The pose.** Both hands should come up over your mouth with a real
     hand/finger shape, and *only* the arms should change — walk, jump and look

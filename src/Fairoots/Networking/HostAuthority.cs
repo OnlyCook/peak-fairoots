@@ -182,6 +182,7 @@ namespace Fairoots.Networking
                 { KeyPrefix + "SporeAreaStatusRateMultiplier", cfg.EffectiveSporeAreaStatusRateMultiplier },
                 { KeyPrefix + "CoverMouthStaminaPerSecond", cfg.EffectiveCoverMouthStaminaPerSecond },
                 { KeyPrefix + "DisableCoverMouth", cfg.EffectiveDisableCoverMouth },
+                { KeyPrefix + "CoverMouthBlocksSporeBombs", cfg.EffectiveCoverMouthBlocksSporeBombs },
                 { KeyPrefix + "ClimbSheltersFromWind", cfg.EffectiveClimbSheltersFromWind },
                 { KeyPrefix + "ClimbWindSpeedMultiplier", cfg.EffectiveClimbWindSpeedMultiplier },
                 { KeyPrefix + "ClimbWindUpwardSpeedMultiplier", cfg.EffectiveClimbWindUpwardSpeedMultiplier },

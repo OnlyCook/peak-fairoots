@@ -162,6 +162,20 @@ namespace Fairoots
         /// </summary>
         public ConfigEntry<bool> CoverMouthHold { get; }
 
+        /// <summary>
+        /// Whether covering your mouth may dip into bonus stamina (the temporary extra
+        /// the game grants from food and similar) once ordinary stamina is spent. Off by
+        /// default: bonus stamina is a scarce resource a player spent something to get,
+        /// so quietly burning it to hold a breath - when the alternative is simply
+        /// uncovering - is the kind of thing that should be opted into.
+        ///
+        /// Per-client, like the keybind and hold/toggle mode: it decides what *your own*
+        /// action costs *you*, and nothing about anyone else's game. What the drain rate
+        /// is remains host-authoritative
+        /// (<see cref="CoverMouthStaminaPerSecond"/>).
+        /// </summary>
+        public ConfigEntry<bool> CoverMouthUseBonusStamina { get; }
+
         // --- Spore-Areas ----------------------------------------------------
         /// <summary>
         /// Master kill switch for the Roots biome's persistent spore areas (the
@@ -251,6 +265,17 @@ namespace Fairoots
         /// </summary>
         public ConfigEntry<float> CoverMouthStaminaPerSecond { get; }
 
+
+        /// <summary>
+        /// Whether covering your mouth also blocks the spore status from a spore bomb's
+        /// temporary mini spore cloud, on top of the biome's persistent spore areas.
+        /// Off by default - see <c>SporeBombs/CoverMouthSporeBombPatch</c> for why the
+        /// mechanic is scoped to spore areas, and note that only the spore status is
+        /// suppressed either way: knockback and screen shake still land.
+        /// <b>Host-authoritative</b>: what a counterplay move protects against is shared
+        /// balance, like its stamina cost.
+        /// </summary>
+        public ConfigEntry<bool> CoverMouthBlocksSporeBombs { get; }
 
         // --- Wind -----------------------------------------------------------
         /// <summary>
@@ -643,6 +668,18 @@ namespace Fairoots
                     "preset is set to Custom (5) - ignored under presets 1-4.",
                     new AcceptableValueRange<double>(0.0, 5.0)));
 
+            CoverMouthBlocksSporeBombs = config.Bind(
+                "Spore-Bombs",
+                "cover-mouth-blocks-spore-bombs",
+                false,
+                "Whether covering your mouth (see General/cover-mouth-key) also protects you from " +
+                "the small spore cloud a spore bomb leaves behind when it goes off. Off by " +
+                "default: the mechanic is meant for the biome's spore areas, which you can see " +
+                "coming and choose to walk into, whereas a spore bomb is a surprise you've " +
+                "already set off. Either way this only stops the spores - the blast still knocks " +
+                "you around. HOST-AUTHORITATIVE: only the host's value counts for the whole " +
+                "lobby.");
+
             DisableSporeAreas = config.Bind(
                 "Spore-Areas",
                 "disable-spore-areas",
@@ -675,6 +712,16 @@ namespace Fairoots
                 "How cover-mouth-key behaves: on (default) means hold the key to keep your mouth " +
                 "covered and let go to stop; off makes it a toggle - press once to start, press " +
                 "again to stop. PER-PLAYER, same as cover-mouth-key above.");
+
+            CoverMouthUseBonusStamina = config.Bind(
+                "General",
+                "cover-mouth-use-bonus-stamina",
+                false,
+                "Whether covering your mouth is allowed to eat into your bonus stamina (the extra " +
+                "you get from food) once your normal stamina runs out. Off by default - covering " +
+                "simply stops when you run out of normal stamina, leaving your bonus intact for " +
+                "climbing. PER-PLAYER: this is your own call, like the keybind; how fast covering " +
+                "drains stamina in the first place is still the host's setting.");
 
             SporeAreaRemovalFractionOverride = config.Bind(
                 "Spore-Areas",
@@ -1418,6 +1465,13 @@ namespace Fairoots
         /// </summary>
         public bool EffectiveWindBackpackAlwaysImmune =>
             HostAuthority.Resolve("WindBackpackAlwaysImmune", WindBackpackAlwaysImmune.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="CoverMouthBlocksSporeBombs"/>.Value. Host-authoritative.
+        /// </summary>
+        public bool EffectiveCoverMouthBlocksSporeBombs =>
+            HostAuthority.Resolve("CoverMouthBlocksSporeBombs", CoverMouthBlocksSporeBombs.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of

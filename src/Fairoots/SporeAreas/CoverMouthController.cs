@@ -138,15 +138,18 @@ namespace Fairoots.SporeAreas
             }
 
             // Out of stamina ends a cover: the drain has to actually be payable, or
-            // "it costs stamina" would be decoration. Checked as a *state* rather
-            // than by trusting UseStamina's return value, so a cover can't be
-            // sustained on the bonus-stamina reserve indefinitely either. Inlines the
-            // game's own OutOfStamina() thresholds (it's `internal`, and its two
-            // backing fields are public) rather than reflecting into it - two float
-            // comparisons per frame are not worth a reflective call.
+            // "it costs stamina" would be decoration. Checked as a *state* rather than
+            // by trusting UseStamina's return value. Inlines the game's own
+            // OutOfStamina() thresholds (it's `internal`, and its two backing fields are
+            // public) rather than reflecting into it - two float comparisons per frame
+            // are not worth a reflective call.
+            //
+            // Whether the bonus-stamina reserve counts is the player's own choice: with
+            // it off (the default) a cover ends the moment ordinary stamina is gone,
+            // leaving the bonus for climbing.
             if (Plugin.Cfg.EffectiveCoverMouthStaminaPerSecond > 0f
                 && character.data.currentStamina < 0.005f
-                && character.data.extraStamina < 0.001f)
+                && (!Plugin.Cfg.CoverMouthUseBonusStamina.Value || character.data.extraStamina < 0.001f))
             {
                 reason = "out of stamina";
                 return false;
@@ -265,7 +268,8 @@ namespace Fairoots.SporeAreas
                 return;
             }
 
-            UseStaminaMethod.Invoke(character, new object[] { cost, true });
+            // The second argument is the game's own useBonusStamina flag.
+            UseStaminaMethod.Invoke(character, new object[] { cost, Plugin.Cfg.CoverMouthUseBonusStamina.Value });
         }
 
         // --- Replication --------------------------------------------------

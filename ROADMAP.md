@@ -548,6 +548,17 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   (purely visual — no immunity, no stamina, no restrictions), and the seven pose
   offsets under `Debug` are playtest-tuned defaults rather than estimates.
 
+  **Spore bombs (opt-in, 2026-07-27).** `Spore-Bombs/cover-mouth-blocks-spore-bombs`
+  (off by default, host-authoritative) extends the immunity to the temporary cloud a
+  spore bomb leaves behind. Off by default because the mechanic is scoped to spore
+  areas — something you see coming and choose to walk into, which is what makes
+  holding your breath through it counterplay — whereas a bomb is a surprise you've
+  already triggered; it exists because the maintainer wanted the freedom to enable
+  it. Only the spore status is blocked either way: the blast still knocks you about.
+  Worth knowing for anyone touching this: a bomb's cloud is **not** a
+  `StatusEmitter` and not a one-shot — it is a single `AOE` that re-explodes on a
+  timer, which only became visible by tracing a live call stack.
+
   **Known limitation:** the pose still shifts slightly depending on which idle
   animation the character is in. The gross session-to-session variance is fixed
   (the capture is synchronous with the other animator layers muted, so it no

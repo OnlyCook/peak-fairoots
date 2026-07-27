@@ -164,6 +164,13 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       colliderless, and a spore bomb's only collider is its invisible trigger
       volume), excluding the local player's own body, which otherwise sits at
       0.00m and crowds out the entire report.
+    - `SporeStatusSourcePatch.cs` — logs any Spores application that lands on the
+      local player *while their mouth is covered*, with the call stack that asked
+      for it. That combination should be impossible, so every line is a bug report.
+      Earned its keep immediately: it's what revealed a bomb's cloud to be a
+      timer-driven repeating `AOE`, after both plausible readings of the decompile
+      turned out to be wrong. Same approach and rationale as
+      `ScreenshakeSourcePatch`.
     - `PingRadiusProbePatch.cs` / `RemovedMarkerOverlay.cs` — dev-only probes
       for the foliage-detection and cull-removal debug loop.
     - `TriggerRadiusOverlay.cs` — draws a red 3D wireframe (via `GL` immediate-
@@ -216,6 +223,20 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       sphere reaching absurdly far above the actual mushroom mesh (confirmed
       via `TriggerRadiusOverlay`'s wireframe), which made jumping over one
       impossible. Left alone for the round "Explosive Spore Bomb" variant.
+    - `CoverMouthSporeBombPatch.cs` + `SporeBombDetonationMarker.cs` — the opt-in
+      `Spore-Bombs/cover-mouth-blocks-spore-bombs` setting (off by default,
+      host-authoritative): covering your mouth also blocks the spore payload of a
+      spore bomb's temporary cloud. Only the *status* is suppressed — knockback,
+      noise and shake still land. A bomb's cloud is not a `StatusEmitter`, so the
+      spore-area immunity can't reach it: it's **one `AOE` that re-explodes on a
+      timer** (`TimeEvent` invoking `Explode` repeatedly — established from a live
+      call stack, not the decompile), so the patch zeroes `statusAmount` *and*
+      `hasAffliction` around each `Explode` call and always restores them. Scoping
+      uses `SporeBombDetonationMarker`, a tag put on the spawned explosion, rather
+      than `DetonationScreenshakeRegistry` — read that file's remarks before
+      changing it: the registry expires after seconds (it's for screen shakes), so
+      the registry-based version blocked a cloud's first few seconds and silently
+      let the rest through.
     - `SporeBombRecolorPatch.cs` — the visual-readability fix: tints every spore
       bomb (both the mushroom-cluster variants and the explosive one) toward the
       pink/magenta of the game's own Spores status effect, so a green hazard

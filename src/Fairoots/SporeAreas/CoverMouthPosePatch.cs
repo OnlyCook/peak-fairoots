@@ -123,6 +123,15 @@ namespace Fairoots.SporeAreas
 
         private static Quaternion _rightWristBodyRelative = Quaternion.identity;
 
+        /// <summary>How long after the local character appears to wait before capturing (see <see cref="Prewarm"/>).</summary>
+        private const float PrewarmDelaySeconds = 3f;
+
+        private const float PrewarmRetrySeconds = 2f;
+
+        private const int MaxPrewarmAttempts = 5;
+
+        private static float _nextPrewarmAttempt;
+        private static int _prewarmAttempts;
         private static bool _captureFailed;
         private static bool _layersLogged;
         private static string _poseState;
@@ -160,6 +169,8 @@ namespace Fairoots.SporeAreas
             _leftFingerPose = null;
             _rightFingerPose = null;
             _captureFailed = false;
+            _nextPrewarmAttempt = 0f;
+            _prewarmAttempts = 0;
         }
 
         /// <summary>
@@ -290,7 +301,7 @@ namespace Fairoots.SporeAreas
         /// of the emote is visible. Nothing about the result depends on timing or on what
         /// the character was doing.
         /// </summary>
-        private static void TryCapturePose(Character character)
+        private static bool TryCapturePose(Character character)
         {
             var refs = character.refs;
             Transform leftTip = refs.ikLeft != null ? refs.ikLeft.data.tip : null;
@@ -298,18 +309,17 @@ namespace Fairoots.SporeAreas
             Animator animator = refs.animator;
             Transform body = BodyRoot(character);
 
-            if (leftTip == null || rightTip == null || animator == null || body == null)
+            if (leftTip == null || rightTip == null || animator == null || !animator.isInitialized || body == null)
             {
-                _captureFailed = true;
-                Diag.Warn("[CoverMouthPose] no arm IK tips or animator to capture a hand pose from - falling back to arm IK only.");
-                return;
+                // Transient during spawn - the caller retries rather than giving up.
+                return false;
             }
 
             string state = ResolvePoseState(animator);
             if (string.IsNullOrEmpty(state))
             {
                 _captureFailed = true;
-                return;
+                return false;
             }
 
             LogAnimatorLayersOnce(animator);
@@ -348,6 +358,71 @@ namespace Fairoots.SporeAreas
             Diag.V(
                 $"[CoverMouthPose] captured hand pose from \"{state}\" at t={Plugin.Cfg.CoverMouthPoseEmoteTime.Value:0.##}: " +
                 $"{_leftFingerPose.Count} left finger bone(s), {_rightFingerPose.Count} right finger bone(s)");
+            return true;
+        }
+
+        /// <summary>
+        /// Captures the pose <b>at spawn</b>, well before anyone covers their mouth.
+        /// Polled from <c>Plugin.Update</c>.
+        ///
+        /// The capture forces the animator into the emote state and evaluates it
+        /// immediately (<c>Animator.Update(0)</c>), and PEAK's characters are physics
+        /// ragdolls whose bodyparts chase the animated pose - so slamming a whole new
+        /// pose in and out within one frame gives the ragdoll a real impulse. Doing it
+        /// mid-run was violent enough to be a bug in its own right: the maintainer
+        /// reported being <em>teleported backwards</em> with arms twitching the first
+        /// time they covered their mouth in a live run (2026-07-27).
+        ///
+        /// Doing it while the player is standing in the airport before the run makes the
+        /// same blip harmless: nothing is at stake there, and by the time the mechanic is
+        /// ever used the pose is long since cached. Retried rather than latched, because
+        /// early in a spawn the rig genuinely isn't ready yet.
+        /// </summary>
+        internal static void Prewarm()
+        {
+            if (HasCapturedPose || _captureFailed || Plugin.Cfg == null)
+            {
+                return;
+            }
+
+            var character = Character.localCharacter;
+            if (character == null)
+            {
+                _nextPrewarmAttempt = 0f;
+                return;
+            }
+
+            // First sighting of a character: wait a moment before touching its animator -
+            // the rig and its IK constraints are built during spawn, and a capture from a
+            // half-built rig is exactly the kind of thing that produces a subtly wrong
+            // pose rather than an obvious failure.
+            if (_nextPrewarmAttempt <= 0f)
+            {
+                _nextPrewarmAttempt = Time.time + PrewarmDelaySeconds;
+                return;
+            }
+
+            if (Time.time < _nextPrewarmAttempt)
+            {
+                return;
+            }
+
+            _nextPrewarmAttempt = Time.time + PrewarmRetrySeconds;
+            _prewarmAttempts++;
+
+            if (TryCapturePose(character))
+            {
+                Diag.V($"[CoverMouthPose] pose pre-warmed at spawn after {_prewarmAttempts} attempt(s)");
+                return;
+            }
+
+            if (_prewarmAttempts >= MaxPrewarmAttempts && !_captureFailed)
+            {
+                _captureFailed = true;
+                Diag.Warn(
+                    $"[CoverMouthPose] gave up pre-warming the hand pose after {_prewarmAttempts} attempts - " +
+                    "covering your mouth will use arm IK only (no finger shape).");
+            }
         }
 
         /// <summary>
@@ -458,8 +533,14 @@ namespace Fairoots.SporeAreas
                 refs.ikLeft.weight = 1f;
                 refs.ikRight.weight = 1f;
 
+                // Last resort only. The pose is normally captured at spawn (Prewarm),
+                // precisely so this never runs mid-run - capturing here is what
+                // teleported the maintainer backwards with twitching arms. Kept so a
+                // failed pre-warm degrades to "one ugly moment" rather than "no pose at
+                // all", and only ever fires once.
                 if (!HasCapturedPose && !_captureFailed)
                 {
+                    Diag.Warn("[CoverMouthPose] pose wasn't pre-warmed at spawn - capturing now, which may jolt the character.");
                     TryCapturePose(character);
                 }
             }

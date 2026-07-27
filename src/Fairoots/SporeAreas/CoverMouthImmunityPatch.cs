@@ -48,6 +48,9 @@ namespace Fairoots.SporeAreas
         /// </summary>
         private static readonly HashSet<int> ForcedPlainEmitters = new HashSet<int>();
 
+        /// <summary>Spore-bomb-spawned emitters already reported once - see <see cref="IsFromSporeBomb"/>.</summary>
+        private static readonly HashSet<int> _loggedBombEmitters = new HashSet<int>();
+
         /// <summary>
         /// Each suppressed emitter's <c>timeSinceLastTick</c>, preserved across the
         /// cover so releasing the key resumes the tick that was already in progress
@@ -97,6 +100,7 @@ namespace Fairoots.SporeAreas
         {
             SavedTickProgress.Clear();
             ForcedPlainEmitters.Clear();
+            _loggedBombEmitters.Clear();
         }
 
         [HarmonyPostfix]
@@ -127,11 +131,17 @@ namespace Fairoots.SporeAreas
                     ForcedPlainEmitters.Add(id);
                 }
 
-                // Park the in-progress tick. Vanilla leaves the field alone while the
-                // emitter is disabled, so this is just the value from the last
-                // uncovered frame - captured every frame so no ordering assumption is
-                // needed about when the cover began.
-                if (IsPlayerInRange(__instance))
+                // Park the in-progress tick, but only for the level's own spore areas.
+                //
+                // A spore bomb's lingering cloud is deliberately excluded (live-reported
+                // 2026-07-27): parking exists to stop tap-spamming the key from buying
+                // near-free immunity in an area you chose to stand in, and it works by
+                // delivering the withheld tick the moment the cover drops. Applied to a
+                // bomb, that reads as a bug - the player covered their mouth *before* the
+                // blast, took nothing, and then got spores anyway on releasing, which is
+                // precisely the opposite of what the opt-in setting promises. A bomb's
+                // cloud is a one-off you either blocked or didn't.
+                if (!IsFromSporeBomb(__instance) && IsPlayerInRange(__instance))
                 {
                     SavedTickProgress[id] = TickProgressRef(__instance);
                 }
@@ -222,9 +232,46 @@ namespace Fairoots.SporeAreas
                    < emitter.radius + emitter.outerFade;
         }
 
-        private static bool ShouldSuppress(StatusEmitter emitter) =>
-            CoverMouthController.LocalCovering
-            && SporeAreaScan.IsSporeArea(emitter)
-            && !SporeAreaScan.IsSporeBombSpawned(emitter.transform);
+        /// <summary>
+        /// Whether this emitter should be gated off right now. A spore bomb's own
+        /// lingering cloud counts only when the opt-in
+        /// <c>Spore-Bombs/cover-mouth-blocks-spore-bombs</c> setting is on - otherwise
+        /// the mechanic stays scoped to the biome's persistent spore areas.
+        /// </summary>
+        private static bool ShouldSuppress(StatusEmitter emitter)
+        {
+            if (!CoverMouthController.LocalCovering || !SporeAreaScan.IsSporeArea(emitter))
+            {
+                return false;
+            }
+
+            if (!IsFromSporeBomb(emitter))
+            {
+                return true;
+            }
+
+            return Plugin.Cfg.EffectiveCoverMouthBlocksSporeBombs;
+        }
+
+        /// <summary>
+        /// Whether an emitter belongs to a spore bomb's detonation rather than to the
+        /// level. Logs the first one it ever sees, because whether spore bombs leave a
+        /// lingering <c>StatusEmitter</c> behind at all (as opposed to applying their
+        /// spores once through the spawned <c>AOE</c>) decides which of the two
+        /// cover-mouth spore-bomb paths is actually doing the work - and the answer isn't
+        /// in the decompiled code, since it's prefab data.
+        /// </summary>
+        private static bool IsFromSporeBomb(StatusEmitter emitter)
+        {
+            bool fromBomb = SporeAreaScan.IsSporeBombSpawned(emitter.transform);
+            if (fromBomb && _loggedBombEmitters.Add(emitter.GetInstanceID()))
+            {
+                Diag.V(
+                    $"[CoverMouth] spore-bomb detonation left a lingering spore emitter: " +
+                    $"\"{SporeAreaScan.DescribePath(emitter.transform)}\" (radius={emitter.radius}, amount={emitter.amount})");
+            }
+
+            return fromBomb;
+        }
     }
 }

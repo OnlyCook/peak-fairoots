@@ -159,6 +159,10 @@ namespace Fairoots
             RootsLevelWatcher.CheckAndRun();
             CoverMouthController.Tick();
 
+            // Capture the cover-mouth hand pose while the player is still standing in
+            // the airport, not the first time they need it - see CoverMouthPose.Prewarm.
+            CoverMouthPose.Prewarm();
+
             if (!Cfg.EnableDebugLogging.Value)
             {
                 return;
