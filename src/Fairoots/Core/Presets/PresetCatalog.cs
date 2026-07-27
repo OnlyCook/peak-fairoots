@@ -200,6 +200,29 @@ namespace Fairoots.Core.Presets
         }
 
         /// <summary>
+        /// Multiplier applied to a persistent spore area's
+        /// <c>radius</c> (and, proportionally, its <c>innerFade</c>/<c>outerFade</c>
+        /// and its cloud VFX scale - see <see cref="SporeAreaTuning"/>), per
+        /// ROADMAP.md's "Spore area radius" row (-15%/-30%/-45%). 1.0 = vanilla
+        /// (Subtle). Vanilla is <c>radius = 16</c> world units (~26m), so Balanced
+        /// takes it to ~13.6 units. Starting estimates pending playtest.
+        ///
+        /// Not to be confused with <see cref="SporeBombSporeAreaRadiusMultiplier"/>,
+        /// which is the *spore bomb's* temporary mini area.
+        /// </summary>
+        public static double SporeAreaRadiusMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.85;
+                case PresetId.Generous: return 0.70;
+                case PresetId.Tame: return 0.55;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
         /// The unconditional bush/grass placement-removal pass is on for every
         /// preset, including Subtle (ROADMAP.md - the game never prevents a spore
         /// bomb landing in foliage, so this gap is always fixed). Kept as a method

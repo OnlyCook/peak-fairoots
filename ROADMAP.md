@@ -224,7 +224,7 @@ once and left alone).
 | Spore bomb screen-shake distance cap | vanilla (~75m, unconfirmed) | 30m | 20m | 10m |
 | Spore bomb particle/VFX count | vanilla | −25% | −50% | −65% |
 | Spore area count (seeded removal — see below) | 0% | 0% | 20% | 35% |
-| Spore area radius | vanilla | −15% | −30% | −45% |
+| Spore area radius (hazard + visible cloud — see below) | vanilla | −15% | −30% | −45% |
 | Spore area lethality (status/sec) | vanilla | −15% | −35% | −55% |
 | Spore area screen-filter opacity | vanilla | −20% | −40% | −60% |
 | Wind disperses spore areas | if not already vanilla behavior, on | on | on | on, generous |
@@ -458,6 +458,32 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   cull, and independent of scene-enumeration order. Level-load-only, like the
   spore-bomb removal fraction. Live-verified 2026-07-27: 23 areas at 0.5 →
   removed 12, kept 11 (= `floor(23 × 0.5)`).
+
+  **What "a spore area" actually is, structurally (confirmed 2026-07-27, and it
+  corrects an earlier assumption):** the object both the disable switch and the
+  thinning pass act on is `"Mushroom tree Spore Cloud"`, which is the **whole
+  mushroom-tree prop** — the mushroom meshes and their `MeshCollider`s are its
+  direct children, alongside a `"Spore Cloud"` child carrying the
+  `StatusEmitter` and two `"Particles"` systems. So removing a spore area
+  removes the emitter mushroom *and its collision geometry* (a mushroom cap that
+  could have been stood on goes with it). That is the intended scope, confirmed
+  by the maintainer: the ask was "disable the spore areas **and** their Spore
+  Emitter, the mushroom in the centre," not "silence the emitter and leave the
+  prop standing."
+
+  **Radius (implemented 2026-07-27):** `Spore-Areas/radius-multiplier` scales
+  `StatusEmitter.radius` **and** `innerFade`/`outerFade` by the same factor,
+  **and** the two cloud particle systems' transforms — so the visible cloud and
+  the real hazard extent always agree (the maintainer's explicit requirement; a
+  hazard whose apparent size disagrees with its actual size is worse than either
+  size alone). Scaling the fades along with the radius is what preserves the
+  falloff *shape*: the native ramp is measured inward from the boundary, and
+  vanilla's `radius = 16` / `innerFade = 8` means "the outer half fades in," so
+  scaling the radius alone would turn a shrunken area into nearly all ramp and
+  an enlarged one into nearly all full-strength core — i.e. the radius dial
+  would quietly become a lethality dial, which is a separate setting's job. The
+  emitter mushroom is deliberately *not* scaled (only the particle systems are,
+  and they're a separate child of the prop). Live-updatable, unlike removal.
 - **Creatures**: zombies currently have **no distance-based deaggro at
   all** once they've targeted a player (confirmed absent in code, not just
   hard to find) — this is the one creature change that's genuinely new

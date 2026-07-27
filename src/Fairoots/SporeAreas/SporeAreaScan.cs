@@ -83,10 +83,22 @@ namespace Fairoots.SporeAreas
         /// <c>Biome</c> - the <c>*Shrooms</c>-style group parents hold every
         /// instance of a prop type at once), and the Roots Segment itself.
         ///
-        /// In practice (confirmed in-game) this resolves to the emitter's own
-        /// object, named "Mushroom tree Spore Cloud", whose parent is the scenery
-        /// mushroom tree it grows on (<c>Evil Shroom</c> / <c>Mush Trees (spores)</c>)
-        /// - which correctly stays put.
+        /// In practice this resolves one level up from the emitter, to
+        /// "Mushroom tree Spore Cloud" - confirmed by the structure dump in
+        /// <c>SporeAreaRadiusPatch</c>, which also corrected an earlier assumption
+        /// in this comment. That object is the <b>whole mushroom-tree prop</b>: the
+        /// mushroom meshes and their <c>MeshCollider</c>s are its direct children,
+        /// alongside a "Spore Cloud" child carrying the <c>StatusEmitter</c> and two
+        /// "Particles" systems. Its own parent (<c>Evil Shroom</c> /
+        /// <c>Mush Trees (spores)</c>) holds several of them, which is where the
+        /// walk stops.
+        ///
+        /// So removing or disabling a spore area takes the emitter mushroom with it,
+        /// <b>including its collision geometry</b> - a mushroom cap that could have
+        /// been stood on is gone too. That is the maintainer's explicitly confirmed
+        /// intent (2026-07-27): the ask was "disable all spore areas *and* their
+        /// Spore Emitter, which is the mushroom in the centre," not "silence the
+        /// emitter and leave the prop."
         /// </summary>
         internal static GameObject ResolveAreaRoot(StatusEmitter emitter)
         {

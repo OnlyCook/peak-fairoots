@@ -116,6 +116,7 @@ namespace Fairoots
             // (see SporeAreaDisablePatch's remarks).
             SporeAreas.SporeAreaCullPatch.Run(found.transform);
             SporeAreas.SporeAreaDisablePatch.Run(found.transform);
+            SporeAreas.SporeAreaRadiusPatch.Run(found.transform);
 
             if (Plugin.Cfg.EnableDebugLogging.Value && Plugin.Cfg.LogSceneScanOnLoad.Value)
             {

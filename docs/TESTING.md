@@ -57,6 +57,24 @@ Two layers, per ROADMAP.md's testing strategy:
      (unused shader slots must not be switched on), an unreadable status color
      leaves the original untouched, the target's HDR intensity doesn't change
      the result, and HSV round-trips exactly including HDR values.
+   - **Spore-area thinning** (`SporeAreaCullTests`): same seed removes the same
+     *specific* areas; the count is exactly `floor(total × (1 - fraction))`
+     survivors across sizes and fractions; out-of-range fractions clamp;
+     different seeds give a different set but the same count; the mechanic tag
+     is independent of the spore-bomb cull's, so the two never correlate; the
+     result is independent of input order; and the **cluster-first rule** is
+     asserted directly (three tight pairs plus four isolated areas, budget 3 →
+     exactly one member of each pair removed, no isolated area touched), plus
+     Subtle and Balanced removing nothing at all.
+   - **Spore-area size** (`SporeAreaTuningTests`): not seed-gated (every area
+     gets the same flat scaling), so these are invariant proofs — a multiplier
+     of 1.0 is *exactly* vanilla, scaling is proportional, negatives clamp to
+     zero instead of producing a nonsensical negative radius, the visual scale
+     has a positive floor (never a degenerate zero-scale transform), and the
+     visible cloud scale always equals the radius scale so what you see is what
+     applies the status. The load-bearing one: `innerFade` stays the same
+     *fraction* of the radius at every multiplier, so the falloff shape is
+     preserved and the radius dial can't quietly double as a lethality dial.
    - **Preset resolution** (`PresetResolutionTests`): a hand-set config value
      always wins over the active preset and is never clobbered by switching
      presets; every spore-bomb preset row (cull fraction, trigger radius,
@@ -530,9 +548,10 @@ level load and per config change:
 1. With the setting **off**, walk into a spore cloud: vanilla behavior — Spores
    status ticks up, green screen filter appears.
 2. Flip it **on** mid-run (no level reload). Every cloud should disappear
-   *visually* as well: the cloud particles **and** the mushroom in the middle
-   of it, while the giant mushroom tree it grows on stays (that's scenery, not
-   the hazard). Standing where a cloud was should apply no Spores and show no
+   *visually* as well: the cloud particles **and** the whole mushroom-tree prop
+   in the middle of it, colliders included — the emitter mushroom is part of the
+   hazard here, so a mushroom cap you could previously stand on goes with it
+   (confirmed intended, 2026-07-27). Standing where a cloud was should apply no Spores and show no
    screen filter. The log line should report `N newly hidden`.
 3. Flip it back **off** — every cloud returns immediately, in place. `N
    restored` should equal what was hidden. Nothing *else* in the level should
@@ -566,8 +585,9 @@ one is **level-load-only** — changing it mid-level does nothing by design.
 3. Same seed, same level, load twice → an identical removed list (compare the
    `@ (grid)` coordinates on the per-removal lines). Then change only the seed
    and reload: same count, different set.
-4. Walk to a couple of removed coordinates: no cloud, no mushroom, no spores —
-   and the surrounding mushroom tree still there.
+4. Walk to a couple of removed coordinates: no cloud, no mushroom, no spores.
+   The mushroom tree itself is part of what's removed (see the disable-switch
+   section above), so the spot should be bare.
 5. With a non-zero fraction *and* `disable-spore-areas` on, then toggling that
    switch back off: only the areas the seed kept should reappear — the
    seed-removed ones must stay gone.
@@ -576,6 +596,31 @@ one is **level-load-only** — changing it mid-level does nothing by design.
 of thinning, and whether the cluster-first choice reads as sensible on the
 ground (are the *right* clouds gone — the overlapping ones — or does it feel
 arbitrary?).
+
+### Spore areas: radius (`Spore-Areas/radius-multiplier`)
+
+**Pre-req:** debug logging on, `preset = Custom` (presets 1-4 use their own
+values: 1.00 / 0.85 / 0.70 / 0.55). Live-updatable, so stand at a cloud and
+change it while watching.
+
+1. Try something obvious in both directions (2.0, then 0.4). The **visible**
+   cloud must grow/shrink to match, and the point where spores start ticking
+   should move with it (walk in from outside).
+2. The emitter mushroom must **not** change size. Structurally confirmed
+   (2026-07-27): the two `"Particles"` systems that get scaled are children of
+   the `"Spore Cloud"` node, while the mushroom meshes are siblings of it — so
+   only the gas scales. Worth an eyeball anyway.
+3. `radius-multiplier = 1.0` must be pixel-for-pixel vanilla, including after
+   having been set to something else first and back (every value is applied from
+   a cached vanilla baseline, so repeated changes can't compound).
+4. Check the log line: `multiplier=..., N spore area(s) resized (e.g. radius 16
+   -> X world units, 25.6m -> Ym), 2N cloud VFX transform(s) scaled` — the VFX
+   count should be exactly twice the area count (two particle systems each). If
+   it ever says `had no VFX to scale`, the prefab layout changed.
+
+**Report back:** whether Balanced's 0.85 is a meaningful improvement or too
+timid, and whether the resized cloud still *looks* right (a heavily shrunk cloud
+shouldn't look like a sparse puff, a heavily enlarged one shouldn't look thin).
 
 ### Host authority (multiplayer — needs a second player/PC, can't be verified solo)
 

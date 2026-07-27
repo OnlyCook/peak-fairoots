@@ -259,9 +259,13 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       ancestor that still represents that one area (stopping before any
       ancestor owning a second `StatusEmitter`, any
       `PropSpawner`/`PropGrouper`/`Biome` grouping node, and `Roots Segment`) —
-      confirmed in-game to land on `"Mushroom tree Spore Cloud"`, whose parent
-      is the scenery mushroom tree itself (`Evil Shroom` /
-      `Mush Trees (spores)`), which correctly stays. Restores only what it
+      confirmed in-game to land on `"Mushroom tree Spore Cloud"`, which is the
+      **whole mushroom-tree prop** (mushroom meshes + `MeshCollider`s as direct
+      children, plus a `"Spore Cloud"` child carrying the emitter and two
+      `"Particles"` systems — see `SporeAreaScan.ResolveAreaRoot`'s remarks for
+      the confirmed layout). So the emitter mushroom and its collision geometry
+      go with the hazard, which is the maintainer's confirmed intent, not an
+      overreach. Restores only what it
       hid itself (a registry keyed by instance ID), so turning the setting off
       can't un-hide something the game deactivated for its own reasons.
       Deliberately excludes a spore bomb's own temporary spore area
