@@ -140,6 +140,28 @@ namespace Fairoots
         /// </summary>
         public ConfigEntry<double> SporeBombSporeAreaRadiusMultiplierOverride { get; }
 
+        /// <summary>
+        /// Key that covers the player's mouth against spore areas (default
+        /// <see cref="KeyCode.X"/>). In <c>General</c> rather than
+        /// <c>Spore-Areas</c> because it's a keybind, not a balance dial - it sits
+        /// with the other whole-mod settings.
+        ///
+        /// <b>Deliberately per-client, not host-authoritative</b> (the maintainer's
+        /// explicit call): which key a player presses, and whether they hold or
+        /// toggle it, changes nothing about shared game state - the same reasoning
+        /// that exempts <see cref="RecolorSporeBombs"/> and the wind-fall camera
+        /// clamp. What the mechanic *costs* (<see cref="CoverMouthStaminaPerSecond"/>)
+        /// is host-authoritative, because that is shared balance.
+        /// </summary>
+        public ConfigEntry<KeyCode> CoverMouthKey { get; }
+
+        /// <summary>
+        /// Whether <see cref="CoverMouthKey"/> must be held down (true, the default)
+        /// or acts as a press-to-toggle (false). Per-client, same reasoning as
+        /// <see cref="CoverMouthKey"/>.
+        /// </summary>
+        public ConfigEntry<bool> CoverMouthHold { get; }
+
         // --- Spore-Areas ----------------------------------------------------
         /// <summary>
         /// Master kill switch for the Roots biome's persistent spore areas (the
@@ -199,6 +221,36 @@ namespace Fairoots
         /// <see cref="SporeBombCullFractionOverride"/>.
         /// </summary>
         public ConfigEntry<double> SporeAreaStatusRateMultiplierOverride { get; }
+
+        /// <summary>
+        /// Master kill switch for the whole cover-your-mouth mechanic. When on, the
+        /// key does nothing at all: no immunity, no stamina drain, no hand
+        /// restrictions, no pose. <b>Host-authoritative</b> (read via
+        /// <see cref="EffectiveDisableCoverMouth"/>) - unlike the keybind and
+        /// hold/toggle mode, which are the player's own business, whether a
+        /// counterplay mechanic <em>exists in this run</em> is shared balance, so the
+        /// host decides for the lobby. Same shape as
+        /// <see cref="DisableWindEntirely"/>/<see cref="DisableSporeAreas"/>: flat (no
+        /// preset ever turns it on), off by default, always immediate.
+        ///
+        /// A player who simply doesn't want the mechanic for themselves can set
+        /// <see cref="CoverMouthKey"/> to <see cref="KeyCode.None"/> instead; that
+        /// needs no host cooperation, because opting out of a move you could make is
+        /// not altering anyone else's game.
+        /// </summary>
+        public ConfigEntry<bool> DisableCoverMouth { get; }
+
+        /// <summary>
+        /// Stamina drained per second while holding a mouth cover. Flat (not folded
+        /// through the preset/override system - it's the price of a player action,
+        /// not a per-preset balance curve) but <b>host-authoritative</b>
+        /// (<see cref="EffectiveCoverMouthStaminaPerSecond"/>): how expensive a
+        /// counterplay move is, is shared balance, unlike the keybind that triggers
+        /// it. Small by default - for scale, vanilla wall climbing costs up to 0.2/s.
+        /// 0 makes covering free.
+        /// </summary>
+        public ConfigEntry<float> CoverMouthStaminaPerSecond { get; }
+
 
         // --- Wind -----------------------------------------------------------
         /// <summary>
@@ -559,6 +611,26 @@ namespace Fairoots
                 "lobby. Off by default; no preset ever turns this on automatically. Applies " +
                 "immediately, regardless of apply-changes-live.");
 
+            CoverMouthKey = config.Bind(
+                "General",
+                "cover-mouth-key",
+                KeyCode.X,
+                "Key to cover your mouth with both hands, making you immune to spore areas while " +
+                "you hold it. Your hands are busy while covering: you can't climb, pick things up, " +
+                "or switch items, and anything you're holding is put away (an item you're carrying " +
+                "in your hands with no free pocket for it gets dropped). Set to None to disable " +
+                "the mechanic entirely. PER-PLAYER: this and cover-mouth-hold below are yours " +
+                "alone - unlike most settings, the host's value has no effect on you (how much " +
+                "stamina it costs IS host-controlled, though).");
+
+            CoverMouthHold = config.Bind(
+                "General",
+                "cover-mouth-hold",
+                true,
+                "How cover-mouth-key behaves: on (default) means hold the key to keep your mouth " +
+                "covered and let go to stop; off makes it a toggle - press once to start, press " +
+                "again to stop. PER-PLAYER, same as cover-mouth-key above.");
+
             SporeAreaRemovalFractionOverride = config.Bind(
                 "Spore-Areas",
                 "removal-fraction",
@@ -602,6 +674,30 @@ namespace Fairoots
                     "above; this only changes the rate. Only takes effect when preset is set to " +
                     "Custom (5) - ignored under presets 1-4.",
                     new AcceptableValueRange<double>(0.0, 3.0)));
+
+            DisableCoverMouth = config.Bind(
+                "Spore-Areas",
+                "disable-cover-mouth",
+                false,
+                "Master switch: when on, the cover-your-mouth mechanic doesn't exist - the key " +
+                "does nothing, for everyone in the run. HOST-AUTHORITATIVE: if you're not the " +
+                "host, this has no effect at all; only the host's value counts for the whole " +
+                "lobby. Off by default; no preset ever turns this on. If you just don't want to " +
+                "use the mechanic yourself, set cover-mouth-key to None in General instead - that " +
+                "works regardless of the host. Applies immediately, regardless of " +
+                "apply-changes-live.");
+
+            CoverMouthStaminaPerSecond = config.Bind(
+                "Spore-Areas",
+                "cover-mouth-stamina-per-second",
+                0.03f,
+                new ConfigDescription(
+                    "How much stamina covering your mouth drains per second. Small by default - " +
+                    "for scale, climbing a wall costs up to 0.2 per second, so this is about a " +
+                    "sixth of that. You stop covering automatically when you run out of stamina. " +
+                    "0 makes it free. HOST-AUTHORITATIVE: only the host's value counts for the " +
+                    "whole lobby (the keybind itself is per-player - see General).",
+                    new AcceptableValueRange<float>(0f, 0.5f)));
 
             DisableWindEntirely = config.Bind(
                 "Wind",
@@ -1172,6 +1268,23 @@ namespace Fairoots
         /// </summary>
         public bool EffectiveWindBackpackAlwaysImmune =>
             HostAuthority.Resolve("WindBackpackAlwaysImmune", WindBackpackAlwaysImmune.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="DisableCoverMouth"/>.Value. Host-authoritative - flat, same
+        /// shape as <see cref="EffectiveDisableSporeAreas"/>.
+        /// </summary>
+        public bool EffectiveDisableCoverMouth =>
+            HostAuthority.Resolve("DisableCoverMouth", DisableCoverMouth.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="CoverMouthStaminaPerSecond"/>.Value. Host-authoritative -
+        /// flat (not preset/live-snapshot resolved, matching the raw config entry),
+        /// but it decides what a counterplay move costs, which is shared balance.
+        /// </summary>
+        public float EffectiveCoverMouthStaminaPerSecond =>
+            HostAuthority.Resolve("CoverMouthStaminaPerSecond", CoverMouthStaminaPerSecond.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of

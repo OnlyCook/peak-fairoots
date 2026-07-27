@@ -28,6 +28,11 @@ namespace Fairoots.Networking
         public override void OnJoinedRoom()
         {
             HostAuthority.PublishAll();
+
+            // Re-assert our own cover-mouth state as a player property: a write made
+            // while roomless goes nowhere, so without this a player who joined
+            // mid-cover would be shown to everyone else with their hands down.
+            CoverMouthController.RepublishOnJoin();
         }
 
         public override void OnMasterClientSwitched(Photon.Realtime.Player newMasterClient)

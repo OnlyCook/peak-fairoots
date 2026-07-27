@@ -284,6 +284,38 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       reapplies can't compound and 1.0 always restores true vanilla.
       Live-updatable, unlike removal. Also owns the one-time verbose structure
       dump that established the prefab layout above.
+    - `CoverMouthController.cs` — the cover-your-mouth mechanic's driver (polled
+      from `Plugin.Update`): reads the key, runs `Core/CoverMouth.NextState`,
+      charges stamina, empties the player's hands as the cover starts (a slot item
+      is *pocketed*, the temporary fourth held item is *dropped* via the game's own
+      `DropItemRpc`), and publishes the state as a Photon **player** custom
+      property so other clients can pose it. Per-client by design — each player
+      decides about their own mouth, and the immunity only ever affects them, since
+      spore areas apply status to `Character.localCharacter` only. Refuses to start
+      while the player is holding onto anything: the restriction patches stop a
+      covering player from starting a climb, and this stops a climbing player from
+      covering, so a defensive button can never turn into a fall.
+    - `CoverMouthImmunityPatch.cs` — what covering buys, via the game's **own**
+      gate: `StatusEmitter.emitterDisabledByWind`, the flag wind already uses to
+      disperse spore areas. Reusing it means the mechanic ends the green screen
+      filter and suppresses the status exactly the way dispersal already does,
+      instead of reimplementing both. Wind-affected emitters (all of them, in
+      Roots) are handled by ORing the flag in on their own `FixedUpdate` postfix,
+      where the game rewrites it every tick so no restore bookkeeping is needed;
+      plain emitters are tracked and restored explicitly.
+      **Plus the anti-exploit half:** progress toward the next spore tick is
+      *paused* by covering, never reset, so tapping the key buys exactly the time
+      it was held. Read that field's remarks before touching it — the leak is in
+      vanilla's own re-entry path (`timeSinceLastTick = -extraWarningTime`, a fresh
+      1.5s grace every time the emitter thinks you re-entered), and the first fix
+      for it failed on a one-frame ordering detail also documented there.
+    - `CoverMouthRestrictionPatches.cs` — what covering costs besides stamina: no
+      interaction (`Interaction.canInteract`, the single gate every interaction
+      passes through — which is also how rope/vine/climb-handle grabs are covered,
+      since those are interactibles rather than a separate climb input), no
+      slot/backpack switching (`CharacterItems.DoSwitching`), no starting a wall
+      climb (`CharacterClimbing.TryToStartWallClimb`, the one climb that isn't an
+      interaction). All scoped to the local character and no-ops when not covering.
     - `SporeAreaCullPatch.cs` — the seeded thinning pass
       (`Spore-Areas/removal-fraction`): deactivates a fraction of the level's
       spore areas, with `Core/SporeAreaCull.cs` deciding which. Level-load-only
@@ -331,6 +363,10 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       foliage removal, then a `ClusteredRemovalSelection` cull budgeted against
       it. Returns per-candidate outcomes; `SporeBombCullPatch` maps them back
       onto real GameObjects.
+    - `CoverMouth.cs` — the cover-mouth input state machine (hold vs. toggle, plus
+      the outside veto that force-cancels a cover and can't be latched around) and
+      its framerate-independent stamina cost. Unity-free so the awkward part is
+      unit-tested rather than only observable by pressing a key in-game.
     - `SporeAreaTuning.cs` — pure arithmetic for the spore areas' size and
       Spores build-up rate (not seed-gated - every area gets the identical flat
       treatment, same shape as `SporeBombExplosionTuning`). Two non-obvious

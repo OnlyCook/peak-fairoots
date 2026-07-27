@@ -85,6 +85,7 @@ namespace Fairoots
                 SporeBombCullPatch.KeptTriggerColliders.Clear();
                 SporeAreas.SporeAreaDisablePatch.ClearLevelState();
                 SporeAreas.SporeAreaCullPatch.ClearLevelState();
+                SporeAreas.CoverMouthImmunityPatch.ClearLevelState();
             }
 
             if (currentlyActive)

@@ -75,6 +75,16 @@ Two layers, per ROADMAP.md's testing strategy:
      applies the status. The load-bearing one: `innerFade` stays the same
      *fraction* of the radius at every multiplier, so the falloff shape is
      preserved and the radius dial can't quietly double as a lethality dial.
+   - **Cover-mouth input/cost** (`CoverMouthTests`): hold mode follows the key
+     exactly; toggle mode flips only on the key-*down* edge (a held key must not
+     re-toggle every frame) and survives being held or released; the outside veto
+     (climbing, out of stamina, a menu open, the host's kill switch) force-cancels
+     a cover and blocks starting one in *both* modes, and specifically **cannot be
+     latched around** — the trap being that a veto which only suppressed the effect
+     while leaving a toggle latched would make the next press read as "start" when
+     it was really "clear a stuck flag," so the player would press once and see
+     nothing happen. Plus: the stamina cost is framerate-independent (60fps and
+     144fps pay the same for one second), and zero when disabled.
    - **Preset resolution** (`PresetResolutionTests`): a hand-set config value
      always wins over the active preset and is never clobbered by switching
      presets; every spore-bomb preset row (cull fraction, trigger radius,
@@ -621,6 +631,45 @@ change it while watching.
 **Report back:** whether Balanced's 0.85 is a meaningful improvement or too
 timid, and whether the resized cloud still *looks* right (a heavily shrunk cloud
 shouldn't look like a sparse puff, a heavily enlarged one shouldn't look thin).
+
+### Cover your mouth vs. spore areas (`General/cover-mouth-key`)
+
+**Pre-req:** debug logging on, in a Roots run, standing in a spore cloud. Default
+key `X`, hold mode. Transitions log as
+`[CoverMouth] local player covered/uncovered their mouth (reason); N spore area(s)
+with parked tick progress`. The animation is **not implemented yet**, so the log
+is currently the only feedback that it engaged.
+
+1. Hold the key in a cloud: the Spores meter stops climbing and the green screen
+   filter goes away. Release and both resume.
+2. While holding it, try to climb a wall, pick something up, grab a rope, and
+   switch slots/backpack — all refused, all working again the instant you let go.
+3. Hold an item from a slot and press the key → it's pocketed. Pick up a fourth
+   (temporary, in-hands) item and press the key → it's dropped.
+4. Grab a wall and *then* press the key → nothing happens (log:
+   `holding onto something (climbing)`). This direction is deliberate — covering
+   must never drop you off a wall.
+5. Hold it with the stamina bar nearly empty → cuts out at zero (log:
+   `out of stamina`).
+6. `cover-mouth-hold = false` → one press on, one press off, and holding the key
+   doesn't flicker it.
+7. **The anti-exploit check.** Spam the key on a fast cycle (~300ms) inside a
+   cloud. Every `uncovered` line must report **1** parked area (0 means the
+   mechanic is broken) followed by `resumed spore tick progress at Xs`, and X
+   should climb across taps and wrap past 0.5 as ticks actually land. The meter
+   must visibly fill roughly in proportion to the time the key is *up*. Verified
+   2026-07-27: 66 releases, 66 resumes.
+8. Hold the key, walk fully out of the cloud, come back, release → behaves like a
+   fresh entry, not an instant hit.
+9. Host sets `disable-cover-mouth = true` mid-run → the key goes dead for everyone
+   immediately, cancelling any cover in progress. A non-host setting it has no
+   effect; a player setting their own `cover-mouth-key = None` opts out regardless
+   of the host.
+10. Spore *bombs* should still hit you normally while covering (a setting to
+    include their temporary mini areas is planned, not built).
+
+**Report back:** whether 0.03 stamina/second feels like the intended "small
+amount," and whether the immunity feels worth the hands-busy cost.
 
 ### Host authority (multiplayer — needs a second player/PC, can't be verified solo)
 

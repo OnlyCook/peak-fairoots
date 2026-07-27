@@ -148,6 +148,7 @@ namespace Fairoots
             }
 
             RootsLevelWatcher.CheckAndRun();
+            CoverMouthController.Tick();
 
             if (!Cfg.EnableDebugLogging.Value)
             {

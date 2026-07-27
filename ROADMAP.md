@@ -502,6 +502,40 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   the interval would change only how chunky the meter's jumps are, not how fast
   it fills. Independent of the radius dial, so "how big" and "how fast" tune
   separately.
+
+  **Cover your mouth (implemented 2026-07-27; the animation is still to come).**
+  Hold a key (default `X`, `General/cover-mouth-key`; `cover-mouth-hold` switches
+  it to a toggle) to be immune to spore areas. Both the keybind and hold/toggle
+  mode are **per-client** — which key a player presses changes nothing shared,
+  the same reasoning that exempts the spore-bomb recolor — while what the mechanic
+  *costs* (`Spore-Areas/cover-mouth-stamina-per-second`, default 0.03/s against
+  climbing's 0.2/s) and whether it exists at all
+  (`Spore-Areas/disable-cover-mouth`) are host-authoritative, because those are
+  shared balance. A player who doesn't want it sets their own key to `None`, which
+  needs no host cooperation: opting out of a move you could make isn't altering
+  anyone else's game.
+
+  It occupies both hands, literally: while covering you can't interact with or
+  pick up anything (which also covers ropes, vines and climb handles — they're
+  interactibles), can't switch items or backpack, and can't start a wall climb;
+  an item held from a slot is pocketed and the temporary fourth held item is
+  dropped. Conversely you can't *start* covering while already holding onto
+  something — the reverse (covering drops you off the wall) would turn a defensive
+  button into a fall.
+
+  **The immunity reuses the game's own `emitterDisabledByWind` gate**, so it
+  behaves exactly like the wind dispersal players already know, screen filter
+  included, rather than reimplementing status suppression.
+
+  **Tapping the key is not a free ride** (exploit found in the first playtest:
+  tapping on a ~300ms cycle gave near-total immunity for a fraction of the
+  stamina). The cause was vanilla's own re-entry grace — an emitter that thinks
+  you just re-entered sets its tick timer to −1s, so every release re-armed 1.5s
+  of safety. Progress toward the next spore tick is now *paused* by covering and
+  resumed on release, never reset: spores accrue in proportion to uncovered time
+  and stamina in proportion to covered time, so you pay for what you get. Leaving
+  the area is still a genuine reset. Live-verified: 66 releases, 66 resumes, with
+  ticks landing throughout.
 - **Creatures**: zombies currently have **no distance-based deaggro at
   all** once they've targeted a player (confirmed absent in code, not just
   hard to find) — this is the one creature change that's genuinely new
