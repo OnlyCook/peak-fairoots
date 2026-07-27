@@ -140,6 +140,143 @@ namespace Fairoots
         /// </summary>
         public ConfigEntry<double> SporeBombSporeAreaRadiusMultiplierOverride { get; }
 
+        /// <summary>
+        /// Key that covers the player's mouth against spore areas (default
+        /// <see cref="KeyCode.X"/>). In <c>General</c> rather than
+        /// <c>Spore-Areas</c> because it's a keybind, not a balance dial - it sits
+        /// with the other whole-mod settings.
+        ///
+        /// <b>Deliberately per-client, not host-authoritative</b> (the maintainer's
+        /// explicit call): which key a player presses, and whether they hold or
+        /// toggle it, changes nothing about shared game state - the same reasoning
+        /// that exempts <see cref="RecolorSporeBombs"/> and the wind-fall camera
+        /// clamp. What the mechanic *costs* (<see cref="CoverMouthStaminaPerSecond"/>)
+        /// is host-authoritative, because that is shared balance.
+        /// </summary>
+        public ConfigEntry<KeyCode> CoverMouthKey { get; }
+
+        /// <summary>
+        /// Whether <see cref="CoverMouthKey"/> must be held down (true, the default)
+        /// or acts as a press-to-toggle (false). Per-client, same reasoning as
+        /// <see cref="CoverMouthKey"/>.
+        /// </summary>
+        public ConfigEntry<bool> CoverMouthHold { get; }
+
+        /// <summary>
+        /// Whether covering your mouth may dip into bonus stamina (the temporary extra
+        /// the game grants from food and similar) once ordinary stamina is spent. Off by
+        /// default: bonus stamina is a scarce resource a player spent something to get,
+        /// so quietly burning it to hold a breath - when the alternative is simply
+        /// uncovering - is the kind of thing that should be opted into.
+        ///
+        /// Per-client, like the keybind and hold/toggle mode: it decides what *your own*
+        /// action costs *you*, and nothing about anyone else's game. What the drain rate
+        /// is remains host-authoritative
+        /// (<see cref="CoverMouthStaminaPerSecond"/>).
+        /// </summary>
+        public ConfigEntry<bool> CoverMouthUseBonusStamina { get; }
+
+        // --- Spore-Areas ----------------------------------------------------
+        /// <summary>
+        /// Master kill switch for the Roots biome's persistent spore areas (the
+        /// game's "Mushroom Spore Clouds" - a <c>Spores</c>-type
+        /// <c>WindAffectedStatusEmitter</c> plus the emitter mushroom in the
+        /// middle of the cloud and its cloud VFX). When on, the whole spore-area
+        /// object is deactivated, so it applies no Spores status, shows no
+        /// screen-filter warning, and isn't visible either -
+        /// <c>SporeAreas/SporeAreaDisablePatch</c> does the work.
+        ///
+        /// Deliberately scoped to the level's own baked-in spore areas: the small
+        /// temporary spore area a spore bomb leaves behind on detonation is a
+        /// separate hazard with its own settings under <c>Spore-Bombs</c> and is
+        /// never touched by this. <b>Host-authoritative</b> (read via
+        /// <see cref="EffectiveDisableSporeAreas"/>), flat (not folded through the
+        /// preset/override system - no preset ever turns it on) and always
+        /// immediate regardless of <see cref="ApplyChangesLive"/>, exactly like
+        /// <see cref="DisableWindEntirely"/>.
+        /// </summary>
+        public ConfigEntry<bool> DisableSporeAreas { get; }
+
+        /// <summary>
+        /// Custom-preset value for the fraction of the level's spore areas to
+        /// remove outright (see <see cref="Core.SporeAreaCull"/>) - "make spore
+        /// areas less common." Seeded and cluster-first: the emitter closest to
+        /// another emitter goes first, so overlapping clouds get thinned before
+        /// isolated ones. 0 = remove none. Only takes effect under
+        /// <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>. Like the spore-bomb
+        /// removal fraction, this is level-load-only either way - which spore
+        /// areas were already removed can't be un-removed mid-level.
+        /// </summary>
+        public ConfigEntry<double> SporeAreaRemovalFractionOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for the multiplier applied to every persistent spore
+        /// area's radius - and, proportionally, its inner/outer fade and the visible
+        /// size of the cloud itself, so what you see matches what actually applies
+        /// the status (see <see cref="Core.SporeAreaTuning"/>). 1.0 = vanilla
+        /// (radius 16 world units). Only takes effect under
+        /// <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
+        ///
+        /// Not to be confused with
+        /// <see cref="SporeBombSporeAreaRadiusMultiplierOverride"/>, which is the
+        /// temporary mini spore area a *spore bomb* leaves behind.
+        /// </summary>
+        public ConfigEntry<double> SporeAreaRadiusMultiplierOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for the multiplier applied to how fast the Spores
+        /// status builds up while a player stands in a spore area
+        /// (<see cref="Core.SporeAreaTuning.ScaleStatusRate"/>; vanilla is
+        /// <c>amount = 0.025</c> per second in Roots). 1.0 = vanilla, 0 = the area
+        /// never applies spores at all. Only takes effect under
+        /// <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
+        /// </summary>
+        public ConfigEntry<double> SporeAreaStatusRateMultiplierOverride { get; }
+
+        /// <summary>
+        /// Master kill switch for the whole cover-your-mouth mechanic. When on, the
+        /// key does nothing at all: no immunity, no stamina drain, no hand
+        /// restrictions, no pose. <b>Host-authoritative</b> (read via
+        /// <see cref="EffectiveDisableCoverMouth"/>) - unlike the keybind and
+        /// hold/toggle mode, which are the player's own business, whether a
+        /// counterplay mechanic <em>exists in this run</em> is shared balance, so the
+        /// host decides for the lobby. Same shape as
+        /// <see cref="DisableWindEntirely"/>/<see cref="DisableSporeAreas"/>: flat (no
+        /// preset ever turns it on), off by default, always immediate.
+        ///
+        /// A player who simply doesn't want the mechanic for themselves can set
+        /// <see cref="CoverMouthKey"/> to <see cref="KeyCode.None"/> instead; that
+        /// needs no host cooperation, because opting out of a move you could make is
+        /// not altering anyone else's game.
+        /// </summary>
+        public ConfigEntry<bool> DisableCoverMouth { get; }
+
+        /// <summary>
+        /// Stamina drained per second while holding a mouth cover. Flat (not folded
+        /// through the preset/override system - it's the price of a player action,
+        /// not a per-preset balance curve) but <b>host-authoritative</b>
+        /// (<see cref="EffectiveCoverMouthStaminaPerSecond"/>): how expensive a
+        /// counterplay move is, is shared balance, unlike the keybind that triggers
+        /// it. Small by default - for scale, vanilla wall climbing costs up to 0.2/s.
+        /// 0 makes covering free.
+        /// </summary>
+        public ConfigEntry<float> CoverMouthStaminaPerSecond { get; }
+
+
+        /// <summary>
+        /// Whether covering your mouth also blocks the spore status from a spore bomb's
+        /// temporary mini spore cloud, on top of the biome's persistent spore areas.
+        /// Off by default - see <c>SporeBombs/CoverMouthSporeBombPatch</c> for why the
+        /// mechanic is scoped to spore areas, and note that only the spore status is
+        /// suppressed either way: knockback and screen shake still land.
+        /// <b>Host-authoritative</b>: what a counterplay move protects against is shared
+        /// balance, like its stamina cost.
+        /// </summary>
+        public ConfigEntry<bool> CoverMouthBlocksSporeBombs { get; }
+
         // --- Wind -----------------------------------------------------------
         /// <summary>
         /// Master kill switch for the entire wind mechanic. When on, wind
@@ -350,6 +487,51 @@ namespace Fairoots
         /// <summary>Draw a 3D wireframe (red) over every nearby kept spore bomb's current trigger hitbox. Off by default.</summary>
         public ConfigEntry<bool> ShowSporeBombTriggerRadius { get; }
 
+        // --- Cover-mouth pose tuning (Debug) ------------------------------
+        // Six knobs for one pose, which needs justifying: the pose is pure
+        // visuals, so the only way to judge it is to look at it, and every
+        // value here (which clip, which frame of it, where the hands sit) is
+        // Unity *asset*-dependent - none of it can be derived from the
+        // decompiled code or checked by a test. Live knobs turn "rebuild,
+        // relaunch, load a run, look" into "drag a slider," which is why they
+        // live in Debug rather than being hardcoded constants. Expect them to
+        // collapse into constants once the pose is locked in.
+
+        /// <summary>
+        /// Holds the cover-mouth pose on permanently so it can be tuned without keeping
+        /// a key held. <b>Visual only</b> - no immunity, no stamina drain, no hands-busy
+        /// restrictions, and nothing is published to other players; the mechanic itself
+        /// is untouched. Local player only.
+        /// </summary>
+        public ConfigEntry<bool> CoverMouthPosePreview { get; }
+
+        /// <summary>Animator state to freeze as the cover-mouth pose. Empty = auto-detect the "it's so over" emote.</summary>
+        public ConfigEntry<string> CoverMouthPoseEmote { get; }
+
+        /// <summary>Normalised time (0-1) within the pose clip to freeze on.</summary>
+        public ConfigEntry<float> CoverMouthPoseEmoteTime { get; }
+
+        /// <summary>How far in front of the head the hands sit, in centimetres.</summary>
+        public ConfigEntry<float> CoverMouthPoseForwardCm { get; }
+
+        /// <summary>How far below the head (mouth height) the hands sit, in centimetres.</summary>
+        public ConfigEntry<float> CoverMouthPoseBelowHeadCm { get; }
+
+        /// <summary>Vertical gap between the two stacked hands, in centimetres.</summary>
+        public ConfigEntry<float> CoverMouthPoseHandGapCm { get; }
+
+        /// <summary>Sideways offset of each hand from the centre line, in centimetres.</summary>
+        public ConfigEntry<float> CoverMouthPoseSideCm { get; }
+
+        /// <summary>Extra hand turn about the body's vertical axis, in degrees, mirrored per hand (thumbs out vs. thumbs to the face).</summary>
+        public ConfigEntry<float> CoverMouthPoseHandYawDeg { get; }
+
+        /// <summary>Extra hand tilt about the body's forward axis, in degrees, mirrored per hand.</summary>
+        public ConfigEntry<float> CoverMouthPoseHandRollDeg { get; }
+
+        /// <summary>Extra hand pitch about the body's sideways axis, in degrees (not mirrored - both hands pitch the same way).</summary>
+        public ConfigEntry<float> CoverMouthPoseHandPitchDeg { get; }
+
         /// <summary>
         /// For before/after comparison screenshots: when on, spore-bomb trigger
         /// hitboxes are left at vanilla size instead of being shrunk, and the
@@ -485,6 +667,129 @@ namespace Fairoots
                     "Spore Bomb\" variant, which has no spore area. Only takes effect when " +
                     "preset is set to Custom (5) - ignored under presets 1-4.",
                     new AcceptableValueRange<double>(0.0, 5.0)));
+
+            CoverMouthBlocksSporeBombs = config.Bind(
+                "Spore-Bombs",
+                "cover-mouth-blocks-spore-bombs",
+                false,
+                "Whether covering your mouth (see General/cover-mouth-key) also protects you from " +
+                "the small spore cloud a spore bomb leaves behind when it goes off. Off by " +
+                "default: the mechanic is meant for the biome's spore areas, which you can see " +
+                "coming and choose to walk into, whereas a spore bomb is a surprise you've " +
+                "already set off. Either way this only stops the spores - the blast still knocks " +
+                "you around. HOST-AUTHORITATIVE: only the host's value counts for the whole " +
+                "lobby.");
+
+            DisableSporeAreas = config.Bind(
+                "Spore-Areas",
+                "disable-spore-areas",
+                false,
+                "Master switch: when on, the Roots biome's spore areas (\"Mushroom Spore Clouds\") " +
+                "are removed entirely - no Spores status, no green screen filter, and the emitter " +
+                "mushroom in the middle of the cloud plus the cloud itself disappear with them. " +
+                "Doesn't touch the small temporary spore area a spore bomb leaves behind when it " +
+                "goes off (that's the Spore-Bombs section). HOST-AUTHORITATIVE: if you're not the " +
+                "host, this has no effect at all - only the host's value counts for the whole " +
+                "lobby. Off by default; no preset ever turns this on automatically. Applies " +
+                "immediately, regardless of apply-changes-live.");
+
+            CoverMouthKey = config.Bind(
+                "General",
+                "cover-mouth-key",
+                KeyCode.X,
+                "Key to cover your mouth with both hands, making you immune to spore areas while " +
+                "you hold it. Your hands are busy while covering: you can't climb, pick things up, " +
+                "or switch items, and anything you're holding is put away (an item you're carrying " +
+                "in your hands with no free pocket for it gets dropped). Set to None to disable " +
+                "the mechanic entirely. PER-PLAYER: this and cover-mouth-hold below are yours " +
+                "alone - unlike most settings, the host's value has no effect on you (how much " +
+                "stamina it costs IS host-controlled, though).");
+
+            CoverMouthHold = config.Bind(
+                "General",
+                "cover-mouth-hold",
+                true,
+                "How cover-mouth-key behaves: on (default) means hold the key to keep your mouth " +
+                "covered and let go to stop; off makes it a toggle - press once to start, press " +
+                "again to stop. PER-PLAYER, same as cover-mouth-key above.");
+
+            CoverMouthUseBonusStamina = config.Bind(
+                "General",
+                "cover-mouth-use-bonus-stamina",
+                false,
+                "Whether covering your mouth is allowed to eat into your bonus stamina (the extra " +
+                "you get from food) once your normal stamina runs out. Off by default - covering " +
+                "simply stops when you run out of normal stamina, leaving your bonus intact for " +
+                "climbing. PER-PLAYER: this is your own call, like the keybind; how fast covering " +
+                "drains stamina in the first place is still the host's setting.");
+
+            SporeAreaRemovalFractionOverride = config.Bind(
+                "Spore-Areas",
+                "removal-fraction",
+                0.0,
+                new ConfigDescription(
+                    "Fraction of the level's spore areas to remove entirely, e.g. 0.25 removes a " +
+                    "quarter of them. Which ones is decided by the seed, and always starts with " +
+                    "the spore area closest to another one - so overlapping clouds (the ones you " +
+                    "can't get past without taking spores) get thinned first, and isolated ones " +
+                    "you can simply walk around are left alone. 0 = remove none. Only takes " +
+                    "effect when preset is set to Custom (5) - ignored under presets 1-4, which " +
+                    "remove none at all on Subtle/Balanced. Only applies on the next Roots level " +
+                    "load either way, since a spore area that's already gone can't come back " +
+                    "mid-level.",
+                    new AcceptableValueRange<double>(0.0, 1.0)));
+
+            SporeAreaRadiusMultiplierOverride = config.Bind(
+                "Spore-Areas",
+                "radius-multiplier",
+                0.85,
+                new ConfigDescription(
+                    "Multiplier applied to how far every spore area reaches, e.g. 0.7 shrinks it " +
+                    "to 70% of vanilla, 1.5 makes it half again as big. The visible cloud is " +
+                    "resized to match, so what you can see is what actually gives you spores. " +
+                    "1.0 always means vanilla size (radius 16, about 26m across from the middle). " +
+                    "How quickly the spores themselves are applied is a separate setting - this " +
+                    "only changes the size. Only takes effect when preset is set to Custom (5) - " +
+                    "ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 3.0)));
+
+            SporeAreaStatusRateMultiplierOverride = config.Bind(
+                "Spore-Areas",
+                "status-rate-multiplier",
+                0.85,
+                new ConfigDescription(
+                    "Multiplier applied to how often/quickly you're given spores while standing " +
+                    "in a spore area, e.g. 0.5 means the Spores meter fills half as fast, 2.0 " +
+                    "twice as fast, 0 means a spore area never gives you spores at all (its cloud " +
+                    "is still there - use disable-spore-areas to remove them outright). 1.0 always " +
+                    "means vanilla. How far the area reaches is the separate radius-multiplier " +
+                    "above; this only changes the rate. Only takes effect when preset is set to " +
+                    "Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 3.0)));
+
+            DisableCoverMouth = config.Bind(
+                "Spore-Areas",
+                "disable-cover-mouth",
+                false,
+                "Master switch: when on, the cover-your-mouth mechanic doesn't exist - the key " +
+                "does nothing, for everyone in the run. HOST-AUTHORITATIVE: if you're not the " +
+                "host, this has no effect at all; only the host's value counts for the whole " +
+                "lobby. Off by default; no preset ever turns this on. If you just don't want to " +
+                "use the mechanic yourself, set cover-mouth-key to None in General instead - that " +
+                "works regardless of the host. Applies immediately, regardless of " +
+                "apply-changes-live.");
+
+            CoverMouthStaminaPerSecond = config.Bind(
+                "Spore-Areas",
+                "cover-mouth-stamina-per-second",
+                0.03f,
+                new ConfigDescription(
+                    "How much stamina covering your mouth drains per second. Small by default - " +
+                    "for scale, climbing a wall costs up to 0.2 per second, so this is about a " +
+                    "sixth of that. You stop covering automatically when you run out of stamina. " +
+                    "0 makes it free. HOST-AUTHORITATIVE: only the host's value counts for the " +
+                    "whole lobby (the keybind itself is per-player - see General).",
+                    new AcceptableValueRange<float>(0f, 0.5f)));
 
             DisableWindEntirely = config.Bind(
                 "Wind",
@@ -766,6 +1071,111 @@ namespace Fairoots
                 "for eyeballing how much the trigger box was actually shrunk against the real " +
                 "prefab. Off by default.");
 
+            CoverMouthPosePreview = config.Bind(
+                "Debug",
+                "cover-mouth-pose-preview",
+                false,
+                "Holds the cover-your-mouth pose on permanently so you can tune the pose settings " +
+                "below without having to keep the key held down while you edit them. This is " +
+                "PURELY VISUAL: it doesn't make you immune to spores, doesn't drain stamina, " +
+                "doesn't tie up your hands, and other players don't see it - the mechanic itself " +
+                "behaves exactly as normal while this is on. Off by default.");
+
+            CoverMouthPoseEmote = config.Bind(
+                "Debug",
+                "cover-mouth-pose-emote",
+                string.Empty,
+                "Which animation the cover-your-mouth pose borrows its hand and finger shape " +
+                "from. Leave empty to auto-pick the \"it's so over\" emote, which is what the " +
+                "pose is designed around. With debug logging on, every available emote is listed " +
+                "in the log the first time you cover your mouth, so you can copy an exact name " +
+                "from there if you'd rather use a different one. Pose-tuning knob.");
+
+            CoverMouthPoseEmoteTime = config.Bind(
+                "Debug",
+                "cover-mouth-pose-emote-time",
+                0.6f,
+                new ConfigDescription(
+                    "Which moment of the pose animation to hold, from 0 (its first frame) to 1 " +
+                    "(its last). The pose is frozen on a single frame rather than played, so this " +
+                    "picks which one. Pose-tuning knob.",
+                    new AcceptableValueRange<float>(0f, 1f)));
+
+            CoverMouthPoseForwardCm = config.Bind(
+                "Debug",
+                "cover-mouth-pose-forward-cm",
+                80f,
+                new ConfigDescription(
+                    "How far in front of the face your hands are held while covering your mouth, " +
+                    "in centimetres. Default is the maintainer's own playtest-tuned value. " +
+                    "Pose-tuning knob.",
+                    new AcceptableValueRange<float>(0f, 80f)));
+
+            CoverMouthPoseBelowHeadCm = config.Bind(
+                "Debug",
+                "cover-mouth-pose-below-head-cm",
+                0f,
+                new ConfigDescription(
+                    "How far below eye level your hands are held while covering your mouth, in " +
+                    "centimetres - i.e. mouth height. Pose-tuning knob.",
+                    new AcceptableValueRange<float>(-20f, 40f)));
+
+            CoverMouthPoseHandGapCm = config.Bind(
+                "Debug",
+                "cover-mouth-pose-hand-gap-cm",
+                7f,
+                new ConfigDescription(
+                    "Vertical gap between your two hands while covering your mouth, in " +
+                    "centimetres - they're stacked one above the other so they don't intersect. " +
+                    "Default is the maintainer's own playtest-tuned value. Pose-tuning knob.",
+                    new AcceptableValueRange<float>(0f, 40f)));
+
+            CoverMouthPoseSideCm = config.Bind(
+                "Debug",
+                "cover-mouth-pose-side-cm",
+                13f,
+                new ConfigDescription(
+                    "How far to each side of centre your hands sit while covering your mouth, in " +
+                    "centimetres. Near 0 means both hands are on the centre line, which is what " +
+                    "makes the pose read as covering your mouth rather than gesturing. " +
+                    "Pose-tuning knob.",
+                    new AcceptableValueRange<float>(0f, 25f)));
+
+            CoverMouthPoseHandYawDeg = config.Bind(
+                "Debug",
+                "cover-mouth-pose-hand-yaw-deg",
+                0f,
+                new ConfigDescription(
+                    "Turns both hands outward (or inward) while covering your mouth, in degrees - " +
+                    "this is the one that decides where your thumbs point. 0 leaves the hands as " +
+                    "the borrowed animation has them, which is palm-to-palm like praying; turning " +
+                    "them opens the palms toward your face so the thumbs point away from it. " +
+                    "Mirrored, so the two hands always stay symmetric. The sign is what decides " +
+                    "which side of your hands faces you: negative turns the palms toward your " +
+                    "face (correct for covering your mouth), positive turns them away. " +
+                    "Pose-tuning knob.",
+                    new AcceptableValueRange<float>(-180f, 180f)));
+
+            CoverMouthPoseHandRollDeg = config.Bind(
+                "Debug",
+                "cover-mouth-pose-hand-roll-deg",
+                10f,
+                new ConfigDescription(
+                    "Tips both hands so the thumbs ride higher or lower while covering your mouth, " +
+                    "in degrees - use it with cover-mouth-pose-hand-yaw-deg to aim the thumbs " +
+                    "up-and-out rather than straight out. Mirrored between the two hands; negate " +
+                    "it if the thumbs end up pointing down instead of up. Pose-tuning knob.",
+                    new AcceptableValueRange<float>(-180f, 180f)));
+
+            CoverMouthPoseHandPitchDeg = config.Bind(
+                "Debug",
+                "cover-mouth-pose-hand-pitch-deg",
+                -10f,
+                new ConfigDescription(
+                    "Tilts both hands' fingers up or down while covering your mouth, in degrees. " +
+                    "Not mirrored - both hands tilt the same way. Pose-tuning knob.",
+                    new AcceptableValueRange<float>(-180f, 180f)));
+
             KeepVanillaTriggerRadius = config.Bind(
                 "Debug",
                 "keep-vanilla-trigger-radius",
@@ -832,6 +1242,27 @@ namespace Fairoots
             OverrideResolution.Resolve(
                 PresetCatalog.SporeBombSporeAreaRadiusMultiplier(Preset.Value),
                 SporeBombSporeAreaRadiusMultiplierOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>The effective fraction of the level's spore areas to remove.</summary>
+        public double SporeAreaRemovalFraction =>
+            OverrideResolution.Resolve(
+                PresetCatalog.SporeAreaRemovalFraction(Preset.Value),
+                SporeAreaRemovalFractionOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>The effective radius multiplier for every persistent spore area.</summary>
+        public double SporeAreaRadiusMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.SporeAreaRadiusMultiplier(Preset.Value),
+                SporeAreaRadiusMultiplierOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>The effective Spores build-up rate multiplier for every persistent spore area.</summary>
+        public double SporeAreaStatusRateMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.SporeAreaStatusRateMultiplier(Preset.Value),
+                SporeAreaStatusRateMultiplierOverride.Value,
                 UseCustomOverrides);
 
         /// <summary>The effective wind-force (and gust-timing) multiplier.</summary>
@@ -912,6 +1343,9 @@ namespace Fairoots
         private double _snapVfxCountMultiplier;
         private double _snapTriggerHeightMultiplier;
         private double _snapSporeAreaRadiusMultiplier;
+        private double _snapSporeAreaRemovalFraction;
+        private double _snapSporeAreaRadiusMultiplierValue;
+        private double _snapSporeAreaStatusRateMultiplier;
         private double _snapWindForceMultiplier;
         private double _snapWindGustDurationMultiplier;
         private double _snapWindItemForceMultiplier;
@@ -937,6 +1371,9 @@ namespace Fairoots
             _snapVfxCountMultiplier = SporeBombVfxCountMultiplier;
             _snapTriggerHeightMultiplier = SporeBombTriggerHeightMultiplier;
             _snapSporeAreaRadiusMultiplier = SporeBombSporeAreaRadiusMultiplier;
+            _snapSporeAreaRemovalFraction = SporeAreaRemovalFraction;
+            _snapSporeAreaRadiusMultiplierValue = SporeAreaRadiusMultiplier;
+            _snapSporeAreaStatusRateMultiplier = SporeAreaStatusRateMultiplier;
             _snapWindForceMultiplier = WindForceMultiplier;
             _snapWindGustDurationMultiplier = WindGustDurationMultiplier;
             _snapWindItemForceMultiplier = WindItemForceMultiplier;
@@ -992,6 +1429,18 @@ namespace Fairoots
         public double EffectiveSporeBombSporeAreaRadiusMultiplier =>
             HostAuthority.Resolve("SporeBombSporeAreaRadiusMultiplier", UseLiveValue ? SporeBombSporeAreaRadiusMultiplier : _snapSporeAreaRadiusMultiplier);
 
+        /// <summary>Game-facing code should read this instead of <see cref="SporeAreaRemovalFraction"/>. Host-authoritative.</summary>
+        public double EffectiveSporeAreaRemovalFraction =>
+            HostAuthority.Resolve("SporeAreaRemovalFraction", UseLiveValue ? SporeAreaRemovalFraction : _snapSporeAreaRemovalFraction);
+
+        /// <summary>Game-facing code should read this instead of <see cref="SporeAreaRadiusMultiplier"/>. Host-authoritative.</summary>
+        public double EffectiveSporeAreaRadiusMultiplier =>
+            HostAuthority.Resolve("SporeAreaRadiusMultiplier", UseLiveValue ? SporeAreaRadiusMultiplier : _snapSporeAreaRadiusMultiplierValue);
+
+        /// <summary>Game-facing code should read this instead of <see cref="SporeAreaStatusRateMultiplier"/>. Host-authoritative.</summary>
+        public double EffectiveSporeAreaStatusRateMultiplier =>
+            HostAuthority.Resolve("SporeAreaStatusRateMultiplier", UseLiveValue ? SporeAreaStatusRateMultiplier : _snapSporeAreaStatusRateMultiplier);
+
         /// <summary>Game-facing code should read this instead of <see cref="WindForceMultiplier"/>. Host-authoritative.</summary>
         public double EffectiveWindForceMultiplier =>
             HostAuthority.Resolve("WindForceMultiplier", UseLiveValue ? WindForceMultiplier : _snapWindForceMultiplier);
@@ -1016,6 +1465,41 @@ namespace Fairoots
         /// </summary>
         public bool EffectiveWindBackpackAlwaysImmune =>
             HostAuthority.Resolve("WindBackpackAlwaysImmune", WindBackpackAlwaysImmune.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="CoverMouthBlocksSporeBombs"/>.Value. Host-authoritative.
+        /// </summary>
+        public bool EffectiveCoverMouthBlocksSporeBombs =>
+            HostAuthority.Resolve("CoverMouthBlocksSporeBombs", CoverMouthBlocksSporeBombs.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="DisableCoverMouth"/>.Value. Host-authoritative - flat, same
+        /// shape as <see cref="EffectiveDisableSporeAreas"/>.
+        /// </summary>
+        public bool EffectiveDisableCoverMouth =>
+            HostAuthority.Resolve("DisableCoverMouth", DisableCoverMouth.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="CoverMouthStaminaPerSecond"/>.Value. Host-authoritative -
+        /// flat (not preset/live-snapshot resolved, matching the raw config entry),
+        /// but it decides what a counterplay move costs, which is shared balance.
+        /// </summary>
+        public float EffectiveCoverMouthStaminaPerSecond =>
+            HostAuthority.Resolve("CoverMouthStaminaPerSecond", CoverMouthStaminaPerSecond.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="DisableSporeAreas"/>.Value. Host-authoritative - flat (not
+        /// preset/live-snapshot resolved, matching the raw config entry itself),
+        /// but whether a hazard exists at all is shared game state, so only the
+        /// host's value counts (same shape as
+        /// <see cref="EffectiveDisableWindEntirely"/>).
+        /// </summary>
+        public bool EffectiveDisableSporeAreas =>
+            HostAuthority.Resolve("DisableSporeAreas", DisableSporeAreas.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of

@@ -83,6 +83,9 @@ namespace Fairoots
                 _processed = null;
                 SporeBombCullPatch.RemovedPositions.Clear();
                 SporeBombCullPatch.KeptTriggerColliders.Clear();
+                SporeAreas.SporeAreaDisablePatch.ClearLevelState();
+                SporeAreas.SporeAreaCullPatch.ClearLevelState();
+                SporeAreas.CoverMouthImmunityPatch.ClearLevelState();
             }
 
             if (currentlyActive)
@@ -109,6 +112,12 @@ namespace Fairoots
             Networking.HostAuthority.PublishAll();
             DetonationScreenshakeRegistry.Clear();
             SporeBombCullPatch.Run(found.transform);
+            // Order matters: the seeded removal runs first, so the disable switch
+            // below never claims an already-removed area into its restore registry
+            // (see SporeAreaDisablePatch's remarks).
+            SporeAreas.SporeAreaCullPatch.Run(found.transform);
+            SporeAreas.SporeAreaDisablePatch.Run(found.transform);
+            SporeAreas.SporeAreaTuningPatch.Run(found.transform);
 
             if (Plugin.Cfg.EnableDebugLogging.Value && Plugin.Cfg.LogSceneScanOnLoad.Value)
             {

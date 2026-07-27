@@ -195,6 +195,13 @@ player has explicitly touched always overrides whatever the active preset
 would otherwise set for that mechanic — applying/switching a preset never
 silently clobbers a hand-tuned value.
 
+**Every preset number in this table is a placeholder** (maintainer, 2026-07-27):
+they exist so a preset is testable at all, and they are expected to be re-tuned
+wholesale in Phase 9 once the full mechanic set is in — adding one mechanic
+changes what the others should be, so tuning them individually as each lands
+would be work thrown away. Pick something sensible per new mechanic, keep the
+direction consistent with the neighbouring rows, and move on.
+
 Exact numeric values below are **starting targets, not final** — several of
 the underlying vanilla defaults are Unity scene/asset data rather than
 compiled code (see `RESEARCH.md`'s per-mechanic "open questions"), so the
@@ -223,7 +230,8 @@ once and left alone).
 | Spore bomb knockback/explosion force | vanilla | −20% | −40% | −60% |
 | Spore bomb screen-shake distance cap | vanilla (~75m, unconfirmed) | 30m | 20m | 10m |
 | Spore bomb particle/VFX count | vanilla | −25% | −50% | −65% |
-| Spore area radius | vanilla | −15% | −30% | −45% |
+| Spore area count (seeded removal — see below) | 0% | 0% | 20% | 35% |
+| Spore area radius (hazard + visible cloud — see below) | vanilla | −15% | −30% | −45% |
 | Spore area lethality (status/sec) | vanilla | −15% | −35% | −55% |
 | Spore area screen-filter opacity | vanilla | −20% | −40% | −60% |
 | Wind disperses spore areas | if not already vanilla behavior, on | on | on | on, generous |
@@ -420,9 +428,146 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
 - **Spore areas** (the status-effect gas clouds — a different hazard from
   spore bombs, despite the similar name) run through a single generic
   radius-based hazard-zone component with public radius/lethality/falloff
-  fields. Wind-suppression of spore areas may already partially exist in
-  vanilla for some instances — needs the same runtime confirmation pass to
-  know whether this is "tune an existing interaction" or "build a new one."
+  fields. Wind-suppression of spore areas **already exists natively for 100%
+  of them** in Roots (runtime-confirmed: every `Spores` emitter in the biome is
+  a `WindAffectedStatusEmitter`), so that row is tune-not-build.
+
+  **Master disable switch (implemented 2026-07-27):**
+  `Spore-Areas/disable-spore-areas` (off by default, no preset ever turns it
+  on) removes the biome's spore areas outright — status ticks, the green
+  screen-filter warning, the emitter mushroom in the middle of the cloud and
+  the cloud VFX all go together, because the whole area object is deactivated
+  rather than just the emitter component. Flat and host-authoritative, always
+  immediate (a hazard either exists or it doesn't, so waiting for a level
+  reload would read as broken), and reversible in both directions — it only
+  restores what Fairoots itself hid. Scoped to the level's own baked-in spore
+  areas: the temporary mini spore area a spore bomb leaves on detonation is a
+  separate hazard with its own `Spore-Bombs` settings and is never touched.
+  Identity is the component (`StatusEmitter.statusType == Spores`,
+  `amount > 0`), not a prefab name — there is no spore-area class or name to
+  match on. See `CODEBASE.md`'s `SporeAreas/` section.
+
+  **Seeded thinning — "make spore areas less common" (implemented
+  2026-07-27):** `Spore-Areas/removal-fraction` removes a fraction of the
+  level's spore areas outright. **0% on both Subtle and Balanced** (the
+  maintainer's explicit call), unlike the spore-bomb cull which already thins
+  at Balanced: Roots has only ~12-23 spore areas in a whole level against 400+
+  spore bombs, so they're landmarks rather than clutter, and thinning them at
+  the default preset would change the shape of the biome rather than its
+  fairness. Generous 20% / Tame 35% are starting estimates pending playtest.
+
+  **Which ones go is cluster-first, and that's the point.** Removal always
+  starts with the emitter whose nearest *other* emitter is closest and works
+  outward, so overlapping clouds — the stretches of biome you can't cross
+  without taking spores — get thinned before isolated ones a player can just
+  walk around. Seeded per `(host seed, "spore-area-cull", rounded emitter
+  position)`, its own mechanic tag so it never correlates with the spore-bomb
+  cull, and independent of scene-enumeration order. Level-load-only, like the
+  spore-bomb removal fraction. Live-verified 2026-07-27: 23 areas at 0.5 →
+  removed 12, kept 11 (= `floor(23 × 0.5)`).
+
+  **What "a spore area" actually is, structurally (confirmed 2026-07-27, and it
+  corrects an earlier assumption):** the object both the disable switch and the
+  thinning pass act on is `"Mushroom tree Spore Cloud"`, which is the **whole
+  mushroom-tree prop** — the mushroom meshes and their `MeshCollider`s are its
+  direct children, alongside a `"Spore Cloud"` child carrying the
+  `StatusEmitter` and two `"Particles"` systems. So removing a spore area
+  removes the emitter mushroom *and its collision geometry* (a mushroom cap that
+  could have been stood on goes with it). That is the intended scope, confirmed
+  by the maintainer: the ask was "disable the spore areas **and** their Spore
+  Emitter, the mushroom in the centre," not "silence the emitter and leave the
+  prop standing."
+
+  **Radius (implemented 2026-07-27):** `Spore-Areas/radius-multiplier` scales
+  `StatusEmitter.radius` **and** `innerFade`/`outerFade` by the same factor,
+  **and** the two cloud particle systems' transforms — so the visible cloud and
+  the real hazard extent always agree (the maintainer's explicit requirement; a
+  hazard whose apparent size disagrees with its actual size is worse than either
+  size alone). Scaling the fades along with the radius is what preserves the
+  falloff *shape*: the native ramp is measured inward from the boundary, and
+  vanilla's `radius = 16` / `innerFade = 8` means "the outer half fades in," so
+  scaling the radius alone would turn a shrunken area into nearly all ramp and
+  an enlarged one into nearly all full-strength core — i.e. the radius dial
+  would quietly become a lethality dial, which is a separate setting's job. The
+  emitter mushroom is deliberately *not* scaled (only the particle systems are,
+  and they're a separate child of the prop). Live-updatable, unlike removal.
+
+  **Status build-up rate (implemented 2026-07-27):**
+  `Spore-Areas/status-rate-multiplier` scales how fast the Spores status
+  accumulates on a player inside an area. It scales `StatusEmitter.amount`, not
+  the tick interval, and that isn't an arbitrary choice: the native emitter
+  applies `amount × tickTime × falloff` every `tickTime`, so the per-tick amount
+  is already proportional to the interval and the resulting rate
+  (`amount × falloff` per second) doesn't contain `tickTime` at all — scaling
+  the interval would change only how chunky the meter's jumps are, not how fast
+  it fills. Independent of the radius dial, so "how big" and "how fast" tune
+  separately.
+
+  **Cover your mouth (implemented 2026-07-27; the animation is still to come).**
+  Hold a key (default `X`, `General/cover-mouth-key`; `cover-mouth-hold` switches
+  it to a toggle) to be immune to spore areas. Both the keybind and hold/toggle
+  mode are **per-client** — which key a player presses changes nothing shared,
+  the same reasoning that exempts the spore-bomb recolor — while what the mechanic
+  *costs* (`Spore-Areas/cover-mouth-stamina-per-second`, default 0.03/s against
+  climbing's 0.2/s) and whether it exists at all
+  (`Spore-Areas/disable-cover-mouth`) are host-authoritative, because those are
+  shared balance. A player who doesn't want it sets their own key to `None`, which
+  needs no host cooperation: opting out of a move you could make isn't altering
+  anyone else's game.
+
+  It occupies both hands, literally: while covering you can't interact with or
+  pick up anything (which also covers ropes, vines and climb handles — they're
+  interactibles), can't switch items or backpack, and can't start a wall climb;
+  an item held from a slot is pocketed and the temporary fourth held item is
+  dropped. Conversely you can't *start* covering while already holding onto
+  something — the reverse (covering drops you off the wall) would turn a defensive
+  button into a fall.
+
+  **The immunity reuses the game's own `emitterDisabledByWind` gate**, so it
+  behaves exactly like the wind dispersal players already know, screen filter
+  included, rather than reimplementing status suppression.
+
+  **Tapping the key is not a free ride** (exploit found in the first playtest:
+  tapping on a ~300ms cycle gave near-total immunity for a fraction of the
+  stamina). The cause was vanilla's own re-entry grace — an emitter that thinks
+  you just re-entered sets its tick timer to −1s, so every release re-armed 1.5s
+  of safety. Progress toward the next spore tick is now *paused* by covering and
+  resumed on release, never reset: spores accrue in proportion to uncovered time
+  and stamina in proportion to covered time, so you pay for what you get. Leaving
+  the area is still a genuine reset.
+
+  **The pose (implemented 2026-07-27).** Both hands come up over the mouth, for
+  the covering player and everyone else in the lobby. Hand and finger shape is
+  borrowed from the emote the game labels "it's so over", captured once and
+  re-applied per frame rather than played — so the emote's legs and head motion
+  never happen (the maintainer's requirement) and there is no animation state
+  left to reset. Arm placement is the game's own two-bone arm IK. Remote players
+  see it for free: the pose patches aren't gated to the local character, so the
+  one replicated bool per player is all the "animation networking" there is.
+  `Debug/cover-mouth-pose-preview` holds the pose on permanently for tuning
+  (purely visual — no immunity, no stamina, no restrictions), and the seven pose
+  offsets under `Debug` are playtest-tuned defaults rather than estimates.
+
+  **Spore bombs (opt-in, 2026-07-27).** `Spore-Bombs/cover-mouth-blocks-spore-bombs`
+  (off by default, host-authoritative) extends the immunity to the temporary cloud a
+  spore bomb leaves behind. Off by default because the mechanic is scoped to spore
+  areas — something you see coming and choose to walk into, which is what makes
+  holding your breath through it counterplay — whereas a bomb is a surprise you've
+  already triggered; it exists because the maintainer wanted the freedom to enable
+  it. Only the spore status is blocked either way: the blast still knocks you about.
+  Worth knowing for anyone touching this: a bomb's cloud is **not** a
+  `StatusEmitter` and not a one-shot — it is a single `AOE` that re-explodes on a
+  timer, which only became visible by tracing a live call stack.
+
+  **Known limitation:** the pose still shifts slightly depending on which idle
+  animation the character is in. The gross session-to-session variance is fixed
+  (the capture is synchronous with the other animator layers muted, so it no
+  longer bakes in whatever else was playing), but the *live* pose is placed
+  relative to the head and solved from a shoulder that idle animations keep
+  moving, so some drift is inherent to the IK approach. Accepted as good enough
+  for now; a rework would have to anchor the hands to something steadier than
+  the animated head. Live-verified: 66 releases, 66 resumes, with
+  ticks landing throughout.
 - **Creatures**: zombies currently have **no distance-based deaggro at
   all** once they've targeted a player (confirmed absent in code, not just
   hard to find) — this is the one creature change that's genuinely new
@@ -565,8 +710,12 @@ other PEAK mods already use.
    `Wind/disable-wind-entirely` master switch (off by default, never enabled by
    any preset) fully reverts the entire wind mechanic to vanilla for players
    who don't want it at all.
-6. **Phase 6:** Spore Areas — radius/lethality/opacity scaling, wind
-   interaction, the new cover-mouth mechanic.
+6. **Phase 6 (in progress):** Spore Areas — the master disable switch
+   (**done**, 2026-07-27 — see the spore-area mechanic note above), seeded
+   thinning of how many spore areas a level has, radius/lethality scaling, and
+   the new cover-mouth mechanic. Screen-filter opacity and any UI/indicator
+   work are explicitly **not** in this phase's scope (maintainer's call,
+   2026-07-27).
 7. **Phase 7:** Creatures — zombie deaggro (new logic), zombie/beetle speed
    and knockback scaling, full-disable option, spider attack telegraph
    audio.

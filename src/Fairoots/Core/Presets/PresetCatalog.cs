@@ -174,6 +174,75 @@ namespace Fairoots.Core.Presets
         }
 
         /// <summary>
+        /// Target fraction of the level's persistent spore areas ("Mushroom Spore
+        /// Clouds") to remove, per <see cref="SporeAreaCull"/>.
+        ///
+        /// <b>Zero on both Subtle and Balanced</b> - the maintainer's explicit
+        /// call (2026-07-27), and a deliberate difference from
+        /// <see cref="SporeBombCullFraction"/> (which already thins at Balanced).
+        /// Roots has only ~12-23 spore areas in a whole level, against 400+ spore
+        /// bombs: they're landmarks, not clutter, so removing any at the default
+        /// preset would change the shape of the biome rather than just its
+        /// fairness. Only the two most forgiving presets thin them, and even
+        /// there the cluster-first rule means what goes is the overlap, not the
+        /// landmark. Starting estimates pending playtest.
+        /// </summary>
+        public static double SporeAreaRemovalFraction(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 0.00;
+                case PresetId.Balanced: return 0.00;
+                case PresetId.Generous: return 0.20;
+                case PresetId.Tame: return 0.35;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
+        /// Multiplier applied to a persistent spore area's
+        /// <c>radius</c> (and, proportionally, its <c>innerFade</c>/<c>outerFade</c>
+        /// and its cloud VFX scale - see <see cref="SporeAreaTuning"/>), per
+        /// ROADMAP.md's "Spore area radius" row (-15%/-30%/-45%). 1.0 = vanilla
+        /// (Subtle). Vanilla is <c>radius = 16</c> world units (~26m), so Balanced
+        /// takes it to ~13.6 units. Starting estimates pending playtest.
+        ///
+        /// Not to be confused with <see cref="SporeBombSporeAreaRadiusMultiplier"/>,
+        /// which is the *spore bomb's* temporary mini area.
+        /// </summary>
+        public static double SporeAreaRadiusMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.85;
+                case PresetId.Generous: return 0.70;
+                case PresetId.Tame: return 0.55;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
+        /// Multiplier applied to how fast the Spores status builds up inside a
+        /// persistent spore area (<c>StatusEmitter.amount</c>, vanilla 0.025 in
+        /// Roots - see <see cref="SporeAreaTuning.ScaleStatusRate"/>), per
+        /// ROADMAP.md's "Spore area lethality (status/sec)" row
+        /// (-15%/-35%/-55%). 1.0 = vanilla (Subtle). Starting estimates pending
+        /// playtest.
+        /// </summary>
+        public static double SporeAreaStatusRateMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.85;
+                case PresetId.Generous: return 0.65;
+                case PresetId.Tame: return 0.45;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
         /// The unconditional bush/grass placement-removal pass is on for every
         /// preset, including Subtle (ROADMAP.md - the game never prevents a spore
         /// bomb landing in foliage, so this gap is always fixed). Kept as a method

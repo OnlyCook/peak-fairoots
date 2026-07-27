@@ -2,6 +2,7 @@ using System;
 using BepInEx;
 using Fairoots.Diagnostics;
 using Fairoots.Networking;
+using Fairoots.SporeAreas;
 using Fairoots.SporeBombs;
 using Fairoots.Wind;
 using HarmonyLib;
@@ -64,6 +65,7 @@ namespace Fairoots
                 {
                     SporeBombCullPatch.ReapplyTriggerRadiusToAll();
                     WindChillZoneTuningPatch.ReapplyAll();
+                    SporeAreaTuningPatch.ReapplyToAll();
                 }
             };
 
@@ -83,6 +85,32 @@ namespace Fairoots
             // ApplyChangesLive (see its own remarks), same treatment as
             // KeepVanillaTriggerRadius above.
             Cfg.DisableWindEntirely.SettingChanged += (s, e) => WindChillZoneTuningPatch.ReapplyAll();
+
+            // Same treatment as the wind kill switch: a hazard either exists or it
+            // doesn't, so waiting for a level reload would just read as broken.
+            // Applies in both directions (hides, and restores what it hid).
+            Cfg.DisableSporeAreas.SettingChanged += (s, e) => SporeAreaDisablePatch.ReapplyToAll();
+
+            // A resize or a rate change can be undone, unlike a removal, so both
+            // spore-area tuning dials get the same immediate-reapply treatment as
+            // the wind/trigger-radius multipliers - only while live updates are on
+            // (with them off, the Effective* accessors keep returning the
+            // level-load snapshot anyway).
+            EventHandler reapplySporeAreaTuning = (s, e) =>
+            {
+                if (Cfg.ApplyChangesLive.Value) SporeAreaTuningPatch.ReapplyToAll();
+            };
+            Cfg.SporeAreaRadiusMultiplierOverride.SettingChanged += reapplySporeAreaTuning;
+            Cfg.SporeAreaStatusRateMultiplierOverride.SettingChanged += reapplySporeAreaTuning;
+
+            // The pose's clip choice is cached after its first lookup (it logs the
+            // whole emote list, so it shouldn't re-run every frame) - drop that cache
+            // when the setting changes so a new clip name applies without a restart.
+            // Both of these are baked into the captured pose rather than read per frame
+            // (the capture freezes one frame of one clip), so changing either has to
+            // force a re-capture or it would look like the setting did nothing.
+            Cfg.CoverMouthPoseEmote.SettingChanged += (s, e) => CoverMouthPose.InvalidateEmote();
+            Cfg.CoverMouthPoseEmoteTime.SettingChanged += (s, e) => CoverMouthPose.InvalidateEmote();
 
             // Cosmetic, client-side, and always immediate (see its remarks in
             // PluginConfig) - a scene-wide repaint in both directions, so
@@ -129,6 +157,11 @@ namespace Fairoots
             }
 
             RootsLevelWatcher.CheckAndRun();
+            CoverMouthController.Tick();
+
+            // Capture the cover-mouth hand pose while the player is still standing in
+            // the airport, not the first time they need it - see CoverMouthPose.Prewarm.
+            CoverMouthPose.Prewarm();
 
             if (!Cfg.EnableDebugLogging.Value)
             {

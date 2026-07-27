@@ -6,8 +6,8 @@ structure do, so a reader can find where a given mechanic lives without
 re-scanning the whole tree.
 
 **Phase 2 (seed/preset core), Phase 4 (spore bombs), and Phase 5 (wind) are
-in.** Spore areas and creatures are not written yet; see `ROADMAP.md`'s phased
-plan.
+in; Phase 6 (spore areas) is in progress.** Creatures are not written yet; see
+`ROADMAP.md`'s phased plan.
 
 **Host authority (locked in 2026-07-22 — read `ROADMAP.md`'s "Host authority"
 section before touching `PluginConfig.cs` or anything under `Wind/`/
@@ -164,6 +164,13 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       colliderless, and a spore bomb's only collider is its invisible trigger
       volume), excluding the local player's own body, which otherwise sits at
       0.00m and crowds out the entire report.
+    - `SporeStatusSourcePatch.cs` — logs any Spores application that lands on the
+      local player *while their mouth is covered*, with the call stack that asked
+      for it. That combination should be impossible, so every line is a bug report.
+      Earned its keep immediately: it's what revealed a bomb's cloud to be a
+      timer-driven repeating `AOE`, after both plausible readings of the decompile
+      turned out to be wrong. Same approach and rationale as
+      `ScreenshakeSourcePatch`.
     - `PingRadiusProbePatch.cs` / `RemovedMarkerOverlay.cs` — dev-only probes
       for the foliage-detection and cull-removal debug loop.
     - `TriggerRadiusOverlay.cs` — draws a red 3D wireframe (via `GL` immediate-
@@ -216,6 +223,20 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       sphere reaching absurdly far above the actual mushroom mesh (confirmed
       via `TriggerRadiusOverlay`'s wireframe), which made jumping over one
       impossible. Left alone for the round "Explosive Spore Bomb" variant.
+    - `CoverMouthSporeBombPatch.cs` + `SporeBombDetonationMarker.cs` — the opt-in
+      `Spore-Bombs/cover-mouth-blocks-spore-bombs` setting (off by default,
+      host-authoritative): covering your mouth also blocks the spore payload of a
+      spore bomb's temporary cloud. Only the *status* is suppressed — knockback,
+      noise and shake still land. A bomb's cloud is not a `StatusEmitter`, so the
+      spore-area immunity can't reach it: it's **one `AOE` that re-explodes on a
+      timer** (`TimeEvent` invoking `Explode` repeatedly — established from a live
+      call stack, not the decompile), so the patch zeroes `statusAmount` *and*
+      `hasAffliction` around each `Explode` call and always restores them. Scoping
+      uses `SporeBombDetonationMarker`, a tag put on the spawned explosion, rather
+      than `DetonationScreenshakeRegistry` — read that file's remarks before
+      changing it: the registry expires after seconds (it's for screen shakes), so
+      the registry-based version blocked a cloud's first few seconds and silently
+      let the rest through.
     - `SporeBombRecolorPatch.cs` — the visual-readability fix: tints every spore
       bomb (both the mushroom-cluster variants and the explosive one) toward the
       pink/magenta of the game's own Spores status effect, so a green hazard
@@ -240,6 +261,112 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       baseline-caching pattern as `SporeBombCullPatch`'s vanilla trigger radii.
       **The only client-side, non-host-authoritative gameplay-adjacent feature in
       the mod** (it's cosmetic — see `PluginConfig.cs` above).
+  - **`SporeAreas/`** — the Phase 6 spore-area mechanics (the persistent
+    "Mushroom Spore Clouds", a different hazard from spore bombs):
+    - `SporeAreaDisablePatch.cs` — the `Spore-Areas/disable-spore-areas` master
+      switch. Not a Harmony patch despite the folder convention (same as
+      `SporeBombRecolorPatch`): the emitters are baked into the Roots scene at
+      author time, so there's no runtime placement call to hook — driven once
+      per level from `RootsLevelWatcher`, plus a scene-wide `ReapplyToAll()` on
+      the setting changing or a host room-property update. Identity is the
+      **component**, not a name: a `StatusEmitter` with `statusType == Spores`
+      and `amount > 0` (runtime-confirmed - 12-23 per level in Roots, all
+      `WindAffectedStatusEmitter`, `radius=16`, `innerFade=8`, `amount=0.025`;
+      there is no spore-area class or prefab name to match on, and `amount > 0`
+      excludes the mirror-image "subtracts spores" use of the same component).
+      Deactivates the whole area object rather than just the component, so the
+      emitter mushroom and cloud VFX go with the status ticks and screen
+      filter; `ResolveAreaRoot` walks *up* from the emitter to the highest
+      ancestor that still represents that one area (stopping before any
+      ancestor owning a second `StatusEmitter`, any
+      `PropSpawner`/`PropGrouper`/`Biome` grouping node, and `Roots Segment`) —
+      confirmed in-game to land on `"Mushroom tree Spore Cloud"`, which is the
+      **whole mushroom-tree prop** (mushroom meshes + `MeshCollider`s as direct
+      children, plus a `"Spore Cloud"` child carrying the emitter and two
+      `"Particles"` systems — see `SporeAreaScan.ResolveAreaRoot`'s remarks for
+      the confirmed layout). So the emitter mushroom and its collision geometry
+      go with the hazard, which is the maintainer's confirmed intent, not an
+      overreach. Restores only what it
+      hid itself (a registry keyed by instance ID), so turning the setting off
+      can't un-hide something the game deactivated for its own reasons.
+      Deliberately excludes a spore bomb's own temporary spore area
+      (`IsSporeBombSpawned`) — that's the `Spore-Bombs` section's business.
+    - `SporeAreaScan.cs` — the shared "what is a spore area, and which
+      GameObject *is* it" logic (identity check, spore-bomb-spawned exclusion,
+      `ResolveAreaRoot`'s parent walk, path formatting) that every mechanic in
+      this folder calls. One copy on purpose: two slightly different identity
+      checks would mean the removal pass and the disable pass disagreeing about
+      how many spore areas the level has.
+    - `SporeAreaTuningPatch.cs` — the flat, non-seeded field tuning applied to
+      every spore area: size (`radius` + `innerFade`/`outerFade` + the two cloud
+      particle systems' transforms) and Spores build-up rate (`amount`), both in
+      one pass since they act on the same components. Baseline-cached per
+      instance ID (same pattern as `WindChillZoneTuningPatch`), so repeated
+      reapplies can't compound and 1.0 always restores true vanilla.
+      Live-updatable, unlike removal. Also owns the one-time verbose structure
+      dump that established the prefab layout above.
+    - `CoverMouthController.cs` — the cover-your-mouth mechanic's driver (polled
+      from `Plugin.Update`): reads the key, runs `Core/CoverMouth.NextState`,
+      charges stamina, empties the player's hands as the cover starts (a slot item
+      is *pocketed*, the temporary fourth held item is *dropped* via the game's own
+      `DropItemRpc`), and publishes the state as a Photon **player** custom
+      property so other clients can pose it. Per-client by design — each player
+      decides about their own mouth, and the immunity only ever affects them, since
+      spore areas apply status to `Character.localCharacter` only. Refuses to start
+      while the player is holding onto anything: the restriction patches stop a
+      covering player from starting a climb, and this stops a climbing player from
+      covering, so a defensive button can never turn into a fall.
+    - `CoverMouthImmunityPatch.cs` — what covering buys, via the game's **own**
+      gate: `StatusEmitter.emitterDisabledByWind`, the flag wind already uses to
+      disperse spore areas. Reusing it means the mechanic ends the green screen
+      filter and suppresses the status exactly the way dispersal already does,
+      instead of reimplementing both. Wind-affected emitters (all of them, in
+      Roots) are handled by ORing the flag in on their own `FixedUpdate` postfix,
+      where the game rewrites it every tick so no restore bookkeeping is needed;
+      plain emitters are tracked and restored explicitly.
+      **Plus the anti-exploit half:** progress toward the next spore tick is
+      *paused* by covering, never reset, so tapping the key buys exactly the time
+      it was held. Read that field's remarks before touching it — the leak is in
+      vanilla's own re-entry path (`timeSinceLastTick = -extraWarningTime`, a fresh
+      1.5s grace every time the emitter thinks you re-entered), and the first fix
+      for it failed on a one-frame ordering detail also documented there.
+    - `CoverMouthPosePatch.cs` — the visible half: both hands over the mouth, on
+      every client. Three systems, each doing the part it can: **hand/finger
+      shape** is captured from an existing emote clip (finger curl is
+      unreachable from a Harmony mod — it's animation data, and arm IK solves
+      only three bones); **the clip is never left playing**, its wrist/finger
+      rotations are captured once and re-applied per frame, so the emote's legs
+      and head motion never happen and there's no animation state to reset; and
+      **arm IK** places the hands via `HandleIK` (weights) / `ConfigureIK`
+      (targets). Neither method is gated to the local character, so remote
+      players' poses come free off the replicated player property — no animation
+      networking. Three findings worth not rediscovering, all documented at
+      their fields: the clip is `A_Scout_Emote_Defeat` (the emote *labelled*
+      "it's so over" — the wheel shows `LocalizedText.GetText(key)`, so keys
+      don't resemble labels, and only the `PlayEmote` probe could resolve it);
+      the wrist must be stored **body-relative and applied via the IK target**,
+      not stored forearm-relative and written to the bone (that flips the hands
+      and starts a solver-feedback oscillation — "twitching"); and the capture
+      must be **synchronous with other layers muted** (`Animator.Update(0)`),
+      or it silently captures the clip blended with the session's idle state and
+      the six other weight-1 layers, making the pose differ per session.
+    - `CoverMouthRestrictionPatches.cs` — what covering costs besides stamina: no
+      interaction (`Interaction.canInteract`, the single gate every interaction
+      passes through — which is also how rope/vine/climb-handle grabs are covered,
+      since those are interactibles rather than a separate climb input), no
+      slot/backpack switching (`CharacterItems.DoSwitching`), no starting a wall
+      climb (`CharacterClimbing.TryToStartWallClimb`, the one climb that isn't an
+      interaction). All scoped to the local character and no-ops when not covering.
+    - `SporeAreaCullPatch.cs` — the seeded thinning pass
+      (`Spore-Areas/removal-fraction`): deactivates a fraction of the level's
+      spore areas, with `Core/SporeAreaCull.cs` deciding which. Level-load-only
+      (like the spore-bomb cull fraction — a removed area can't come back
+      mid-level, so nothing is wired to `SettingChanged`), and runs **before**
+      `SporeAreaDisablePatch` each load so the two compose. Verbose logging
+      reports each removal's nearest-neighbour spacing plus a
+      removed-vs-kept median comparison, which is what makes the cluster-first
+      claim checkable against a real level instead of taken on faith (the
+      per-removal lines alone are in scene order, so they can't show it).
   - **`Core/`** — the pure, Unity-free decision layer (see split rule above):
     - `WorldUnits.cs` (+ the game-facing `GameUnits.cs` wrapper in the project
       root) — **read this before adding any `*-meters` setting.** PEAK's world
@@ -262,10 +389,42 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       Deliberately **not** `HashCode.Combine`/`string.GetHashCode`/`System.Random`
       (all per-process-randomized or runtime-dependent — would break the seed
       guarantee). See its file comment.
-    - `SporeBombCull.cs` — the two-pass spore-bomb removal decision (pure
-      arithmetic + seeded ranked selection): unconditional foliage removal,
-      then a seeded cull budgeted against it. Returns per-candidate outcomes;
-      `SporeBombCullPatch` maps them back onto real GameObjects.
+    - `ClusteredRemovalSelection.cs` — "given these positions and a budget of N
+      to remove, which N?": the seeded, cluster-first selection shared by every
+      mechanic that thins placed hazards (ranked by nearest-neighbour distance,
+      closest-clustered first, sparing a removed candidate's nearest neighbour
+      so a tight pair loses one member rather than both; ties broken by the seed
+      hash then position, so scene-enumeration order never matters). Also owns
+      `RemovalBudget` — the one rounding rule ("at least `floor(total * (1 -
+      fraction))` always survive"). Extracted from `SporeBombCull` when
+      `SporeAreaCull` needed the same logic; the pre-existing spore-bomb cull
+      tests passing unchanged is the proof the extraction was
+      behavior-preserving.
+    - `SporeBombCull.cs` — the two-pass spore-bomb removal decision: unconditional
+      foliage removal, then a `ClusteredRemovalSelection` cull budgeted against
+      it. Returns per-candidate outcomes; `SporeBombCullPatch` maps them back
+      onto real GameObjects.
+    - `CoverMouth.cs` — the cover-mouth input state machine (hold vs. toggle, plus
+      the outside veto that force-cancels a cover and can't be latched around) and
+      its framerate-independent stamina cost. Unity-free so the awkward part is
+      unit-tested rather than only observable by pressing a key in-game.
+    - `SporeAreaTuning.cs` — pure arithmetic for the spore areas' size and
+      Spores build-up rate (not seed-gated - every area gets the identical flat
+      treatment, same shape as `SporeBombExplosionTuning`). Two non-obvious
+      rules live here, both with tests: the fades scale *with* the radius (the
+      native falloff ramp is measured inward from the boundary, so scaling
+      radius alone would turn the size dial into a lethality dial), and the
+      rate dial scales `amount` rather than the tick interval (the native
+      per-tick amount is proportional to the interval, so the rate doesn't
+      contain it - scaling the interval changes granularity only, not rate).
+    - `SporeAreaCull.cs` — the spore-area thinning decision. Simpler than
+      `SporeBombCull`: no foliage pass (a spore cloud is a 16-unit-radius volume
+      around a mushroom, not a small prop that can get buried in a fern), just
+      one budgeted `ClusteredRemovalSelection` pass under its own mechanic tag so
+      the two mechanics' choices never correlate. Cluster-first is what makes it
+      a fairness change rather than "less content": what hurts a run is
+      overlapping 16-unit radii forming a stretch you can't cross, so removal
+      starts there and leaves walk-around-able isolated clouds alone.
     - `SporeBombExplosionTuning.cs` — pure arithmetic for the trigger-radius/
       knockback/screen-shake-cap/VFX-count multipliers, plus the
       trigger-height-cutoff bug-fix decision (`ShouldSuppressTriggerForHeight`)
@@ -446,9 +605,9 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
 
 ## Planned structure (fills in as phases land — see ROADMAP.md)
 
-`SporeBombs/` and `Wind/` (above) are the first two mechanic-group folders;
-expect one more per remaining mechanic group, mirroring `OVERVIEW.md`'s
-sections: `SporeAreas/`, `Creatures/` — each holding the Harmony patches that
+`SporeBombs/`, `Wind/` and `SporeAreas/` (above) are the mechanic-group folders
+so far; expect one more per remaining mechanic group, mirroring `OVERVIEW.md`'s
+sections: `Creatures/` — each holding the Harmony patches that
 scan the scene and apply removals/tweaks, delegating every seeded decision to
 `Core/`. New per-mechanic preset values land in `Core/Presets/PresetCatalog.cs`
 as each phase is implemented.

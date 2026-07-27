@@ -1,5 +1,6 @@
 using ExitGames.Client.Photon;
 using Fairoots.Diagnostics;
+using Fairoots.SporeAreas;
 using Fairoots.SporeBombs;
 using Fairoots.Wind;
 using Photon.Pun;
@@ -27,6 +28,11 @@ namespace Fairoots.Networking
         public override void OnJoinedRoom()
         {
             HostAuthority.PublishAll();
+
+            // Re-assert our own cover-mouth state as a player property: a write made
+            // while roomless goes nowhere, so without this a player who joined
+            // mid-cover would be shown to everyone else with their hands down.
+            CoverMouthController.RepublishOnJoin();
         }
 
         public override void OnMasterClientSwitched(Photon.Realtime.Player newMasterClient)
@@ -59,9 +65,11 @@ namespace Fairoots.Networking
                 return; // our own local values are already authoritative - nothing to refresh.
             }
 
-            Diag.V("[HostAuthoritySync] room properties updated - reapplying cached wind/trigger-radius tuning.");
+            Diag.V("[HostAuthoritySync] room properties updated - reapplying cached wind/trigger-radius/spore-area state.");
             WindChillZoneTuningPatch.ReapplyAll();
             SporeBombCullPatch.ReapplyTriggerRadiusToAll();
+            SporeAreaDisablePatch.ReapplyToAll();
+            SporeAreaTuningPatch.ReapplyToAll();
         }
     }
 }

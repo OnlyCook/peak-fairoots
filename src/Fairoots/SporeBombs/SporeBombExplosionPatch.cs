@@ -97,6 +97,14 @@ namespace Fairoots.SporeBombs
             // ExplosionEffect spawns over the following second, which don't exist yet).
             DetonationScreenshakeRegistry.Record(spawned.transform.position);
 
+            // Tag the spawned explosion permanently, so anything that needs to ask "did
+            // this come from a spore bomb?" later can, without depending on the registry
+            // above still remembering it - see SporeBombDetonationMarker.
+            if (spawned.GetComponent<SporeBombDetonationMarker>() == null)
+            {
+                spawned.AddComponent<SporeBombDetonationMarker>();
+            }
+
             bool forcePositional = SporeBombExplosionTuning.ShouldForcePositionalScreenshake(shakeCapMeters);
 
             // AddScreenshake.range is world units, the setting is meters, and the two
