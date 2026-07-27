@@ -223,6 +223,7 @@ once and left alone).
 | Spore bomb knockback/explosion force | vanilla | −20% | −40% | −60% |
 | Spore bomb screen-shake distance cap | vanilla (~75m, unconfirmed) | 30m | 20m | 10m |
 | Spore bomb particle/VFX count | vanilla | −25% | −50% | −65% |
+| Spore area count (seeded removal — see below) | 0% | 0% | 20% | 35% |
 | Spore area radius | vanilla | −15% | −30% | −45% |
 | Spore area lethality (status/sec) | vanilla | −15% | −35% | −55% |
 | Spore area screen-filter opacity | vanilla | −20% | −40% | −60% |
@@ -438,6 +439,25 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   Identity is the component (`StatusEmitter.statusType == Spores`,
   `amount > 0`), not a prefab name — there is no spore-area class or name to
   match on. See `CODEBASE.md`'s `SporeAreas/` section.
+
+  **Seeded thinning — "make spore areas less common" (implemented
+  2026-07-27):** `Spore-Areas/removal-fraction` removes a fraction of the
+  level's spore areas outright. **0% on both Subtle and Balanced** (the
+  maintainer's explicit call), unlike the spore-bomb cull which already thins
+  at Balanced: Roots has only ~12-23 spore areas in a whole level against 400+
+  spore bombs, so they're landmarks rather than clutter, and thinning them at
+  the default preset would change the shape of the biome rather than its
+  fairness. Generous 20% / Tame 35% are starting estimates pending playtest.
+
+  **Which ones go is cluster-first, and that's the point.** Removal always
+  starts with the emitter whose nearest *other* emitter is closest and works
+  outward, so overlapping clouds — the stretches of biome you can't cross
+  without taking spores — get thinned before isolated ones a player can just
+  walk around. Seeded per `(host seed, "spore-area-cull", rounded emitter
+  position)`, its own mechanic tag so it never correlates with the spore-bomb
+  cull, and independent of scene-enumeration order. Level-load-only, like the
+  spore-bomb removal fraction. Live-verified 2026-07-27: 23 areas at 0.5 →
+  removed 12, kept 11 (= `floor(23 × 0.5)`).
 - **Creatures**: zombies currently have **no distance-based deaggro at
   all** once they've targeted a player (confirmed absent in code, not just
   hard to find) — this is the one creature change that's genuinely new

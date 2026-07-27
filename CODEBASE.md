@@ -266,6 +266,22 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       can't un-hide something the game deactivated for its own reasons.
       Deliberately excludes a spore bomb's own temporary spore area
       (`IsSporeBombSpawned`) — that's the `Spore-Bombs` section's business.
+    - `SporeAreaScan.cs` — the shared "what is a spore area, and which
+      GameObject *is* it" logic (identity check, spore-bomb-spawned exclusion,
+      `ResolveAreaRoot`'s parent walk, path formatting) that every mechanic in
+      this folder calls. One copy on purpose: two slightly different identity
+      checks would mean the removal pass and the disable pass disagreeing about
+      how many spore areas the level has.
+    - `SporeAreaCullPatch.cs` — the seeded thinning pass
+      (`Spore-Areas/removal-fraction`): deactivates a fraction of the level's
+      spore areas, with `Core/SporeAreaCull.cs` deciding which. Level-load-only
+      (like the spore-bomb cull fraction — a removed area can't come back
+      mid-level, so nothing is wired to `SettingChanged`), and runs **before**
+      `SporeAreaDisablePatch` each load so the two compose. Verbose logging
+      reports each removal's nearest-neighbour spacing plus a
+      removed-vs-kept median comparison, which is what makes the cluster-first
+      claim checkable against a real level instead of taken on faith (the
+      per-removal lines alone are in scene order, so they can't show it).
   - **`Core/`** — the pure, Unity-free decision layer (see split rule above):
     - `WorldUnits.cs` (+ the game-facing `GameUnits.cs` wrapper in the project
       root) — **read this before adding any `*-meters` setting.** PEAK's world
@@ -288,10 +304,29 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       Deliberately **not** `HashCode.Combine`/`string.GetHashCode`/`System.Random`
       (all per-process-randomized or runtime-dependent — would break the seed
       guarantee). See its file comment.
-    - `SporeBombCull.cs` — the two-pass spore-bomb removal decision (pure
-      arithmetic + seeded ranked selection): unconditional foliage removal,
-      then a seeded cull budgeted against it. Returns per-candidate outcomes;
-      `SporeBombCullPatch` maps them back onto real GameObjects.
+    - `ClusteredRemovalSelection.cs` — "given these positions and a budget of N
+      to remove, which N?": the seeded, cluster-first selection shared by every
+      mechanic that thins placed hazards (ranked by nearest-neighbour distance,
+      closest-clustered first, sparing a removed candidate's nearest neighbour
+      so a tight pair loses one member rather than both; ties broken by the seed
+      hash then position, so scene-enumeration order never matters). Also owns
+      `RemovalBudget` — the one rounding rule ("at least `floor(total * (1 -
+      fraction))` always survive"). Extracted from `SporeBombCull` when
+      `SporeAreaCull` needed the same logic; the pre-existing spore-bomb cull
+      tests passing unchanged is the proof the extraction was
+      behavior-preserving.
+    - `SporeBombCull.cs` — the two-pass spore-bomb removal decision: unconditional
+      foliage removal, then a `ClusteredRemovalSelection` cull budgeted against
+      it. Returns per-candidate outcomes; `SporeBombCullPatch` maps them back
+      onto real GameObjects.
+    - `SporeAreaCull.cs` — the spore-area thinning decision. Simpler than
+      `SporeBombCull`: no foliage pass (a spore cloud is a 16-unit-radius volume
+      around a mushroom, not a small prop that can get buried in a fern), just
+      one budgeted `ClusteredRemovalSelection` pass under its own mechanic tag so
+      the two mechanics' choices never correlate. Cluster-first is what makes it
+      a fairness change rather than "less content": what hurts a run is
+      overlapping 16-unit radii forming a stretch you can't cross, so removal
+      starts there and leaves walk-around-able isolated clouds alone.
     - `SporeBombExplosionTuning.cs` — pure arithmetic for the trigger-radius/
       knockback/screen-shake-cap/VFX-count multipliers, plus the
       trigger-height-cutoff bug-fix decision (`ShouldSuppressTriggerForHeight`)

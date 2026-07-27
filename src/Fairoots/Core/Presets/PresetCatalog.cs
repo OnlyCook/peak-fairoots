@@ -174,6 +174,32 @@ namespace Fairoots.Core.Presets
         }
 
         /// <summary>
+        /// Target fraction of the level's persistent spore areas ("Mushroom Spore
+        /// Clouds") to remove, per <see cref="SporeAreaCull"/>.
+        ///
+        /// <b>Zero on both Subtle and Balanced</b> - the maintainer's explicit
+        /// call (2026-07-27), and a deliberate difference from
+        /// <see cref="SporeBombCullFraction"/> (which already thins at Balanced).
+        /// Roots has only ~12-23 spore areas in a whole level, against 400+ spore
+        /// bombs: they're landmarks, not clutter, so removing any at the default
+        /// preset would change the shape of the biome rather than just its
+        /// fairness. Only the two most forgiving presets thin them, and even
+        /// there the cluster-first rule means what goes is the overlap, not the
+        /// landmark. Starting estimates pending playtest.
+        /// </summary>
+        public static double SporeAreaRemovalFraction(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 0.00;
+                case PresetId.Balanced: return 0.00;
+                case PresetId.Generous: return 0.20;
+                case PresetId.Tame: return 0.35;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
         /// The unconditional bush/grass placement-removal pass is on for every
         /// preset, including Subtle (ROADMAP.md - the game never prevents a spore
         /// bomb landing in foliage, so this gap is always fixed). Kept as a method

@@ -161,6 +161,19 @@ namespace Fairoots
         /// </summary>
         public ConfigEntry<bool> DisableSporeAreas { get; }
 
+        /// <summary>
+        /// Custom-preset value for the fraction of the level's spore areas to
+        /// remove outright (see <see cref="Core.SporeAreaCull"/>) - "make spore
+        /// areas less common." Seeded and cluster-first: the emitter closest to
+        /// another emitter goes first, so overlapping clouds get thinned before
+        /// isolated ones. 0 = remove none. Only takes effect under
+        /// <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>. Like the spore-bomb
+        /// removal fraction, this is level-load-only either way - which spore
+        /// areas were already removed can't be un-removed mid-level.
+        /// </summary>
+        public ConfigEntry<double> SporeAreaRemovalFractionOverride { get; }
+
         // --- Wind -----------------------------------------------------------
         /// <summary>
         /// Master kill switch for the entire wind mechanic. When on, wind
@@ -520,6 +533,22 @@ namespace Fairoots
                 "lobby. Off by default; no preset ever turns this on automatically. Applies " +
                 "immediately, regardless of apply-changes-live.");
 
+            SporeAreaRemovalFractionOverride = config.Bind(
+                "Spore-Areas",
+                "removal-fraction",
+                0.0,
+                new ConfigDescription(
+                    "Fraction of the level's spore areas to remove entirely, e.g. 0.25 removes a " +
+                    "quarter of them. Which ones is decided by the seed, and always starts with " +
+                    "the spore area closest to another one - so overlapping clouds (the ones you " +
+                    "can't get past without taking spores) get thinned first, and isolated ones " +
+                    "you can simply walk around are left alone. 0 = remove none. Only takes " +
+                    "effect when preset is set to Custom (5) - ignored under presets 1-4, which " +
+                    "remove none at all on Subtle/Balanced. Only applies on the next Roots level " +
+                    "load either way, since a spore area that's already gone can't come back " +
+                    "mid-level.",
+                    new AcceptableValueRange<double>(0.0, 1.0)));
+
             DisableWindEntirely = config.Bind(
                 "Wind",
                 "disable-wind-entirely",
@@ -868,6 +897,13 @@ namespace Fairoots
                 SporeBombSporeAreaRadiusMultiplierOverride.Value,
                 UseCustomOverrides);
 
+        /// <summary>The effective fraction of the level's spore areas to remove.</summary>
+        public double SporeAreaRemovalFraction =>
+            OverrideResolution.Resolve(
+                PresetCatalog.SporeAreaRemovalFraction(Preset.Value),
+                SporeAreaRemovalFractionOverride.Value,
+                UseCustomOverrides);
+
         /// <summary>The effective wind-force (and gust-timing) multiplier.</summary>
         public double WindForceMultiplier =>
             OverrideResolution.Resolve(
@@ -946,6 +982,7 @@ namespace Fairoots
         private double _snapVfxCountMultiplier;
         private double _snapTriggerHeightMultiplier;
         private double _snapSporeAreaRadiusMultiplier;
+        private double _snapSporeAreaRemovalFraction;
         private double _snapWindForceMultiplier;
         private double _snapWindGustDurationMultiplier;
         private double _snapWindItemForceMultiplier;
@@ -971,6 +1008,7 @@ namespace Fairoots
             _snapVfxCountMultiplier = SporeBombVfxCountMultiplier;
             _snapTriggerHeightMultiplier = SporeBombTriggerHeightMultiplier;
             _snapSporeAreaRadiusMultiplier = SporeBombSporeAreaRadiusMultiplier;
+            _snapSporeAreaRemovalFraction = SporeAreaRemovalFraction;
             _snapWindForceMultiplier = WindForceMultiplier;
             _snapWindGustDurationMultiplier = WindGustDurationMultiplier;
             _snapWindItemForceMultiplier = WindItemForceMultiplier;
@@ -1025,6 +1063,10 @@ namespace Fairoots
         /// <summary>Game-facing code should read this instead of <see cref="SporeBombSporeAreaRadiusMultiplier"/>. Host-authoritative.</summary>
         public double EffectiveSporeBombSporeAreaRadiusMultiplier =>
             HostAuthority.Resolve("SporeBombSporeAreaRadiusMultiplier", UseLiveValue ? SporeBombSporeAreaRadiusMultiplier : _snapSporeAreaRadiusMultiplier);
+
+        /// <summary>Game-facing code should read this instead of <see cref="SporeAreaRemovalFraction"/>. Host-authoritative.</summary>
+        public double EffectiveSporeAreaRemovalFraction =>
+            HostAuthority.Resolve("SporeAreaRemovalFraction", UseLiveValue ? SporeAreaRemovalFraction : _snapSporeAreaRemovalFraction);
 
         /// <summary>Game-facing code should read this instead of <see cref="WindForceMultiplier"/>. Host-authoritative.</summary>
         public double EffectiveWindForceMultiplier =>

@@ -11,14 +11,11 @@ namespace Fairoots.SporeAreas
     /// "Mushroom Spore Clouds") outright - status ticks, screen filter, the emitter
     /// mushroom in the middle and the cloud VFX all go with them.
     ///
-    /// Identity (runtime-confirmed, see the roots-runtime-findings memory and
-    /// RESEARCH.md Q9): a spore area is a <c>StatusEmitter</c> whose
-    /// <c>statusType</c> is <c>Spores</c> - in Roots always the
-    /// <c>WindAffectedStatusEmitter</c> subclass, with <c>radius=16</c>,
-    /// <c>innerFade=8</c>, <c>amount=0.025</c>. There is no dedicated spore-area
-    /// class or name to match on, which is why the component's own status type is
-    /// the identity check here rather than a name substring (the way spore bombs
-    /// are matched).
+    /// Identity and "which GameObject <em>is</em> the spore area" both live in
+    /// <see cref="SporeAreaScan"/>, shared with every other mechanic in this folder
+    /// (runtime-confirmed: in Roots every spore area is a
+    /// <c>WindAffectedStatusEmitter</c> with <c>radius=16</c>, <c>innerFade=8</c>,
+    /// <c>amount=0.025</c>, all named "Mushroom tree Spore Cloud").
     ///
     /// Not a Harmony patch despite the folder's naming convention, for the same
     /// reason <c>SporeBombRecolorPatch</c> isn't: the emitters are baked into the
@@ -26,33 +23,26 @@ namespace Fairoots.SporeAreas
     /// Driven once per level from <see cref="RootsLevelWatcher"/>, plus a
     /// scene-wide <see cref="ReapplyToAll"/> whenever the setting changes.
     ///
-    /// <b>Deliberately excludes a spore bomb's own temporary spore area.</b> Those
-    /// are spawned by <c>SpawnGameObject</c> at detonation time rather than baked
-    /// into the scene, so a level-load scan can't see them anyway - but
-    /// <see cref="ReapplyToAll"/> runs while a detonation may be live, so
-    /// <see cref="IsSporeBombSpawned"/> filters them out explicitly instead of
-    /// relying on timing.
+    /// <b>Deliberately excludes a spore bomb's own temporary spore area</b>
+    /// (<see cref="SporeAreaScan.IsSporeBombSpawned"/>) - that hazard is tuned by
+    /// the <c>Spore-Bombs</c> settings instead.
+    ///
+    /// Runs <em>after</em> <see cref="SporeAreaCullPatch"/> each level load, which
+    /// is what makes the two compose correctly: an area the seeded removal pass
+    /// already deactivated is skipped here (never claimed into
+    /// <see cref="Deactivated"/>), so turning this switch off restores only the
+    /// areas the level was actually supposed to have.
     /// </summary>
     internal static class SporeAreaDisablePatch
     {
         /// <summary>
-        /// How far up the hierarchy <see cref="ResolveAreaRoot"/> is willing to walk
-        /// from the emitter component to find the object that owns the whole spore
-        /// area (mushroom mesh + cloud VFX + emitter). Small on purpose: walking too
-        /// far would eventually hit the <c>PropSpawner</c> group holding *every*
-        /// spore area in the level and deactivate all of them at once. The
-        /// structural guards in <see cref="ResolveAreaRoot"/> stop that on their
-        /// own; this is just a second backstop.
-        /// </summary>
-        private const int MaxParentWalk = 3;
-
-        /// <summary>
         /// Every GameObject this session deactivated, so turning the setting back
         /// off restores exactly what Fairoots hid and nothing else - re-activating
         /// whatever happens to be inactive around a spore emitter would also undo
-        /// the game's own deactivations (e.g. <c>DisableBasedOnRunSettings</c>).
-        /// Keyed by <see cref="UnityEngine.Object.GetInstanceID"/>; entries whose
-        /// object has since been destroyed are skipped and dropped on the next pass.
+        /// the game's own deactivations (e.g. <c>DisableBasedOnRunSettings</c>) and
+        /// the seeded removal pass's. Keyed by
+        /// <see cref="UnityEngine.Object.GetInstanceID"/>; entries whose object has
+        /// since been destroyed are skipped and dropped on the next pass.
         /// </summary>
         private static readonly Dictionary<int, GameObject> Deactivated = new Dictionary<int, GameObject>();
 
@@ -80,9 +70,8 @@ namespace Fairoots.SporeAreas
         /// <c>SettingChanged</c> and to <c>HostAuthoritySync</c>'s room-property
         /// update, so a client whose level load raced ahead of the host's first
         /// publish still ends up matching the host. Scene-wide rather than
-        /// Roots-Segment-scoped because a hidden emitter's own segment lookup would
-        /// need the segment to still be around, and this also has to work the
-        /// moment the player flips the toggle from anywhere.
+        /// Roots-Segment-scoped because it also has to work the moment the player
+        /// flips the toggle, from wherever they are.
         /// </summary>
         internal static void ReapplyToAll()
         {
@@ -111,34 +100,28 @@ namespace Fairoots.SporeAreas
         {
             bool disable = Plugin.Cfg.EffectiveDisableSporeAreas;
 
-            int found = 0, hidden = 0, restored = 0;
-            for (int i = 0; i < emitters.Count; i++)
+            var areas = SporeAreaScan.FilterSporeAreas(emitters);
+            int hidden = 0, restored = 0;
+            foreach (var emitter in areas)
             {
-                var emitter = emitters[i];
-                if (emitter == null || !IsSporeArea(emitter) || IsSporeBombSpawned(emitter.transform))
-                {
-                    continue;
-                }
-
-                found++;
-                GameObject root = ResolveAreaRoot(emitter);
+                GameObject root = SporeAreaScan.ResolveAreaRoot(emitter);
                 int id = root.GetInstanceID();
 
                 if (disable)
                 {
                     if (!root.activeSelf)
                     {
-                        // Either already ours, or the game deactivated it for its
-                        // own reasons - leave it alone and don't claim it, or
-                        // turning the setting off would activate something vanilla
-                        // wanted hidden.
+                        // Either already ours, or something else deactivated it -
+                        // the seeded removal pass, or the game for its own reasons.
+                        // Leave it alone and don't claim it, or turning the setting
+                        // off would activate something that was meant to stay gone.
                         continue;
                     }
 
                     root.SetActive(false);
                     Deactivated[id] = root;
                     hidden++;
-                    Diag.V($"[SporeAreas]   disabled \"{DescribePath(root.transform)}\" (radius={emitter.radius}, amount={emitter.amount})");
+                    Diag.V($"[SporeAreas]   disabled \"{SporeAreaScan.DescribePath(root.transform)}\" (radius={emitter.radius}, amount={emitter.amount})");
                 }
                 else if (Deactivated.TryGetValue(id, out GameObject ours))
                 {
@@ -153,102 +136,7 @@ namespace Fairoots.SporeAreas
 
             Diag.Info(
                 $"[SporeAreas] {reason}: disable-spore-areas={(disable ? "ON" : "off")}, " +
-                $"{found} spore area(s) found, {hidden} newly hidden, {restored} restored");
-        }
-
-        /// <summary>
-        /// A spore area is identified by what the emitter actually does - applying
-        /// the <c>Spores</c> status - not by a name. <c>amount &gt; 0</c> excludes
-        /// the mirror-image case of an emitter that *subtracts* spores (the same
-        /// component type is used for both directions - see
-        /// <c>StatusEmitter.Update</c>, which calls <c>SubtractStatus</c> for a
-        /// negative amount), which would be a cure, not a hazard.
-        /// </summary>
-        private static bool IsSporeArea(StatusEmitter emitter) =>
-            emitter.statusType == CharacterAfflictions.STATUSTYPE.Spores && emitter.amount > 0f;
-
-        /// <summary>
-        /// True for the short-lived spore area a detonating spore bomb spawns,
-        /// which this feature deliberately leaves alone (see class remarks) - it
-        /// hangs under the spawned explosion object, so the spore-bomb name check
-        /// and the explosion object itself are both reachable by walking up.
-        /// </summary>
-        private static bool IsSporeBombSpawned(Transform t)
-        {
-            for (var cur = t; cur != null; cur = cur.parent)
-            {
-                if (SporeBombs.SporeBombCullPatch.ClassifySporeBomb(cur.name)
-                    || cur.name.IndexOf("Explosion", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    return true;
-                }
-
-                if (cur.name == "Roots Segment")
-                {
-                    break;
-                }
-            }
-
-            return false;
-        }
-
-        /// <summary>
-        /// The object to deactivate: the highest ancestor that still represents
-        /// this one spore area, so the emitter mushroom in the middle of the cloud
-        /// and the cloud VFX go with it rather than being left floating in mid-air
-        /// with an invisible, inert emitter beside them.
-        ///
-        /// The walk stops before any ancestor that owns more than this single spore
-        /// area (another <c>StatusEmitter</c> in its subtree), any level-generation
-        /// grouping node (<c>PropSpawner</c>/<c>PropGrouper</c>/<c>Biome</c> - the
-        /// <c>*Shrooms</c>-style group parents confirmed in the runtime scan hold
-        /// every instance of a prop type at once), and the Roots Segment itself.
-        /// If the emitter is its own root - no shared parent to claim - that's what
-        /// gets deactivated, which is still correct whenever the mesh and VFX are
-        /// children of the emitter object rather than its siblings.
-        /// </summary>
-        private static GameObject ResolveAreaRoot(StatusEmitter emitter)
-        {
-            Transform best = emitter.transform;
-
-            for (int step = 0; step < MaxParentWalk; step++)
-            {
-                Transform parent = best.parent;
-                if (parent == null || parent.name == "Roots Segment" || IsGroupingNode(parent))
-                {
-                    break;
-                }
-
-                if (parent.GetComponentsInChildren<StatusEmitter>(true).Length > 1)
-                {
-                    break;
-                }
-
-                best = parent;
-            }
-
-            return best.gameObject;
-        }
-
-        private static bool IsGroupingNode(Transform t) =>
-            t.GetComponent<PropSpawner>() != null
-            || t.GetComponent<PropGrouper>() != null
-            || t.GetComponent<Biome>() != null;
-
-        /// <summary>Ancestor chain up to the Roots Segment, for the verbose log - the emitters have no distinctive names, so the path is what identifies them.</summary>
-        private static string DescribePath(Transform t)
-        {
-            var chain = new List<string>();
-            for (var cur = t; cur != null; cur = cur.parent)
-            {
-                chain.Add(cur.name);
-                if (cur.name == "Roots Segment")
-                {
-                    break;
-                }
-            }
-
-            return string.Join(" < ", chain);
+                $"{areas.Count} spore area(s) found, {hidden} newly hidden, {restored} restored");
         }
     }
 }

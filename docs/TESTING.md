@@ -547,6 +547,36 @@ level load and per config change:
 or lingering particles = the parent-walk stopped too low) or whether too much
 disappeared (terrain/props/whole trees = it walked too high).
 
+### Spore areas: seeded thinning (`Spore-Areas/removal-fraction`)
+
+**Pre-req:** debug logging on. Since Subtle and Balanced both remove 0%, either
+switch to `Generous`/`Tame` or set `preset = Custom` and pick a fraction. This
+one is **level-load-only** — changing it mid-level does nothing by design.
+
+1. Load a Roots level and read the summary line:
+   `[SporeAreaCull] N spore area(s): removed X, kept Y (fraction=..., seed=...)`.
+   `Y` must equal `floor(N × (1 - fraction))` exactly (23 areas at 0.5 → kept
+   11, verified live 2026-07-27).
+2. Check the spacing line right below it:
+   `nearest-neighbour spacing - removed: median Am ..., kept: median Bm ...`.
+   The **removed median should be the lower** of the two — that's the
+   cluster-first rule visible against a real level. At high fractions the gap
+   narrows, which is expected (once the crowded areas are used up, removal has
+   to reach isolated ones too); at a low fraction it should be pronounced.
+3. Same seed, same level, load twice → an identical removed list (compare the
+   `@ (grid)` coordinates on the per-removal lines). Then change only the seed
+   and reload: same count, different set.
+4. Walk to a couple of removed coordinates: no cloud, no mushroom, no spores —
+   and the surrounding mushroom tree still there.
+5. With a non-zero fraction *and* `disable-spore-areas` on, then toggling that
+   switch back off: only the areas the seed kept should reappear — the
+   seed-removed ones must stay gone.
+
+**Report back:** whether Generous's 20% / Tame's 35% feel like the right amount
+of thinning, and whether the cluster-first choice reads as sensible on the
+ground (are the *right* clouds gone — the overlapping ones — or does it feel
+arbitrary?).
+
 ### Host authority (multiplayer — needs a second player/PC, can't be verified solo)
 
 **Pre-req:** debug logging on for both host and at least one non-host client,
