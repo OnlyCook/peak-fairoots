@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Fairoots.Core;
 using Fairoots.SporeBombs;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -200,7 +201,8 @@ namespace Fairoots.Diagnostics
                 return null;
             }
 
-            float maxHeight = Plugin.Cfg.EffectiveSporeBombMaxTriggerHeightMeters;
+            float maxHeight = SporeBombExplosionTuning.ResolveTriggerHeightCutoffMeters(
+                Plugin.Cfg.EffectiveSporeBombTriggerHeightMultiplier);
             if (maxHeight <= 0f)
             {
                 return null;

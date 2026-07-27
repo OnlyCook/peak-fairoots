@@ -307,18 +307,22 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   hitbox size, and the foliage-detection method for the bush/grass check —
   all runtime-logging tasks, not further decompilation.
 
-  **Trigger-height cutoff (implemented, not in the preset table above - a bug
-  fix, not a balance dial):** live playtesting against the trigger-radius
-  wireframe overlay confirmed the "Spore Bomb"/"Poison Spore Bomb" variants'
-  vanilla trigger sphere reaches absurdly far above the actual (short, wide)
-  mushroom mesh - tall enough that jumping over one is physically impossible
-  in vanilla, since the trigger volume is a full sphere reaching well above
-  head height rather than the flattened shape the hazard visually is. Fixed
-  via a Harmony prefix on `TriggerEvent.OnTriggerEnter` that suppresses the
-  hit when the player is above a configurable height over the spore bomb's
-  base (`Spore-Bombs/max-trigger-height-meters`, default 1.75m -
-  playtest-confirmed by the maintainer as "perfect" - 0 = vanilla). Left
-  untouched for the "Explosive Spore Bomb" variant, which is genuinely round.
+  **Trigger-height cutoff (implemented; folded into the preset/override
+  system 2026-07-27 - a bug fix, not a balance dial, but still preset-scaled
+  so a Custom-only override can't silently leak into presets 1-4):** live
+  playtesting against the trigger-radius wireframe overlay confirmed the
+  "Spore Bomb"/"Poison Spore Bomb" variants' vanilla trigger sphere reaches
+  absurdly far above the actual (short, wide) mushroom mesh - tall enough
+  that jumping over one is physically impossible in vanilla, since the
+  trigger volume is a full sphere reaching well above head height rather than
+  the flattened shape the hazard visually is. Fixed via a Harmony prefix on
+  `TriggerEvent.OnTriggerEnter` that suppresses the hit when the player is
+  above a configurable height over the spore bomb's base
+  (`Spore-Bombs/trigger-height-multiplier`, a Custom-preset-only override;
+  1.0 = vanilla/disabled, Balanced's 0.804 reproduces the maintainer's
+  playtest-confirmed "perfect" absolute cutoff from before this became a
+  multiplier). Left untouched for the "Explosive Spore Bomb" variant, which
+  is genuinely round.
 
   **Recolor (implemented 2026-07-26, not in the preset table above - a
   readability fix, not a balance dial):** vanilla spore bombs are green

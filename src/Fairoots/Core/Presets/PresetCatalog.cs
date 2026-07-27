@@ -128,6 +128,52 @@ namespace Fairoots.Core.Presets
         }
 
         /// <summary>
+        /// Multiplier feeding <see cref="Core.SporeBombExplosionTuning.ResolveTriggerHeightCutoffMeters"/>,
+        /// per the maintainer's 2026-07-27 fix (folded into the preset system -
+        /// previously this was a flat, preset-exempt absolute-meters bug fix,
+        /// which meant a manual edit under a non-Custom preset silently took
+        /// effect, which shouldn't happen). 1.0 = vanilla (Subtle - cutoff
+        /// disabled). Balanced's 0.804 reproduces the exact absolute cutoff
+        /// (2.25m) the maintainer had playtest-tuned before this became a
+        /// multiplier - see <see cref="Core.SporeBombExplosionTuning.TriggerHeightBaselineMeters"/>.
+        /// Generous/Tame extrapolate the same relative progression
+        /// <see cref="SporeBombTriggerRadiusMultiplier"/> uses (unconfirmed
+        /// starting estimates pending playtest, like every other not-yet-tuned
+        /// dial in this file).
+        /// </summary>
+        public static double SporeBombTriggerHeightMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.804;
+                case PresetId.Generous: return 0.75;
+                case PresetId.Tame: return 0.589;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
+        /// Multiplier applied to the temporary spore area's radius on
+        /// detonation, per <see cref="Core.SporeBombExplosionTuning.ScaleSporeAreaRadius"/>.
+        /// Not yet tuned per preset - every preset uses 1.0 (vanilla) for now,
+        /// same as before this was folded into the preset/override system
+        /// (2026-07-27, fixing the bug where a manual edit under a non-Custom
+        /// preset silently took effect).
+        /// </summary>
+        public static double SporeBombSporeAreaRadiusMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 1.00;
+                case PresetId.Generous: return 1.00;
+                case PresetId.Tame: return 1.00;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
         /// The unconditional bush/grass placement-removal pass is on for every
         /// preset, including Subtle (ROADMAP.md - the game never prevents a spore
         /// bomb landing in foliage, so this gap is always fixed). Kept as a method

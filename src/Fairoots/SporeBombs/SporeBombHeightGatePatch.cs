@@ -47,7 +47,8 @@ namespace Fairoots.SporeBombs
                 return true; // before/after comparison mode - full vanilla behavior, height cutoff included.
             }
 
-            float maxHeight = Plugin.Cfg.EffectiveSporeBombMaxTriggerHeightMeters;
+            float maxHeight = SporeBombExplosionTuning.ResolveTriggerHeightCutoffMeters(
+                Plugin.Cfg.EffectiveSporeBombTriggerHeightMultiplier);
             if (maxHeight <= 0f)
             {
                 return true; // cutoff disabled - vanilla behavior.

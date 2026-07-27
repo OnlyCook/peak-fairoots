@@ -114,30 +114,31 @@ namespace Fairoots
         public ConfigEntry<double> SporeBombVfxCountMultiplierOverride { get; }
 
         /// <summary>
-        /// Max height, in meters above a spore bomb's base, a player can be at and
-        /// still set it off. Vanilla's trigger sphere reaches absurdly far above
-        /// the actual mushroom mesh for the "Spore Bomb"/"Poison Spore Bomb"
-        /// variants (confirmed by the maintainer via the trigger-radius wireframe
-        /// overlay - a genuinely oversized hitbox, not a misreading), so a player
-        /// jumping over a short, wide mushroom clump still sets it off mid-air.
-        /// This isn't a preset-scaled balance dial - it's a bug fix for a vanilla
-        /// hitbox mistake, so it's a flat value, not folded through the
-        /// preset/override system. 0 disables the cutoff entirely (vanilla
-        /// behavior). Does not apply to the "Explosive Spore Bomb" variant, which
-        /// is genuinely round.
+        /// Custom-preset value for the multiplier feeding
+        /// <see cref="Core.SporeBombExplosionTuning.ResolveTriggerHeightCutoffMeters"/> -
+        /// how high above a spore bomb's base a player can be and still set it
+        /// off. Vanilla's trigger sphere reaches absurdly far above the actual
+        /// mushroom mesh for the "Spore Bomb"/"Poison Spore Bomb" variants
+        /// (confirmed by the maintainer via the trigger-radius wireframe overlay
+        /// - a genuinely oversized hitbox, not a misreading), so a player jumping
+        /// over a short, wide mushroom clump still sets it off mid-air. 1.0 =
+        /// vanilla (cutoff disabled - the fix doesn't engage at all). Does not
+        /// apply to the "Explosive Spore Bomb" variant, which is genuinely round.
+        /// Only takes effect when preset is set to Custom (5) - ignored under
+        /// presets 1-4.
         /// </summary>
-        public ConfigEntry<float> SporeBombMaxTriggerHeightMeters { get; }
+        public ConfigEntry<double> SporeBombTriggerHeightMultiplierOverride { get; }
 
         /// <summary>
-        /// Multiplier applied to the radius (and proportionally, the inner/outer
-        /// fade) of the temporary spore area a regular "Spore Bomb"/"Poison Spore
-        /// Bomb" creates when triggered - the small AOE that applies the Spores
-        /// status effect, not the "Explosive Spore Bomb" variant, which has no
-        /// spore area of its own. 1.0 = vanilla size. Not currently wired to any
-        /// preset (every preset uses 1.0 as a placeholder) - included so it's
-        /// available to tune later without another round of plumbing.
+        /// Custom-preset value for the multiplier applied to the radius (and
+        /// proportionally, the inner/outer fade) of the temporary spore area a
+        /// regular "Spore Bomb"/"Poison Spore Bomb" creates when triggered - the
+        /// small AOE that applies the Spores status effect, not the "Explosive
+        /// Spore Bomb" variant, which has no spore area of its own. 1.0 = vanilla
+        /// size. Only takes effect when preset is set to Custom (5) - ignored
+        /// under presets 1-4; see <see cref="SporeBombCullFractionOverride"/>.
         /// </summary>
-        public ConfigEntry<double> SporeBombSporeAreaRadiusMultiplier { get; }
+        public ConfigEntry<double> SporeBombSporeAreaRadiusMultiplierOverride { get; }
 
         // --- Wind -----------------------------------------------------------
         /// <summary>
@@ -230,9 +231,8 @@ namespace Fairoots
         /// How many seconds after wind force was last applied to the local
         /// character that a subsequent fall still counts as "wind-preceded" for
         /// the camera-dampening clamp above. Flat setting (not folded through the
-        /// preset/override system), same reasoning as
-        /// <see cref="SporeBombMaxTriggerHeightMeters"/> - it's a timing window,
-        /// not a balance dial that scales per preset.
+        /// preset/override system) - it's a timing window, not a balance dial
+        /// that scales per preset.
         /// </summary>
         public ConfigEntry<float> WindRecentForceWindowSeconds { get; }
 
@@ -296,7 +296,7 @@ namespace Fairoots
         /// <summary>
         /// For before/after comparison screenshots: when on, spore-bomb trigger
         /// hitboxes are left at vanilla size instead of being shrunk, and the
-        /// trigger-height cutoff (<see cref="SporeBombMaxTriggerHeightMeters"/>,
+        /// trigger-height cutoff (<see cref="SporeBombTriggerHeightMultiplierOverride"/>,
         /// see <see cref="SporeBombHeightGatePatch"/>) is bypassed too, so a
         /// "vanilla" comparison is genuinely vanilla in every respect, not just
         /// radius. This is a gameplay override (not a diagnostic), so unlike the
@@ -401,25 +401,22 @@ namespace Fairoots
                     "- ignored under presets 1-4.",
                     new AcceptableValueRange<double>(0.0, 5.0)));
 
-            SporeBombMaxTriggerHeightMeters = config.Bind(
+            SporeBombTriggerHeightMultiplierOverride = config.Bind(
                 "Spore-Bombs",
-                "max-trigger-height-meters",
-                // 2.8m == the 1.75 this shipped as before the units fix: that value was
-                // being compared against a raw world-space height, and one world unit is
-                // 1.6 meters (Core/WorldUnits.cs). Rebased rather than left at 1.75 so
-                // the in-game behavior that was actually tuned against the mushroom mesh
-                // is unchanged and the number now honestly means meters.
-                2.8f,
+                "trigger-height-multiplier",
+                1.0,
                 new ConfigDescription(
-                    "Max height, in meters above its base, a player can be at and still set " +
-                    "off a \"Spore Bomb\" or \"Poison Spore Bomb\" (not the round \"Explosive " +
-                    "Spore Bomb\", which is unaffected) - fixes vanilla's oversized trigger " +
-                    "sphere reaching absurdly far above the actual mushroom mesh, which made " +
-                    "it impossible to jump over one without setting it off. 0 disables the " +
-                    "cutoff (vanilla behavior).",
-                    new AcceptableValueRange<float>(0f, 10f)));
+                    "Multiplier controlling how high above its base a player can be and still " +
+                    "set off a \"Spore Bomb\" or \"Poison Spore Bomb\" (not the round " +
+                    "\"Explosive Spore Bomb\", which is unaffected) - fixes vanilla's oversized " +
+                    "trigger sphere reaching absurdly far above the actual mushroom mesh, which " +
+                    "made it impossible to jump over one without setting it off. 1.0 always " +
+                    "means vanilla (cutoff disabled), no matter what else you change - lower " +
+                    "values engage the fix more aggressively. Only takes effect when preset is " +
+                    "set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 3.0)));
 
-            SporeBombSporeAreaRadiusMultiplier = config.Bind(
+            SporeBombSporeAreaRadiusMultiplierOverride = config.Bind(
                 "Spore-Bombs",
                 "spore-area-radius-multiplier",
                 1.0,
@@ -428,9 +425,8 @@ namespace Fairoots
                     "fade) of the temporary spore area a regular \"Spore Bomb\"/\"Poison Spore " +
                     "Bomb\" creates when triggered, e.g. 0.5 halves how far it reaches, 2.0 " +
                     "doubles it. 1.0 always means vanilla size. Doesn't affect the \"Explosive " +
-                    "Spore Bomb\" variant, which has no spore area. Not currently tied to any " +
-                    "preset - every preset uses 1.0 as a placeholder, so this always applies " +
-                    "regardless of the active preset.",
+                    "Spore Bomb\" variant, which has no spore area. Only takes effect when " +
+                    "preset is set to Custom (5) - ignored under presets 1-4.",
                     new AcceptableValueRange<double>(0.0, 5.0)));
 
             DisableWindEntirely = config.Bind(
@@ -634,7 +630,7 @@ namespace Fairoots
                 "For before/after comparison screenshots: when on, spore-bomb trigger " +
                 "hitboxes are left at their original (vanilla) size instead of being shrunk " +
                 "by the configured trigger-radius multiplier, and the trigger-height cutoff " +
-                "(max-trigger-height-meters) is bypassed too, so jumping over one behaves like " +
+                "(trigger-height-multiplier) is bypassed too, so jumping over one behaves like " +
                 "vanilla again. This is a gameplay override, so it takes effect regardless of " +
                 "the debug-logging master switch above. Off by default.");
         }
@@ -679,6 +675,20 @@ namespace Fairoots
             OverrideResolution.Resolve(
                 PresetCatalog.SporeBombVfxCountMultiplier(Preset.Value),
                 SporeBombVfxCountMultiplierOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>The effective trigger-height-cutoff multiplier (1.0 = vanilla/disabled) - see <see cref="Core.SporeBombExplosionTuning.ResolveTriggerHeightCutoffMeters"/>.</summary>
+        public double SporeBombTriggerHeightMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.SporeBombTriggerHeightMultiplier(Preset.Value),
+                SporeBombTriggerHeightMultiplierOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>The effective spore-area radius multiplier for a spore-bomb detonation.</summary>
+        public double SporeBombSporeAreaRadiusMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.SporeBombSporeAreaRadiusMultiplier(Preset.Value),
+                SporeBombSporeAreaRadiusMultiplierOverride.Value,
                 UseCustomOverrides);
 
         /// <summary>The effective wind-force (and gust-timing) multiplier.</summary>
@@ -729,7 +739,7 @@ namespace Fairoots
         private double _snapKnockbackMultiplier;
         private float _snapScreenshakeRangeCapMeters;
         private double _snapVfxCountMultiplier;
-        private float _snapMaxTriggerHeightMeters;
+        private double _snapTriggerHeightMultiplier;
         private double _snapSporeAreaRadiusMultiplier;
         private double _snapWindForceMultiplier;
         private double _snapWindGustDurationMultiplier;
@@ -750,8 +760,8 @@ namespace Fairoots
             _snapKnockbackMultiplier = SporeBombKnockbackMultiplier;
             _snapScreenshakeRangeCapMeters = SporeBombScreenshakeRangeCapMeters;
             _snapVfxCountMultiplier = SporeBombVfxCountMultiplier;
-            _snapMaxTriggerHeightMeters = SporeBombMaxTriggerHeightMeters.Value;
-            _snapSporeAreaRadiusMultiplier = SporeBombSporeAreaRadiusMultiplier.Value;
+            _snapTriggerHeightMultiplier = SporeBombTriggerHeightMultiplier;
+            _snapSporeAreaRadiusMultiplier = SporeBombSporeAreaRadiusMultiplier;
             _snapWindForceMultiplier = WindForceMultiplier;
             _snapWindGustDurationMultiplier = WindGustDurationMultiplier;
             _snapWindItemForceMultiplier = WindItemForceMultiplier;
@@ -795,13 +805,13 @@ namespace Fairoots
         public double EffectiveSporeBombVfxCountMultiplier =>
             HostAuthority.Resolve("SporeBombVfxCountMultiplier", UseLiveValue ? SporeBombVfxCountMultiplier : _snapVfxCountMultiplier);
 
-        /// <summary>Game-facing code should read this instead of <see cref="SporeBombMaxTriggerHeightMeters"/>.Value. Host-authoritative.</summary>
-        public float EffectiveSporeBombMaxTriggerHeightMeters =>
-            HostAuthority.Resolve("SporeBombMaxTriggerHeightMeters", UseLiveValue ? SporeBombMaxTriggerHeightMeters.Value : _snapMaxTriggerHeightMeters);
+        /// <summary>Game-facing code should read this instead of <see cref="SporeBombTriggerHeightMultiplier"/>. Host-authoritative.</summary>
+        public double EffectiveSporeBombTriggerHeightMultiplier =>
+            HostAuthority.Resolve("SporeBombTriggerHeightMultiplier", UseLiveValue ? SporeBombTriggerHeightMultiplier : _snapTriggerHeightMultiplier);
 
-        /// <summary>Game-facing code should read this instead of <see cref="SporeBombSporeAreaRadiusMultiplier"/>.Value. Host-authoritative.</summary>
+        /// <summary>Game-facing code should read this instead of <see cref="SporeBombSporeAreaRadiusMultiplier"/>. Host-authoritative.</summary>
         public double EffectiveSporeBombSporeAreaRadiusMultiplier =>
-            HostAuthority.Resolve("SporeBombSporeAreaRadiusMultiplier", UseLiveValue ? SporeBombSporeAreaRadiusMultiplier.Value : _snapSporeAreaRadiusMultiplier);
+            HostAuthority.Resolve("SporeBombSporeAreaRadiusMultiplier", UseLiveValue ? SporeBombSporeAreaRadiusMultiplier : _snapSporeAreaRadiusMultiplier);
 
         /// <summary>Game-facing code should read this instead of <see cref="WindForceMultiplier"/>. Host-authoritative.</summary>
         public double EffectiveWindForceMultiplier =>

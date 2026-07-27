@@ -168,7 +168,7 @@ namespace Fairoots.Networking
                 { KeyPrefix + "SporeBombKnockbackMultiplier", cfg.EffectiveSporeBombKnockbackMultiplier },
                 { KeyPrefix + "SporeBombScreenshakeRangeCapMeters", cfg.EffectiveSporeBombScreenshakeRangeCapMeters },
                 { KeyPrefix + "SporeBombVfxCountMultiplier", cfg.EffectiveSporeBombVfxCountMultiplier },
-                { KeyPrefix + "SporeBombMaxTriggerHeightMeters", cfg.EffectiveSporeBombMaxTriggerHeightMeters },
+                { KeyPrefix + "SporeBombTriggerHeightMultiplier", cfg.EffectiveSporeBombTriggerHeightMultiplier },
                 { KeyPrefix + "SporeBombSporeAreaRadiusMultiplier", cfg.EffectiveSporeBombSporeAreaRadiusMultiplier },
                 { KeyPrefix + "WindForceMultiplier", cfg.EffectiveWindForceMultiplier },
                 { KeyPrefix + "WindGustDurationMultiplier", cfg.EffectiveWindGustDurationMultiplier },

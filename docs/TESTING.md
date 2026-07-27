@@ -290,19 +290,24 @@ and whether the vanilla-vs-shrunk size difference matches expectations.
 
 ### Trigger-height cutoff (jumping over a Spore Bomb / Poison Spore Bomb)
 
-**Pre-req:** default `max-trigger-height-meters = 1.75` (playtest-confirmed as
-the right value), debug logging on to see the suppression log line (the fix
+**Pre-req:** `preset = Custom` and `Spore-Bombs/trigger-height-multiplier` set
+to a value below `1.0` (`1.0` is vanilla/disabled by design - presets 1-4
+ignore this config entry entirely and always use their own catalog number,
+Balanced's `0.804`), debug logging on to see the suppression log line (the fix
 itself works regardless of debug logging).
 
 1. Find a "Spore Bomb" (`SporeFungus`) or "Poison Spore Bomb" (`SporeMushroom`,
    non-Explo) - not the round "Explosive Spore Bomb" - and try jumping over it
    from a height/approach where you're clearly above the mushroom mound itself.
    It should no longer trigger; check the log for `[SporeBombHeightGate]
-   suppressed trigger on "..." - player X.XXm above base (cutoff 1.75m)`.
+   suppressed trigger on "..." - player X.XXm above base (cutoff X.XXm)` -
+   the cutoff in meters is the configured multiplier times the internal 2.8m
+   baseline (`SporeBombExplosionTuning.TriggerHeightBaselineMeters`).
 2. Walk directly into the same spore bomb at ground level - it should still
    trigger normally (the fix only suppresses height, not proximity).
-3. Set `max-trigger-height-meters = 0` and repeat step 1 - it should go back
-   to vanilla behavior (triggers even when jumped over).
+3. Set `trigger-height-multiplier = 1.0` (or switch to any non-Custom preset)
+   and repeat step 1 - it should go back to vanilla behavior (triggers even
+   when jumped over).
 4. Try jumping over an "Explosive Spore Bomb" - it should behave exactly as
    before this change (still triggers), since that variant is intentionally
    excluded.
@@ -313,16 +318,21 @@ itself works regardless of debug logging).
    README screenshot showing the trigger area now matches the mushroom
    instead of the oversized vanilla sphere. Confirm an "Explosive Spore Bomb"
    still draws as a full, unflattened sphere.
-6. Set `keep-vanilla-trigger-radius = true` (leave `max-trigger-height-meters`
-   at 1.75) and repeat step 1 - jumping over should trigger it again (full
+6. Set `keep-vanilla-trigger-radius = true` (leave `trigger-height-multiplier`
+   below `1.0`) and repeat step 1 - jumping over should trigger it again (full
    vanilla behavior, height cutoff included), and the wireframe should show a
    full, unflattened sphere again. Set it back to `false` afterward and
    confirm both the cutoff and the flattened wireframe return.
+7. Switch to a non-Custom preset (e.g. Balanced) and edit
+   `trigger-height-multiplier` directly in the config or via PEAKLib.ModConfig
+   - it should have **no effect at all** while any preset other than Custom
+   is active; only switching to Custom should make the edited value apply.
 
-**Report back:** whether jumping over now actually works, whether the 1.75m
-default still feels right against the actual mushroom height (adjust
-`max-trigger-height-meters` and re-test if not), and whether ground-level
-triggering and the Explosive variant are both unaffected.
+**Report back:** whether jumping over now actually works, whether Balanced's
+`0.804` (reproducing the maintainer's previously playtest-confirmed 2.25m
+absolute cutoff) still feels right against the actual mushroom height, and
+whether ground-level triggering, the Explosive variant, and the
+non-Custom-preset lockout are all unaffected.
 
 ### Wind force / gust duration / item / backpack immunity / obstacle occlusion
 

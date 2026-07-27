@@ -151,6 +151,31 @@ namespace Fairoots.Core
         }
 
         /// <summary>
+        /// Internal reference absolute cutoff, in meters, that
+        /// <c>trigger-height-multiplier</c>'s <c>1.0</c> used to mean outright
+        /// before it became a preset-scaled multiplier (2026-07-27) - the
+        /// maintainer's own playtest-tuned value at the time. Kept only as the
+        /// anchor so a hand-picked multiplier (Balanced's in particular) can
+        /// reproduce a specific previously-known absolute cutoff; not itself
+        /// user-facing.
+        /// </summary>
+        public const float TriggerHeightBaselineMeters = 2.8f;
+
+        /// <summary>
+        /// Converts a <c>trigger-height-multiplier</c> preset/override value into
+        /// the absolute cutoff <see cref="ShouldSuppressTriggerForHeight"/>
+        /// consumes. <c>1.0</c> or higher means vanilla (cutoff disabled,
+        /// matching the old "0 disables" convention from before this setting
+        /// became a multiplier) - anything above vanilla has no separate meaning,
+        /// since a taller-than-vanilla cutoff would never fire either. Below
+        /// <c>1.0</c> scales down from <see cref="TriggerHeightBaselineMeters"/>.
+        /// </summary>
+        public static float ResolveTriggerHeightCutoffMeters(double multiplier)
+        {
+            return multiplier >= 1.0 ? 0f : (float)(multiplier * TriggerHeightBaselineMeters);
+        }
+
+        /// <summary>
         /// True if a player at <paramref name="heightAboveBase"/> meters above a
         /// spore bomb's base should be treated as having jumped over it rather
         /// than actually triggering it - a bug fix for the "Spore Bomb"/"Poison
