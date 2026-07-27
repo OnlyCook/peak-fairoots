@@ -83,6 +83,7 @@ namespace Fairoots
                 _processed = null;
                 SporeBombCullPatch.RemovedPositions.Clear();
                 SporeBombCullPatch.KeptTriggerColliders.Clear();
+                SporeAreas.SporeAreaDisablePatch.ClearLevelState();
             }
 
             if (currentlyActive)
@@ -109,6 +110,7 @@ namespace Fairoots
             Networking.HostAuthority.PublishAll();
             DetonationScreenshakeRegistry.Clear();
             SporeBombCullPatch.Run(found.transform);
+            SporeAreas.SporeAreaDisablePatch.Run(found.transform);
 
             if (Plugin.Cfg.EnableDebugLogging.Value && Plugin.Cfg.LogSceneScanOnLoad.Value)
             {

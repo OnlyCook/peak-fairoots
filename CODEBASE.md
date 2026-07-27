@@ -6,8 +6,8 @@ structure do, so a reader can find where a given mechanic lives without
 re-scanning the whole tree.
 
 **Phase 2 (seed/preset core), Phase 4 (spore bombs), and Phase 5 (wind) are
-in.** Spore areas and creatures are not written yet; see `ROADMAP.md`'s phased
-plan.
+in; Phase 6 (spore areas) is in progress.** Creatures are not written yet; see
+`ROADMAP.md`'s phased plan.
 
 **Host authority (locked in 2026-07-22 — read `ROADMAP.md`'s "Host authority"
 section before touching `PluginConfig.cs` or anything under `Wind/`/
@@ -240,6 +240,32 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       baseline-caching pattern as `SporeBombCullPatch`'s vanilla trigger radii.
       **The only client-side, non-host-authoritative gameplay-adjacent feature in
       the mod** (it's cosmetic — see `PluginConfig.cs` above).
+  - **`SporeAreas/`** — the Phase 6 spore-area mechanics (the persistent
+    "Mushroom Spore Clouds", a different hazard from spore bombs):
+    - `SporeAreaDisablePatch.cs` — the `Spore-Areas/disable-spore-areas` master
+      switch. Not a Harmony patch despite the folder convention (same as
+      `SporeBombRecolorPatch`): the emitters are baked into the Roots scene at
+      author time, so there's no runtime placement call to hook — driven once
+      per level from `RootsLevelWatcher`, plus a scene-wide `ReapplyToAll()` on
+      the setting changing or a host room-property update. Identity is the
+      **component**, not a name: a `StatusEmitter` with `statusType == Spores`
+      and `amount > 0` (runtime-confirmed - 12-23 per level in Roots, all
+      `WindAffectedStatusEmitter`, `radius=16`, `innerFade=8`, `amount=0.025`;
+      there is no spore-area class or prefab name to match on, and `amount > 0`
+      excludes the mirror-image "subtracts spores" use of the same component).
+      Deactivates the whole area object rather than just the component, so the
+      emitter mushroom and cloud VFX go with the status ticks and screen
+      filter; `ResolveAreaRoot` walks *up* from the emitter to the highest
+      ancestor that still represents that one area (stopping before any
+      ancestor owning a second `StatusEmitter`, any
+      `PropSpawner`/`PropGrouper`/`Biome` grouping node, and `Roots Segment`) —
+      confirmed in-game to land on `"Mushroom tree Spore Cloud"`, whose parent
+      is the scenery mushroom tree itself (`Evil Shroom` /
+      `Mush Trees (spores)`), which correctly stays. Restores only what it
+      hid itself (a registry keyed by instance ID), so turning the setting off
+      can't un-hide something the game deactivated for its own reasons.
+      Deliberately excludes a spore bomb's own temporary spore area
+      (`IsSporeBombSpawned`) — that's the `Spore-Bombs` section's business.
   - **`Core/`** — the pure, Unity-free decision layer (see split rule above):
     - `WorldUnits.cs` (+ the game-facing `GameUnits.cs` wrapper in the project
       root) — **read this before adding any `*-meters` setting.** PEAK's world
@@ -446,9 +472,9 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
 
 ## Planned structure (fills in as phases land — see ROADMAP.md)
 
-`SporeBombs/` and `Wind/` (above) are the first two mechanic-group folders;
-expect one more per remaining mechanic group, mirroring `OVERVIEW.md`'s
-sections: `SporeAreas/`, `Creatures/` — each holding the Harmony patches that
+`SporeBombs/`, `Wind/` and `SporeAreas/` (above) are the mechanic-group folders
+so far; expect one more per remaining mechanic group, mirroring `OVERVIEW.md`'s
+sections: `Creatures/` — each holding the Harmony patches that
 scan the scene and apply removals/tweaks, delegating every seeded decision to
 `Core/`. New per-mechanic preset values land in `Core/Presets/PresetCatalog.cs`
 as each phase is implemented.

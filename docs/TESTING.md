@@ -520,6 +520,33 @@ slow that waiting the gust out is strictly better (the first playtest's
 verdict on the original ×0.55/×0.60/×0.60: too slow, exactly that failure
 mode).
 
+### Spore areas: master disable switch (`Spore-Areas/disable-spore-areas`)
+
+**Pre-req:** debug logging on, in a Roots run. The log reports one line per
+level load and per config change:
+`[SporeAreas] level load: disable-spore-areas=off, N spore area(s) found, ...`
+— N should be in the low tens (12 and 23 in two live runs).
+
+1. With the setting **off**, walk into a spore cloud: vanilla behavior — Spores
+   status ticks up, green screen filter appears.
+2. Flip it **on** mid-run (no level reload). Every cloud should disappear
+   *visually* as well: the cloud particles **and** the mushroom in the middle
+   of it, while the giant mushroom tree it grows on stays (that's scenery, not
+   the hazard). Standing where a cloud was should apply no Spores and show no
+   screen filter. The log line should report `N newly hidden`.
+3. Flip it back **off** — every cloud returns immediately, in place. `N
+   restored` should equal what was hidden. Nothing *else* in the level should
+   pop into existence (the restore is registry-based specifically so it can't
+   un-hide something the game itself disabled).
+4. Set off a spore bomb with the setting **on**: its own temporary mini spore
+   area must still work normally — this switch deliberately doesn't touch it.
+5. Load a fresh Roots level with the setting already on: the clouds should be
+   gone from the start (`level load: disable-spore-areas=ON`).
+
+**Report back:** whether anything visible is left behind (a floating mushroom
+or lingering particles = the parent-walk stopped too low) or whether too much
+disappeared (terrain/props/whole trees = it walked too high).
+
 ### Host authority (multiplayer — needs a second player/PC, can't be verified solo)
 
 **Pre-req:** debug logging on for both host and at least one non-host client,

@@ -1,5 +1,6 @@
 using ExitGames.Client.Photon;
 using Fairoots.Diagnostics;
+using Fairoots.SporeAreas;
 using Fairoots.SporeBombs;
 using Fairoots.Wind;
 using Photon.Pun;
@@ -59,9 +60,10 @@ namespace Fairoots.Networking
                 return; // our own local values are already authoritative - nothing to refresh.
             }
 
-            Diag.V("[HostAuthoritySync] room properties updated - reapplying cached wind/trigger-radius tuning.");
+            Diag.V("[HostAuthoritySync] room properties updated - reapplying cached wind/trigger-radius/spore-area state.");
             WindChillZoneTuningPatch.ReapplyAll();
             SporeBombCullPatch.ReapplyTriggerRadiusToAll();
+            SporeAreaDisablePatch.ReapplyToAll();
         }
     }
 }

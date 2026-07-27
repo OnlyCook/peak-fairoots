@@ -2,6 +2,7 @@ using System;
 using BepInEx;
 using Fairoots.Diagnostics;
 using Fairoots.Networking;
+using Fairoots.SporeAreas;
 using Fairoots.SporeBombs;
 using Fairoots.Wind;
 using HarmonyLib;
@@ -83,6 +84,11 @@ namespace Fairoots
             // ApplyChangesLive (see its own remarks), same treatment as
             // KeepVanillaTriggerRadius above.
             Cfg.DisableWindEntirely.SettingChanged += (s, e) => WindChillZoneTuningPatch.ReapplyAll();
+
+            // Same treatment as the wind kill switch: a hazard either exists or it
+            // doesn't, so waiting for a level reload would just read as broken.
+            // Applies in both directions (hides, and restores what it hid).
+            Cfg.DisableSporeAreas.SettingChanged += (s, e) => SporeAreaDisablePatch.ReapplyToAll();
 
             // Cosmetic, client-side, and always immediate (see its remarks in
             // PluginConfig) - a scene-wide repaint in both directions, so

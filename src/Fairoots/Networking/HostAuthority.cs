@@ -176,6 +176,7 @@ namespace Fairoots.Networking
                 { KeyPrefix + "WindObstacleOcclusionRangeMultiplier", cfg.EffectiveWindObstacleOcclusionRangeMultiplier },
                 { KeyPrefix + "WindBackpackAlwaysImmune", cfg.EffectiveWindBackpackAlwaysImmune },
                 { KeyPrefix + "DisableWindEntirely", cfg.EffectiveDisableWindEntirely },
+                { KeyPrefix + "DisableSporeAreas", cfg.EffectiveDisableSporeAreas },
                 { KeyPrefix + "ClimbSheltersFromWind", cfg.EffectiveClimbSheltersFromWind },
                 { KeyPrefix + "ClimbWindSpeedMultiplier", cfg.EffectiveClimbWindSpeedMultiplier },
                 { KeyPrefix + "ClimbWindUpwardSpeedMultiplier", cfg.EffectiveClimbWindUpwardSpeedMultiplier },

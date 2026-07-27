@@ -140,6 +140,27 @@ namespace Fairoots
         /// </summary>
         public ConfigEntry<double> SporeBombSporeAreaRadiusMultiplierOverride { get; }
 
+        // --- Spore-Areas ----------------------------------------------------
+        /// <summary>
+        /// Master kill switch for the Roots biome's persistent spore areas (the
+        /// game's "Mushroom Spore Clouds" - a <c>Spores</c>-type
+        /// <c>WindAffectedStatusEmitter</c> plus the emitter mushroom in the
+        /// middle of the cloud and its cloud VFX). When on, the whole spore-area
+        /// object is deactivated, so it applies no Spores status, shows no
+        /// screen-filter warning, and isn't visible either -
+        /// <c>SporeAreas/SporeAreaDisablePatch</c> does the work.
+        ///
+        /// Deliberately scoped to the level's own baked-in spore areas: the small
+        /// temporary spore area a spore bomb leaves behind on detonation is a
+        /// separate hazard with its own settings under <c>Spore-Bombs</c> and is
+        /// never touched by this. <b>Host-authoritative</b> (read via
+        /// <see cref="EffectiveDisableSporeAreas"/>), flat (not folded through the
+        /// preset/override system - no preset ever turns it on) and always
+        /// immediate regardless of <see cref="ApplyChangesLive"/>, exactly like
+        /// <see cref="DisableWindEntirely"/>.
+        /// </summary>
+        public ConfigEntry<bool> DisableSporeAreas { get; }
+
         // --- Wind -----------------------------------------------------------
         /// <summary>
         /// Master kill switch for the entire wind mechanic. When on, wind
@@ -485,6 +506,19 @@ namespace Fairoots
                     "Spore Bomb\" variant, which has no spore area. Only takes effect when " +
                     "preset is set to Custom (5) - ignored under presets 1-4.",
                     new AcceptableValueRange<double>(0.0, 5.0)));
+
+            DisableSporeAreas = config.Bind(
+                "Spore-Areas",
+                "disable-spore-areas",
+                false,
+                "Master switch: when on, the Roots biome's spore areas (\"Mushroom Spore Clouds\") " +
+                "are removed entirely - no Spores status, no green screen filter, and the emitter " +
+                "mushroom in the middle of the cloud plus the cloud itself disappear with them. " +
+                "Doesn't touch the small temporary spore area a spore bomb leaves behind when it " +
+                "goes off (that's the Spore-Bombs section). HOST-AUTHORITATIVE: if you're not the " +
+                "host, this has no effect at all - only the host's value counts for the whole " +
+                "lobby. Off by default; no preset ever turns this on automatically. Applies " +
+                "immediately, regardless of apply-changes-live.");
 
             DisableWindEntirely = config.Bind(
                 "Wind",
@@ -1016,6 +1050,17 @@ namespace Fairoots
         /// </summary>
         public bool EffectiveWindBackpackAlwaysImmune =>
             HostAuthority.Resolve("WindBackpackAlwaysImmune", WindBackpackAlwaysImmune.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="DisableSporeAreas"/>.Value. Host-authoritative - flat (not
+        /// preset/live-snapshot resolved, matching the raw config entry itself),
+        /// but whether a hazard exists at all is shared game state, so only the
+        /// host's value counts (same shape as
+        /// <see cref="EffectiveDisableWindEntirely"/>).
+        /// </summary>
+        public bool EffectiveDisableSporeAreas =>
+            HostAuthority.Resolve("DisableSporeAreas", DisableSporeAreas.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of

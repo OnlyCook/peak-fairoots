@@ -420,9 +420,24 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
 - **Spore areas** (the status-effect gas clouds — a different hazard from
   spore bombs, despite the similar name) run through a single generic
   radius-based hazard-zone component with public radius/lethality/falloff
-  fields. Wind-suppression of spore areas may already partially exist in
-  vanilla for some instances — needs the same runtime confirmation pass to
-  know whether this is "tune an existing interaction" or "build a new one."
+  fields. Wind-suppression of spore areas **already exists natively for 100%
+  of them** in Roots (runtime-confirmed: every `Spores` emitter in the biome is
+  a `WindAffectedStatusEmitter`), so that row is tune-not-build.
+
+  **Master disable switch (implemented 2026-07-27):**
+  `Spore-Areas/disable-spore-areas` (off by default, no preset ever turns it
+  on) removes the biome's spore areas outright — status ticks, the green
+  screen-filter warning, the emitter mushroom in the middle of the cloud and
+  the cloud VFX all go together, because the whole area object is deactivated
+  rather than just the emitter component. Flat and host-authoritative, always
+  immediate (a hazard either exists or it doesn't, so waiting for a level
+  reload would read as broken), and reversible in both directions — it only
+  restores what Fairoots itself hid. Scoped to the level's own baked-in spore
+  areas: the temporary mini spore area a spore bomb leaves on detonation is a
+  separate hazard with its own `Spore-Bombs` settings and is never touched.
+  Identity is the component (`StatusEmitter.statusType == Spores`,
+  `amount > 0`), not a prefab name — there is no spore-area class or name to
+  match on. See `CODEBASE.md`'s `SporeAreas/` section.
 - **Creatures**: zombies currently have **no distance-based deaggro at
   all** once they've targeted a player (confirmed absent in code, not just
   hard to find) — this is the one creature change that's genuinely new
@@ -565,8 +580,12 @@ other PEAK mods already use.
    `Wind/disable-wind-entirely` master switch (off by default, never enabled by
    any preset) fully reverts the entire wind mechanic to vanilla for players
    who don't want it at all.
-6. **Phase 6:** Spore Areas — radius/lethality/opacity scaling, wind
-   interaction, the new cover-mouth mechanic.
+6. **Phase 6 (in progress):** Spore Areas — the master disable switch
+   (**done**, 2026-07-27 — see the spore-area mechanic note above), seeded
+   thinning of how many spore areas a level has, radius/lethality scaling, and
+   the new cover-mouth mechanic. Screen-filter opacity and any UI/indicator
+   work are explicitly **not** in this phase's scope (maintainer's call,
+   2026-07-27).
 7. **Phase 7:** Creatures — zombie deaggro (new logic), zombie/beetle speed
    and knockback scaling, full-disable option, spider attack telegraph
    audio.
