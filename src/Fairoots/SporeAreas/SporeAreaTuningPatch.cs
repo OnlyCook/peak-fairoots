@@ -7,11 +7,16 @@ using UnityEngine;
 namespace Fairoots.SporeAreas
 {
     /// <summary>
-    /// Phase 6 (ROADMAP.md's "Spore area radius" row): resizes every persistent
-    /// spore area by the configured multiplier - both the hazard itself
-    /// (<c>StatusEmitter.radius</c> plus its <c>innerFade</c>/<c>outerFade</c>, so
-    /// the falloff shape survives - see <see cref="SporeAreaTuning.ScaleFade"/>)
-    /// and the visible cloud, so the two can't disagree.
+    /// Phase 6 (ROADMAP.md's "Spore area radius" and "Spore area lethality" rows):
+    /// applies the flat, non-seeded field tuning to every persistent spore area -
+    /// its <b>size</b> (<c>StatusEmitter.radius</c> plus its
+    /// <c>innerFade</c>/<c>outerFade</c>, so the falloff shape survives - see
+    /// <see cref="SporeAreaTuning.ScaleFade"/> - and the visible cloud, so the two
+    /// can't disagree) and <b>how fast it applies the Spores status</b>
+    /// (<c>StatusEmitter.amount</c>, see
+    /// <see cref="SporeAreaTuning.ScaleStatusRate"/> for why that field and not the
+    /// tick interval). Both in one pass, since they act on the same components -
+    /// two passes would mean two scene-wide sweeps for one config change.
     ///
     /// Baseline caching, same pattern as <c>WindChillZoneTuningPatch</c> and
     /// <c>SporeBombCullPatch</c>'s trigger radii: each emitter's and each VFX
@@ -26,19 +31,21 @@ namespace Fairoots.SporeAreas
     /// Live-updatable (unlike the removal fraction): a resize can be undone, so
     /// this reapplies on a config change while <c>apply-changes-live</c> is on.
     /// </summary>
-    internal static class SporeAreaRadiusPatch
+    internal static class SporeAreaTuningPatch
     {
         private readonly struct EmitterBaseline
         {
             internal readonly float Radius;
             internal readonly float InnerFade;
             internal readonly float OuterFade;
+            internal readonly float Amount;
 
-            internal EmitterBaseline(float radius, float innerFade, float outerFade)
+            internal EmitterBaseline(float radius, float innerFade, float outerFade, float amount)
             {
                 Radius = radius;
                 InnerFade = innerFade;
                 OuterFade = outerFade;
+                Amount = amount;
             }
         }
 
@@ -57,7 +64,7 @@ namespace Fairoots.SporeAreas
             }
             catch (Exception e)
             {
-                Diag.Error($"[SporeAreaRadius] Run threw: {e.GetType().Name}: {e.Message}");
+                Diag.Error($"[SporeAreaTuning] Run threw: {e.GetType().Name}: {e.Message}");
             }
         }
 
@@ -81,13 +88,14 @@ namespace Fairoots.SporeAreas
             }
             catch (Exception e)
             {
-                Diag.Error($"[SporeAreaRadius] ReapplyToAll threw: {e.GetType().Name}: {e.Message}");
+                Diag.Error($"[SporeAreaTuning] ReapplyToAll threw: {e.GetType().Name}: {e.Message}");
             }
         }
 
         private static void Apply(IReadOnlyList<StatusEmitter> emitters, string reason)
         {
             double multiplier = Plugin.Cfg.EffectiveSporeAreaRadiusMultiplier;
+            double rateMultiplier = Plugin.Cfg.EffectiveSporeAreaStatusRateMultiplier;
             var areas = SporeAreaScan.FilterSporeAreas(emitters);
             if (areas.Count == 0)
             {
@@ -97,22 +105,25 @@ namespace Fairoots.SporeAreas
             LogStructureOnce(areas[0]);
 
             int resized = 0, vfxScaled = 0, vfxMissing = 0;
-            float sampleFrom = 0f, sampleTo = 0f;
+            float sampleFrom = 0f, sampleTo = 0f, sampleRateFrom = 0f, sampleRateTo = 0f;
             foreach (var emitter in areas)
             {
                 int id = emitter.GetInstanceID();
                 if (!VanillaEmitters.TryGetValue(id, out EmitterBaseline vanilla))
                 {
-                    vanilla = new EmitterBaseline(emitter.radius, emitter.innerFade, emitter.outerFade);
+                    vanilla = new EmitterBaseline(emitter.radius, emitter.innerFade, emitter.outerFade, emitter.amount);
                     VanillaEmitters[id] = vanilla;
                 }
 
                 emitter.radius = SporeAreaTuning.ScaleRadius(vanilla.Radius, multiplier);
                 emitter.innerFade = SporeAreaTuning.ScaleFade(vanilla.InnerFade, multiplier);
                 emitter.outerFade = SporeAreaTuning.ScaleFade(vanilla.OuterFade, multiplier);
+                emitter.amount = SporeAreaTuning.ScaleStatusRate(vanilla.Amount, rateMultiplier);
                 resized++;
                 sampleFrom = vanilla.Radius;
                 sampleTo = emitter.radius;
+                sampleRateFrom = vanilla.Amount;
+                sampleRateTo = emitter.amount;
 
                 int scaled = ScaleVfx(SporeAreaScan.ResolveAreaRoot(emitter), multiplier);
                 if (scaled > 0)
@@ -126,11 +137,12 @@ namespace Fairoots.SporeAreas
             }
 
             Diag.Info(
-                $"[SporeAreaRadius] {reason}: multiplier={multiplier:0.###}, {resized} spore area(s) resized " +
-                $"(e.g. radius {sampleFrom:0.##} -> {sampleTo:0.##} world units, " +
+                $"[SporeAreaTuning] {reason}: {resized} spore area(s) tuned. " +
+                $"radius x{multiplier:0.###} (e.g. {sampleFrom:0.##} -> {sampleTo:0.##} world units, " +
                 $"{GameUnits.ToMeters(sampleFrom):0.#}m -> {GameUnits.ToMeters(sampleTo):0.#}m), " +
                 $"{vfxScaled} cloud VFX transform(s) scaled" +
-                (vfxMissing > 0 ? $", {vfxMissing} area(s) had no VFX to scale" : string.Empty));
+                (vfxMissing > 0 ? $", {vfxMissing} area(s) had no VFX to scale" : string.Empty) +
+                $". status rate x{rateMultiplier:0.###} (e.g. amount {sampleRateFrom:0.####} -> {sampleRateTo:0.####} per second)");
         }
 
         /// <summary>
@@ -174,7 +186,10 @@ namespace Fairoots.SporeAreas
         /// from - this is the only way to confirm the VFX scaling above is hitting
         /// the right objects (and to see what to target instead if a level ever
         /// reports "had no VFX to scale"). Same reasoning as
-        /// <c>Diagnostics/MaterialProbe</c>.
+        /// <c>Diagnostics/MaterialProbe</c>. It has already earned its keep once:
+        /// it's what established that the area root is the entire mushroom-tree prop
+        /// and that the two particle systems are a separate child, correcting an
+        /// assumption this folder's comments had been written on.
         /// </summary>
         private static void LogStructureOnce(StatusEmitter sample)
         {
@@ -185,7 +200,7 @@ namespace Fairoots.SporeAreas
 
             _structureLogged = true;
             GameObject root = SporeAreaScan.ResolveAreaRoot(sample);
-            Diag.V($"[SporeAreaRadius] structure of \"{SporeAreaScan.DescribePath(root.transform)}\":");
+            Diag.V($"[SporeAreaTuning] structure of \"{SporeAreaScan.DescribePath(root.transform)}\":");
             foreach (var t in root.GetComponentsInChildren<Transform>(true))
             {
                 var names = new List<string>();
@@ -194,7 +209,7 @@ namespace Fairoots.SporeAreas
                     names.Add(c == null ? "<missing-script>" : c.GetType().Name);
                 }
 
-                Diag.V($"[SporeAreaRadius]   \"{t.name}\" scale={t.localScale} : {string.Join(", ", names)}");
+                Diag.V($"[SporeAreaTuning]   \"{t.name}\" scale={t.localScale} : {string.Join(", ", names)}");
             }
         }
     }

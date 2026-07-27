@@ -65,7 +65,7 @@ namespace Fairoots
                 {
                     SporeBombCullPatch.ReapplyTriggerRadiusToAll();
                     WindChillZoneTuningPatch.ReapplyAll();
-                    SporeAreaRadiusPatch.ReapplyToAll();
+                    SporeAreaTuningPatch.ReapplyToAll();
                 }
             };
 
@@ -91,15 +91,17 @@ namespace Fairoots
             // Applies in both directions (hides, and restores what it hid).
             Cfg.DisableSporeAreas.SettingChanged += (s, e) => SporeAreaDisablePatch.ReapplyToAll();
 
-            // A resize can be undone, unlike a removal, so the spore-area radius
-            // gets the same immediate-reapply treatment as the wind/trigger-radius
-            // multipliers - only while live updates are on (with them off,
-            // EffectiveSporeAreaRadiusMultiplier keeps returning the level-load
-            // snapshot anyway).
-            Cfg.SporeAreaRadiusMultiplierOverride.SettingChanged += (s, e) =>
+            // A resize or a rate change can be undone, unlike a removal, so both
+            // spore-area tuning dials get the same immediate-reapply treatment as
+            // the wind/trigger-radius multipliers - only while live updates are on
+            // (with them off, the Effective* accessors keep returning the
+            // level-load snapshot anyway).
+            EventHandler reapplySporeAreaTuning = (s, e) =>
             {
-                if (Cfg.ApplyChangesLive.Value) SporeAreaRadiusPatch.ReapplyToAll();
+                if (Cfg.ApplyChangesLive.Value) SporeAreaTuningPatch.ReapplyToAll();
             };
+            Cfg.SporeAreaRadiusMultiplierOverride.SettingChanged += reapplySporeAreaTuning;
+            Cfg.SporeAreaStatusRateMultiplierOverride.SettingChanged += reapplySporeAreaTuning;
 
             // Cosmetic, client-side, and always immediate (see its remarks in
             // PluginConfig) - a scene-wide repaint in both directions, so

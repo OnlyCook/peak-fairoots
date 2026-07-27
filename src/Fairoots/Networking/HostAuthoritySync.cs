@@ -64,7 +64,7 @@ namespace Fairoots.Networking
             WindChillZoneTuningPatch.ReapplyAll();
             SporeBombCullPatch.ReapplyTriggerRadiusToAll();
             SporeAreaDisablePatch.ReapplyToAll();
-            SporeAreaRadiusPatch.ReapplyToAll();
+            SporeAreaTuningPatch.ReapplyToAll();
         }
     }
 }

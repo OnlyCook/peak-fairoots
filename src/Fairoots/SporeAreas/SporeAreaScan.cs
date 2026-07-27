@@ -31,16 +31,28 @@ namespace Fairoots.SporeAreas
         /// A spore area is identified by what the emitter actually does - applying
         /// the <c>Spores</c> status - not by a name: there is no spore-area class
         /// and the objects are all called the same thing
-        /// ("Mushroom tree Spore Cloud", runtime-confirmed). <c>amount &gt; 0</c>
-        /// excludes the mirror-image case of an emitter that *subtracts* spores
-        /// (the same component serves both directions - see
+        /// ("Mushroom tree Spore Cloud", runtime-confirmed). The non-negative
+        /// <c>amount</c> requirement excludes the mirror-image case of an emitter
+        /// that *subtracts* spores (the same component serves both directions - see
         /// <c>StatusEmitter.Update</c>, which calls <c>SubtractStatus</c> for a
         /// negative amount), which would be a cure, not a hazard.
         /// </summary>
+        /// <remarks>
+        /// <b>The test is <c>&gt;= 0</c>, not <c>&gt; 0</c>, and that matters.</b>
+        /// <c>amount</c> is a field Fairoots itself writes
+        /// (<c>SporeAreaTuningPatch</c>'s status-rate multiplier), so a
+        /// strictly-positive test would make an area the player had scaled to a rate
+        /// of 0 stop matching its own identity check - it would vanish from every
+        /// subsequent pass, meaning it could never be found again to restore, retune
+        /// or count. An identity check must never depend on a value the mod mutates;
+        /// this one only depends on the sign the level author gave it, which Fairoots
+        /// never flips (<see cref="Core.SporeAreaTuning.ScaleStatusRate"/> clamps at
+        /// 0 rather than going negative, for exactly this reason).
+        /// </remarks>
         internal static bool IsSporeArea(StatusEmitter emitter) =>
             emitter != null
             && emitter.statusType == CharacterAfflictions.STATUSTYPE.Spores
-            && emitter.amount > 0f;
+            && emitter.amount >= 0f;
 
         /// <summary>
         /// True for the short-lived spore area a detonating spore bomb spawns, which
@@ -85,7 +97,7 @@ namespace Fairoots.SporeAreas
         ///
         /// In practice this resolves one level up from the emitter, to
         /// "Mushroom tree Spore Cloud" - confirmed by the structure dump in
-        /// <c>SporeAreaRadiusPatch</c>, which also corrected an earlier assumption
+        /// <c>SporeAreaTuningPatch</c>, which also corrected an earlier assumption
         /// in this comment. That object is the <b>whole mushroom-tree prop</b>: the
         /// mushroom meshes and their <c>MeshCollider</c>s are its direct children,
         /// alongside a "Spore Cloud" child carrying the <c>StatusEmitter</c> and two

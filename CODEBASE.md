@@ -276,6 +276,14 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       this folder calls. One copy on purpose: two slightly different identity
       checks would mean the removal pass and the disable pass disagreeing about
       how many spore areas the level has.
+    - `SporeAreaTuningPatch.cs` — the flat, non-seeded field tuning applied to
+      every spore area: size (`radius` + `innerFade`/`outerFade` + the two cloud
+      particle systems' transforms) and Spores build-up rate (`amount`), both in
+      one pass since they act on the same components. Baseline-cached per
+      instance ID (same pattern as `WindChillZoneTuningPatch`), so repeated
+      reapplies can't compound and 1.0 always restores true vanilla.
+      Live-updatable, unlike removal. Also owns the one-time verbose structure
+      dump that established the prefab layout above.
     - `SporeAreaCullPatch.cs` — the seeded thinning pass
       (`Spore-Areas/removal-fraction`): deactivates a fraction of the level's
       spore areas, with `Core/SporeAreaCull.cs` deciding which. Level-load-only
@@ -323,6 +331,15 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       foliage removal, then a `ClusteredRemovalSelection` cull budgeted against
       it. Returns per-candidate outcomes; `SporeBombCullPatch` maps them back
       onto real GameObjects.
+    - `SporeAreaTuning.cs` — pure arithmetic for the spore areas' size and
+      Spores build-up rate (not seed-gated - every area gets the identical flat
+      treatment, same shape as `SporeBombExplosionTuning`). Two non-obvious
+      rules live here, both with tests: the fades scale *with* the radius (the
+      native falloff ramp is measured inward from the boundary, so scaling
+      radius alone would turn the size dial into a lethality dial), and the
+      rate dial scales `amount` rather than the tick interval (the native
+      per-tick amount is proportional to the interval, so the rate doesn't
+      contain it - scaling the interval changes granularity only, not rate).
     - `SporeAreaCull.cs` — the spore-area thinning decision. Simpler than
       `SporeBombCull`: no foliage pass (a spore cloud is a 16-unit-radius volume
       around a mushroom, not a small prop that can get buried in a fern), just

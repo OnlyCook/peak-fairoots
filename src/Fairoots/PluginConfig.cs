@@ -189,6 +189,17 @@ namespace Fairoots
         /// </summary>
         public ConfigEntry<double> SporeAreaRadiusMultiplierOverride { get; }
 
+        /// <summary>
+        /// Custom-preset value for the multiplier applied to how fast the Spores
+        /// status builds up while a player stands in a spore area
+        /// (<see cref="Core.SporeAreaTuning.ScaleStatusRate"/>; vanilla is
+        /// <c>amount = 0.025</c> per second in Roots). 1.0 = vanilla, 0 = the area
+        /// never applies spores at all. Only takes effect under
+        /// <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
+        /// </summary>
+        public ConfigEntry<double> SporeAreaStatusRateMultiplierOverride { get; }
+
         // --- Wind -----------------------------------------------------------
         /// <summary>
         /// Master kill switch for the entire wind mechanic. When on, wind
@@ -578,6 +589,20 @@ namespace Fairoots
                     "ignored under presets 1-4.",
                     new AcceptableValueRange<double>(0.0, 3.0)));
 
+            SporeAreaStatusRateMultiplierOverride = config.Bind(
+                "Spore-Areas",
+                "status-rate-multiplier",
+                0.85,
+                new ConfigDescription(
+                    "Multiplier applied to how often/quickly you're given spores while standing " +
+                    "in a spore area, e.g. 0.5 means the Spores meter fills half as fast, 2.0 " +
+                    "twice as fast, 0 means a spore area never gives you spores at all (its cloud " +
+                    "is still there - use disable-spore-areas to remove them outright). 1.0 always " +
+                    "means vanilla. How far the area reaches is the separate radius-multiplier " +
+                    "above; this only changes the rate. Only takes effect when preset is set to " +
+                    "Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 3.0)));
+
             DisableWindEntirely = config.Bind(
                 "Wind",
                 "disable-wind-entirely",
@@ -940,6 +965,13 @@ namespace Fairoots
                 SporeAreaRadiusMultiplierOverride.Value,
                 UseCustomOverrides);
 
+        /// <summary>The effective Spores build-up rate multiplier for every persistent spore area.</summary>
+        public double SporeAreaStatusRateMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.SporeAreaStatusRateMultiplier(Preset.Value),
+                SporeAreaStatusRateMultiplierOverride.Value,
+                UseCustomOverrides);
+
         /// <summary>The effective wind-force (and gust-timing) multiplier.</summary>
         public double WindForceMultiplier =>
             OverrideResolution.Resolve(
@@ -1020,6 +1052,7 @@ namespace Fairoots
         private double _snapSporeAreaRadiusMultiplier;
         private double _snapSporeAreaRemovalFraction;
         private double _snapSporeAreaRadiusMultiplierValue;
+        private double _snapSporeAreaStatusRateMultiplier;
         private double _snapWindForceMultiplier;
         private double _snapWindGustDurationMultiplier;
         private double _snapWindItemForceMultiplier;
@@ -1047,6 +1080,7 @@ namespace Fairoots
             _snapSporeAreaRadiusMultiplier = SporeBombSporeAreaRadiusMultiplier;
             _snapSporeAreaRemovalFraction = SporeAreaRemovalFraction;
             _snapSporeAreaRadiusMultiplierValue = SporeAreaRadiusMultiplier;
+            _snapSporeAreaStatusRateMultiplier = SporeAreaStatusRateMultiplier;
             _snapWindForceMultiplier = WindForceMultiplier;
             _snapWindGustDurationMultiplier = WindGustDurationMultiplier;
             _snapWindItemForceMultiplier = WindItemForceMultiplier;
@@ -1109,6 +1143,10 @@ namespace Fairoots
         /// <summary>Game-facing code should read this instead of <see cref="SporeAreaRadiusMultiplier"/>. Host-authoritative.</summary>
         public double EffectiveSporeAreaRadiusMultiplier =>
             HostAuthority.Resolve("SporeAreaRadiusMultiplier", UseLiveValue ? SporeAreaRadiusMultiplier : _snapSporeAreaRadiusMultiplierValue);
+
+        /// <summary>Game-facing code should read this instead of <see cref="SporeAreaStatusRateMultiplier"/>. Host-authoritative.</summary>
+        public double EffectiveSporeAreaStatusRateMultiplier =>
+            HostAuthority.Resolve("SporeAreaStatusRateMultiplier", UseLiveValue ? SporeAreaStatusRateMultiplier : _snapSporeAreaStatusRateMultiplier);
 
         /// <summary>Game-facing code should read this instead of <see cref="WindForceMultiplier"/>. Host-authoritative.</summary>
         public double EffectiveWindForceMultiplier =>

@@ -223,6 +223,26 @@ namespace Fairoots.Core.Presets
         }
 
         /// <summary>
+        /// Multiplier applied to how fast the Spores status builds up inside a
+        /// persistent spore area (<c>StatusEmitter.amount</c>, vanilla 0.025 in
+        /// Roots - see <see cref="SporeAreaTuning.ScaleStatusRate"/>), per
+        /// ROADMAP.md's "Spore area lethality (status/sec)" row
+        /// (-15%/-35%/-55%). 1.0 = vanilla (Subtle). Starting estimates pending
+        /// playtest.
+        /// </summary>
+        public static double SporeAreaStatusRateMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.85;
+                case PresetId.Generous: return 0.65;
+                case PresetId.Tame: return 0.45;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
         /// The unconditional bush/grass placement-removal pass is on for every
         /// preset, including Subtle (ROADMAP.md - the game never prevents a spore
         /// bomb landing in foliage, so this gap is always fixed). Kept as a method

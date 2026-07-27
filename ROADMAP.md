@@ -195,6 +195,13 @@ player has explicitly touched always overrides whatever the active preset
 would otherwise set for that mechanic — applying/switching a preset never
 silently clobbers a hand-tuned value.
 
+**Every preset number in this table is a placeholder** (maintainer, 2026-07-27):
+they exist so a preset is testable at all, and they are expected to be re-tuned
+wholesale in Phase 9 once the full mechanic set is in — adding one mechanic
+changes what the others should be, so tuning them individually as each lands
+would be work thrown away. Pick something sensible per new mechanic, keep the
+direction consistent with the neighbouring rows, and move on.
+
 Exact numeric values below are **starting targets, not final** — several of
 the underlying vanilla defaults are Unity scene/asset data rather than
 compiled code (see `RESEARCH.md`'s per-mechanic "open questions"), so the
@@ -484,6 +491,17 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   would quietly become a lethality dial, which is a separate setting's job. The
   emitter mushroom is deliberately *not* scaled (only the particle systems are,
   and they're a separate child of the prop). Live-updatable, unlike removal.
+
+  **Status build-up rate (implemented 2026-07-27):**
+  `Spore-Areas/status-rate-multiplier` scales how fast the Spores status
+  accumulates on a player inside an area. It scales `StatusEmitter.amount`, not
+  the tick interval, and that isn't an arbitrary choice: the native emitter
+  applies `amount × tickTime × falloff` every `tickTime`, so the per-tick amount
+  is already proportional to the interval and the resulting rate
+  (`amount × falloff` per second) doesn't contain `tickTime` at all — scaling
+  the interval would change only how chunky the meter's jumps are, not how fast
+  it fills. Independent of the radius dial, so "how big" and "how fast" tune
+  separately.
 - **Creatures**: zombies currently have **no distance-based deaggro at
   all** once they've targeted a player (confirmed absent in code, not just
   hard to find) — this is the one creature change that's genuinely new

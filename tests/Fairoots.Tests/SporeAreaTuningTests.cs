@@ -78,6 +78,51 @@ namespace Fairoots.Tests
         }
 
         [Fact]
+        public void StatusRateScalesProportionally_AndOneIsVanilla()
+        {
+            const float vanillaAmount = 0.025f; // runtime-confirmed Roots value
+            Assert.Equal(vanillaAmount, SporeAreaTuning.ScaleStatusRate(vanillaAmount, 1.0));
+            Assert.Equal(vanillaAmount * 0.5f, SporeAreaTuning.ScaleStatusRate(vanillaAmount, 0.5), 6);
+            Assert.Equal(vanillaAmount * 2f, SporeAreaTuning.ScaleStatusRate(vanillaAmount, 2.0), 6);
+        }
+
+        [Fact]
+        public void StatusRateNeverGoesNegative_SoAHazardCannotBecomeACure()
+        {
+            // A negative amount flips the native emitter into its SubtractStatus
+            // branch - i.e. the spore cloud would start *healing* spores. Zero is
+            // the intended floor ("never applies spores"). This clamp is also what
+            // keeps SporeAreaScan.IsSporeArea's sign-based identity check valid on
+            // an area Fairoots has zeroed.
+            Assert.Equal(0f, SporeAreaTuning.ScaleStatusRate(0.025f, -1.0));
+            Assert.Equal(0f, SporeAreaTuning.ScaleStatusRate(0.025f, 0.0));
+        }
+
+        [Fact]
+        public void StatusRateAndRadiusAreIndependentDials()
+        {
+            // Scaling the rate must not touch the geometry, and vice versa - the two
+            // settings exist precisely so "how big" and "how fast" can be tuned
+            // separately (and the fade scaling exists so radius doesn't leak into
+            // rate - see FalloffShapeIsPreserved above).
+            Assert.Equal(VanillaRadius, SporeAreaTuning.ScaleRadius(VanillaRadius, 1.0));
+            Assert.Equal(0.0125f, SporeAreaTuning.ScaleStatusRate(0.025f, 0.5), 6);
+        }
+
+        [Fact]
+        public void StatusRatePresetProgression_SubtleIsVanillaAndEachPresetIsGentler()
+        {
+            Assert.Equal(1.0, PresetCatalog.SporeAreaStatusRateMultiplier(PresetId.Subtle));
+            Assert.True(PresetCatalog.SporeAreaStatusRateMultiplier(PresetId.Balanced)
+                        < PresetCatalog.SporeAreaStatusRateMultiplier(PresetId.Subtle));
+            Assert.True(PresetCatalog.SporeAreaStatusRateMultiplier(PresetId.Generous)
+                        < PresetCatalog.SporeAreaStatusRateMultiplier(PresetId.Balanced));
+            Assert.True(PresetCatalog.SporeAreaStatusRateMultiplier(PresetId.Tame)
+                        < PresetCatalog.SporeAreaStatusRateMultiplier(PresetId.Generous));
+            Assert.True(PresetCatalog.SporeAreaStatusRateMultiplier(PresetId.Tame) > 0.0);
+        }
+
+        [Fact]
         public void PresetProgression_SubtleIsVanillaAndEachPresetShrinksFurther()
         {
             Assert.Equal(1.0, PresetCatalog.SporeAreaRadiusMultiplier(PresetId.Subtle));
