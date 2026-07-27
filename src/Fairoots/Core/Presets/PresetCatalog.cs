@@ -183,21 +183,127 @@ namespace Fairoots.Core.Presets
 
         /// <summary>
         /// Climb-to-counter-wind counterplay mechanic - on for all presets.
-        /// Runtime-confirmed (2026-07-22 decompile pass, RESEARCH.md Q6):
-        /// <c>WindChillZone.AddWindForceToCharacter</c> already returns
-        /// immediately whenever <c>character.data.currentClimbHandle != null</c>
-        /// (i.e. the player is actively gripping a climb handle) - wind force is
-        /// already fully suppressed while climbing/hanging in vanilla, and
-        /// <c>ApplyStatus</c> already raises <c>climbingStamMinimumMultiplier</c>
-        /// (the stamina cost) during wind regardless. This mechanic is therefore
-        /// tune-not-build, like the spore-area wind-dispersal feature turned out
-        /// to be - there's nothing to patch, this flag exists purely so the
-        /// preset table has a row to point at confirming the behavior stays on.
+        ///
+        /// **Corrects an earlier misreading (2026-07-27).** The 2026-07-22
+        /// decompile pass concluded this was tune-not-build because
+        /// <c>WindChillZone.AddWindForceToCharacter</c> returns early whenever
+        /// <c>character.data.currentClimbHandle != null</c>. That check only
+        /// covers hanging off a climb *handle* prop - ordinary wall climbing
+        /// (<c>CharacterData.isClimbing</c>), rope climbing and vine climbing all
+        /// take full wind force in vanilla, and being shoved mid-climb drops the
+        /// climb entirely (<c>CharacterClimbing.Update</c> lets go below 0.25
+        /// ragdoll control). So it is built, not just tuned: see
+        /// <see cref="ClimbWindResistance"/> for the mechanic and
+        /// <c>Wind/ClimbWindShelterPatch.cs</c> for the patches. Whether the
+        /// shelter applies at all is the flat, player-facing
+        /// <c>Wind/climb-shelters-from-wind</c> toggle (on by default); what it
+        /// costs is the three multipliers below.
+        ///
+        /// **Off on Subtle** (maintainer's call, 2026-07-27): Subtle's job is to
+        /// leave vanilla mechanics as close to untouched as the mod gets, and
+        /// handing out outright wind immunity is the least subtle thing in it.
+        /// On for every other preset, and for Custom (which follows Balanced
+        /// here). The player-facing toggle can turn it off on top of this, but
+        /// can't turn it on under Subtle - a preset row that says "this mechanic
+        /// doesn't exist here" outranks a per-player switch, same as every other
+        /// preset value.
         /// </summary>
-        public static bool ClimbToCounterWind(PresetId preset) => true;
+        public static bool ClimbToCounterWind(PresetId preset) => CatalogKey(preset) != PresetId.Subtle;
+
+        /// <summary>
+        /// Multiplier applied to climb speed in every direction while wind is
+        /// actually pushing on the climber (<see cref="ClimbWindResistance.Resist"/>),
+        /// the price of the wind immunity climbing now grants. Faded in by live
+        /// wind pressure, so a climber the wind can't reach anyway (behind a rock,
+        /// no gust) is never slowed at all. Gentler on Tame than on Balanced,
+        /// matching every other row's direction - Tame is the most forgiving
+        /// preset, and here "forgiving" means paying less for the shelter.
+        /// Subtle's value is moot (the mechanic is off there - see
+        /// <see cref="ClimbToCounterWind"/>) and is left at 1.0 rather than a
+        /// number that would misleadingly imply a Subtle slowdown exists.
+        ///
+        /// **Balanced's 0.90 is playtest-tuned** (maintainer, 2026-07-27),
+        /// replacing the original 0.55 starting estimate: with the immunity
+        /// itself being the real prize, a heavy slowdown made waiting the gust
+        /// out strictly better than climbing through it, which is the failure
+        /// mode this mechanic exists to remove.
+        /// </summary>
+        public static double ClimbWindSpeedMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.90;
+                case PresetId.Generous: return 0.93;
+                case PresetId.Tame: return 0.96;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
+        /// Extra multiplier on *upward* climb movement only, on top of
+        /// <see cref="ClimbWindSpeedMultiplier"/> - climbing up through a gust is
+        /// the hardest thing you can do, per the maintainer's framing (2026-07-27).
+        /// Downward movement is never penalised beyond the base multiplier.
+        /// Balanced's 0.85 is playtest-tuned, Subtle's 1.0 is moot (mechanic off
+        /// there) - see <see cref="ClimbWindSpeedMultiplier"/> for both.
+        /// </summary>
+        public static double ClimbWindUpwardSpeedMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.85;
+                case PresetId.Generous: return 0.89;
+                case PresetId.Tame: return 0.94;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
+        /// Extra multiplier on climb movement that opposes the wind direction, on
+        /// top of <see cref="ClimbWindSpeedMultiplier"/>. Moving with the wind is
+        /// never sped up - this mechanic is a cost, not a sail. Balanced's 0.85
+        /// is playtest-tuned, Subtle's 1.0 is moot (mechanic off there) - see
+        /// <see cref="ClimbWindSpeedMultiplier"/> for both.
+        /// </summary>
+        public static double ClimbWindIntoWindSpeedMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.85;
+                case PresetId.Generous: return 0.89;
+                case PresetId.Tame: return 0.94;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
 
         /// <summary>Cover-mouth-vs-spore-areas counterplay mechanic - on for all presets.</summary>
         public static bool CoverMouth(PresetId preset) => true;
+
+        /// <summary>
+        /// Multiplier applied to wind force during the short window just after a
+        /// player lets go of a climb (<see cref="ClimbWindResistance.GraceForceMultiplier"/>) -
+        /// the fix for "finishing a climb catapults you," which is the worst
+        /// moment in a gust (maintainer, 2026-07-27). Low but deliberately
+        /// non-zero: full immunity here would let a player wall-tap their way
+        /// across an exposed stretch. Gentler (lower force) on the more forgiving
+        /// presets, same direction as every other row; Subtle's 1.0 is moot, the
+        /// whole mechanic is off there (<see cref="ClimbToCounterWind"/>).
+        /// Starting estimates pending playtest.
+        /// </summary>
+        public static double ClimbWindGraceForceMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.15;
+                case PresetId.Generous: return 0.12;
+                case PresetId.Tame: return 0.08;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
 
         /// <summary>
         /// Multiplier applied to <c>WindChillZone.windForce</c> and, in the same

@@ -86,8 +86,18 @@ namespace Fairoots.Tests
             foreach (PresetId p in new[] { PresetId.Subtle, PresetId.Balanced, PresetId.Generous, PresetId.Tame })
             {
                 Assert.True(PresetCatalog.SporeBombFoliageRemoval(p));
-                Assert.True(PresetCatalog.ClimbToCounterWind(p));
                 Assert.True(PresetCatalog.CoverMouth(p));
+            }
+
+            // Climb-to-counter-wind used to belong on that list. It stopped being
+            // unconditional on 2026-07-27, when it went from "a note about vanilla
+            // behavior" to a real, patched mechanic granting outright wind
+            // immunity - too strong for Subtle, which exists to leave vanilla
+            // mechanics alone. See ClimbWindResistanceTests for its own coverage.
+            Assert.False(PresetCatalog.ClimbToCounterWind(PresetId.Subtle));
+            foreach (PresetId p in new[] { PresetId.Balanced, PresetId.Generous, PresetId.Tame })
+            {
+                Assert.True(PresetCatalog.ClimbToCounterWind(p));
             }
         }
 

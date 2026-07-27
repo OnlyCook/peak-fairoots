@@ -176,6 +176,12 @@ namespace Fairoots.Networking
                 { KeyPrefix + "WindObstacleOcclusionRangeMultiplier", cfg.EffectiveWindObstacleOcclusionRangeMultiplier },
                 { KeyPrefix + "WindBackpackAlwaysImmune", cfg.EffectiveWindBackpackAlwaysImmune },
                 { KeyPrefix + "DisableWindEntirely", cfg.EffectiveDisableWindEntirely },
+                { KeyPrefix + "ClimbSheltersFromWind", cfg.EffectiveClimbSheltersFromWind },
+                { KeyPrefix + "ClimbWindSpeedMultiplier", cfg.EffectiveClimbWindSpeedMultiplier },
+                { KeyPrefix + "ClimbWindUpwardSpeedMultiplier", cfg.EffectiveClimbWindUpwardSpeedMultiplier },
+                { KeyPrefix + "ClimbWindIntoWindSpeedMultiplier", cfg.EffectiveClimbWindIntoWindSpeedMultiplier },
+                { KeyPrefix + "ClimbWindGraceForceMultiplier", cfg.EffectiveClimbWindGraceForceMultiplier },
+                { KeyPrefix + "ClimbShelterGraceSeconds", cfg.EffectiveClimbShelterGraceSeconds },
             };
             room.SetCustomProperties(props);
             Diag.V(

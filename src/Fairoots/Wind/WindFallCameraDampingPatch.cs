@@ -59,6 +59,15 @@ namespace Fairoots.Wind
                 return;
             }
 
+            // Same reasoning for Fairoots' own suppression: a postfix still runs
+            // when ClimbWindShelterPatch's prefix skipped the original, and a
+            // climber who was sheltered from the push was never pushed, so a fall
+            // right after letting go isn't wind-caused.
+            if (ClimbWindShelter.Enabled && ClimbWindShelter.IsHoldingOn(character))
+            {
+                return;
+            }
+
             _lastWindForceTime = Time.time;
         }
     }

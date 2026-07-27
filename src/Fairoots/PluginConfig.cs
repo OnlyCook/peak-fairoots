@@ -236,6 +236,63 @@ namespace Fairoots
         /// </summary>
         public ConfigEntry<float> WindRecentForceWindowSeconds { get; }
 
+        /// <summary>
+        /// Whether holding onto something (wall climbing, a rope, a vine, a climb
+        /// handle) makes the player fully immune to wind force, at the cost of
+        /// climbing much slower while the wind is actually pushing on them - see
+        /// <see cref="Core.ClimbWindResistance"/> for why this is a real mechanic
+        /// rather than the vanilla behavior an earlier research pass thought it
+        /// was. Flat (not preset-gated - every preset has it on, per ROADMAP.md's
+        /// "New: climb-to-counter-wind" row) but player-toggleable, same shape as
+        /// <see cref="WindBackpackAlwaysImmune"/>. Host-authoritative: read via
+        /// <see cref="PluginConfig.EffectiveClimbSheltersFromWind"/>. The three
+        /// speed multipliers below are what it costs; this is whether it happens.
+        /// </summary>
+        public ConfigEntry<bool> ClimbSheltersFromWind { get; }
+
+        /// <summary>
+        /// Custom-preset value for the all-directions climb-speed multiplier
+        /// applied while wind is actually pushing on the climber. Only takes
+        /// effect under <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
+        /// </summary>
+        public ConfigEntry<double> ClimbWindSpeedMultiplierOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for the extra multiplier on upward climb movement
+        /// in wind (on top of <see cref="ClimbWindSpeedMultiplierOverride"/>).
+        /// Only takes effect under <see cref="PresetId.Custom"/>.
+        /// </summary>
+        public ConfigEntry<double> ClimbWindUpwardSpeedMultiplierOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for the extra multiplier on climb movement that
+        /// opposes the wind direction (on top of
+        /// <see cref="ClimbWindSpeedMultiplierOverride"/>). Only takes effect
+        /// under <see cref="PresetId.Custom"/>.
+        /// </summary>
+        public ConfigEntry<double> ClimbWindIntoWindSpeedMultiplierOverride { get; }
+
+        /// <summary>
+        /// How long the much-weaker-wind grace window lasts after letting go of a
+        /// climb (see <see cref="Core.ClimbWindResistance.GraceForceMultiplier"/>
+        /// for why it exists). Flat (not folded through the preset/override
+        /// system) - it's a timing window, not a balance dial, same reasoning as
+        /// <see cref="WindRecentForceWindowSeconds"/> - but unlike that one it IS
+        /// host-authoritative (<see cref="PluginConfig.EffectiveClimbShelterGraceSeconds"/>),
+        /// because it changes how much force actually gets applied rather than
+        /// how the local camera feels. Only has any effect while the climb
+        /// shelter itself is active (<see cref="ClimbSheltersFromWind"/>).
+        /// </summary>
+        public ConfigEntry<float> ClimbShelterGraceSeconds { get; }
+
+        /// <summary>
+        /// Custom-preset value for how strong wind is during the let-go grace
+        /// window, as a fraction of normal. Only takes effect under
+        /// <see cref="PresetId.Custom"/>; see <see cref="SporeBombCullFractionOverride"/>.
+        /// </summary>
+        public ConfigEntry<double> ClimbWindGraceForceMultiplierOverride { get; }
+
         // --- Debug (kept last) --------------------------------------------
         /// <summary>
         /// When on (default), every gameplay setting takes effect the instant
@@ -528,6 +585,92 @@ namespace Fairoots
                     "applies the same regardless of which preset is active.",
                     new AcceptableValueRange<float>(0.1f, 5f)));
 
+            ClimbSheltersFromWind = config.Bind(
+                "Wind",
+                "climb-shelters-from-wind",
+                true,
+                "Whether holding onto something shelters you from wind: while climbing a wall, " +
+                "a rope, a vine or a climb handle, wind can't push you at all - instead " +
+                "climbing gets much slower for as long as the wind is actually blowing on you " +
+                "(see the three climb-*-multiplier settings below). Vanilla only shelters you " +
+                "on a climb handle, so a gust mid-climb normally rips you off the wall, which " +
+                "is why walking into the wind is the only reliable tactic. On by default on " +
+                "every preset EXCEPT Subtle (1), where the mechanic doesn't exist at all - " +
+                "turning this on under Subtle does nothing. If the wind can't reach you " +
+                "anyway - behind a rock, no gust - " +
+                "you climb at full speed, so this never costs you anything when it isn't " +
+                "protecting you. HOST-AUTHORITATIVE: only the host's value counts for the " +
+                "whole lobby. Applies immediately, regardless of apply-changes-live.");
+
+            ClimbWindSpeedMultiplierOverride = config.Bind(
+                "Wind",
+                "climb-speed-multiplier-in-wind",
+                0.90,
+                new ConfigDescription(
+                    "How fast you climb while wind is pushing on you, as a fraction of normal " +
+                    "climbing speed - the price of climb-shelters-from-wind above. E.g. 0.90 " +
+                    "means a tenth slower at full wind pressure; 1.0 means no slowdown " +
+                    "at all (free shelter). Fades in with how hard the wind is actually " +
+                    "blowing, so partial cover means only a partial slowdown. Only takes " +
+                    "effect when preset is set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.05, 1.0)));
+
+            ClimbWindUpwardSpeedMultiplierOverride = config.Bind(
+                "Wind",
+                "climb-upward-speed-multiplier-in-wind",
+                0.85,
+                new ConfigDescription(
+                    "Extra slowdown on climbing UPWARD in wind, multiplied on top of " +
+                    "climb-speed-multiplier-in-wind above (so 0.90 and 0.85 together mean " +
+                    "about three quarters of normal speed climbing up through a full-strength " +
+                    "gust). " +
+                    "Climbing down is never slowed beyond the base multiplier. 1.0 means " +
+                    "upward climbing costs no more than any other direction. Only takes " +
+                    "effect when preset is set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.05, 1.0)));
+
+            ClimbWindIntoWindSpeedMultiplierOverride = config.Bind(
+                "Wind",
+                "climb-into-wind-speed-multiplier",
+                0.85,
+                new ConfigDescription(
+                    "Extra slowdown on climbing INTO the wind (toward where it's blowing " +
+                    "from), multiplied on top of climb-speed-multiplier-in-wind above. " +
+                    "Climbing with the wind is never sped up. 1.0 means direction doesn't " +
+                    "matter. Only takes effect when preset is set to Custom (5) - ignored " +
+                    "under presets 1-4.",
+                    new AcceptableValueRange<double>(0.05, 1.0)));
+
+            ClimbShelterGraceSeconds = config.Bind(
+                "Wind",
+                "climb-shelter-grace-seconds",
+                0.5f,
+                new ConfigDescription(
+                    "How long wind stays much weaker after you let go of a climb - the window " +
+                    "that stops finishing a climb mid-gust from catapulting you, and gives you " +
+                    "time to start sprinting away or re-grab the wall if you let go by " +
+                    "accident. Wind is held at climb-shelter-grace-force-multiplier below for " +
+                    "most of the window, then ramps back to full over the tail of it so it " +
+                    "doesn't end in a sudden shove. Set to 0 to switch the window off entirely " +
+                    "(full wind force the instant you let go, like vanilla). Not tied to any " +
+                    "preset - applies the same regardless of which preset is active, though it " +
+                    "does nothing while the climb shelter itself is off. HOST-AUTHORITATIVE: " +
+                    "only the host's value counts for the whole lobby.",
+                    new AcceptableValueRange<float>(0f, 3f)));
+
+            ClimbWindGraceForceMultiplierOverride = config.Bind(
+                "Wind",
+                "climb-shelter-grace-force-multiplier",
+                0.15,
+                new ConfigDescription(
+                    "How strong wind is during the grace window above, as a fraction of " +
+                    "normal - e.g. 0.15 means 15% force, close to immune but not quite. " +
+                    "Deliberately not 0: full immunity would let you tap a wall over and over " +
+                    "to cross an exposed stretch wind-free, turning the climb shelter into a " +
+                    "movement exploit. 1.0 means no reduction at all. Only takes effect when " +
+                    "preset is set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 1.0)));
+
             // --- Debug section: bound last so it sorts to the bottom of the
             // config file. Everything here is diagnostic or comparison-testing
             // tooling; the two behavior overrides in it (apply-changes-live,
@@ -726,6 +869,34 @@ namespace Fairoots
                 WindFallCameraDampenClampOverride.Value,
                 UseCustomOverrides);
 
+        /// <summary>The effective all-directions climb-speed multiplier while wind is pushing on the climber.</summary>
+        public double ClimbWindSpeedMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.ClimbWindSpeedMultiplier(Preset.Value),
+                ClimbWindSpeedMultiplierOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>The effective extra multiplier on upward climb movement in wind.</summary>
+        public double ClimbWindUpwardSpeedMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.ClimbWindUpwardSpeedMultiplier(Preset.Value),
+                ClimbWindUpwardSpeedMultiplierOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>The effective extra multiplier on climb movement opposing the wind.</summary>
+        public double ClimbWindIntoWindSpeedMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.ClimbWindIntoWindSpeedMultiplier(Preset.Value),
+                ClimbWindIntoWindSpeedMultiplierOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>The effective wind-force multiplier for the let-go grace window.</summary>
+        public double ClimbWindGraceForceMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.ClimbWindGraceForceMultiplier(Preset.Value),
+                ClimbWindGraceForceMultiplierOverride.Value,
+                UseCustomOverrides);
+
         // --- Level-load snapshot (ApplyChangesLive == false) --------------
         // Captured once per Roots level load (RootsLevelWatcher, right before
         // SporeBombCullPatch.Run) so game-facing code has a single, consistent
@@ -746,6 +917,10 @@ namespace Fairoots
         private double _snapWindItemForceMultiplier;
         private double _snapWindObstacleOcclusionRangeMultiplier;
         private double _snapWindFallCameraDampenClamp;
+        private double _snapClimbWindSpeedMultiplier;
+        private double _snapClimbWindUpwardSpeedMultiplier;
+        private double _snapClimbWindIntoWindSpeedMultiplier;
+        private double _snapClimbWindGraceForceMultiplier;
 
         /// <summary>
         /// Freezes every non-Debug resolved setting at its current (live) value.
@@ -767,6 +942,10 @@ namespace Fairoots
             _snapWindItemForceMultiplier = WindItemForceMultiplier;
             _snapWindObstacleOcclusionRangeMultiplier = WindObstacleOcclusionRangeMultiplier;
             _snapWindFallCameraDampenClamp = WindFallCameraDampenClamp;
+            _snapClimbWindSpeedMultiplier = ClimbWindSpeedMultiplier;
+            _snapClimbWindUpwardSpeedMultiplier = ClimbWindUpwardSpeedMultiplier;
+            _snapClimbWindIntoWindSpeedMultiplier = ClimbWindIntoWindSpeedMultiplier;
+            _snapClimbWindGraceForceMultiplier = ClimbWindGraceForceMultiplier;
             _snapshotTaken = true;
         }
 
@@ -855,5 +1034,51 @@ namespace Fairoots
         /// affect anyone but the player it's set for (see class remarks).
         /// </summary>
         public double EffectiveWindFallCameraDampenClamp => UseLiveValue ? WindFallCameraDampenClamp : _snapWindFallCameraDampenClamp;
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="ClimbSheltersFromWind"/>.Value. Host-authoritative - flat
+        /// (not preset/live-snapshot resolved, matching the raw config entry
+        /// itself), but only the host's value counts, same as
+        /// <see cref="EffectiveWindBackpackAlwaysImmune"/>: whether wind can push
+        /// a climber is shared game logic, not local feel.
+        /// </summary>
+        /// <remarks>
+        /// Folds the preset row in: the mechanic is off entirely under Subtle
+        /// (<see cref="PresetCatalog.ClimbToCounterWind"/>), so the player-facing
+        /// toggle can turn it off on top of that but can't turn it on there.
+        /// Deliberately immediate rather than level-load-snapshotted, matching
+        /// the flat toggle it gates.
+        /// </remarks>
+        public bool EffectiveClimbSheltersFromWind =>
+            HostAuthority.Resolve(
+                "ClimbSheltersFromWind",
+                ClimbSheltersFromWind.Value && PresetCatalog.ClimbToCounterWind(Preset.Value));
+
+        /// <summary>Game-facing code should read this instead of <see cref="ClimbWindSpeedMultiplier"/>. Host-authoritative.</summary>
+        public double EffectiveClimbWindSpeedMultiplier =>
+            HostAuthority.Resolve("ClimbWindSpeedMultiplier", UseLiveValue ? ClimbWindSpeedMultiplier : _snapClimbWindSpeedMultiplier);
+
+        /// <summary>Game-facing code should read this instead of <see cref="ClimbWindUpwardSpeedMultiplier"/>. Host-authoritative.</summary>
+        public double EffectiveClimbWindUpwardSpeedMultiplier =>
+            HostAuthority.Resolve("ClimbWindUpwardSpeedMultiplier", UseLiveValue ? ClimbWindUpwardSpeedMultiplier : _snapClimbWindUpwardSpeedMultiplier);
+
+        /// <summary>Game-facing code should read this instead of <see cref="ClimbWindIntoWindSpeedMultiplier"/>. Host-authoritative.</summary>
+        public double EffectiveClimbWindIntoWindSpeedMultiplier =>
+            HostAuthority.Resolve("ClimbWindIntoWindSpeedMultiplier", UseLiveValue ? ClimbWindIntoWindSpeedMultiplier : _snapClimbWindIntoWindSpeedMultiplier);
+
+        /// <summary>Game-facing code should read this instead of <see cref="ClimbWindGraceForceMultiplier"/>. Host-authoritative.</summary>
+        public double EffectiveClimbWindGraceForceMultiplier =>
+            HostAuthority.Resolve("ClimbWindGraceForceMultiplier", UseLiveValue ? ClimbWindGraceForceMultiplier : _snapClimbWindGraceForceMultiplier);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="ClimbShelterGraceSeconds"/>.Value. Host-authoritative -
+        /// flat (not preset/live-snapshot resolved, matching the raw config
+        /// entry), but it decides how much force actually lands on a player, so
+        /// only the host's value counts.
+        /// </summary>
+        public float EffectiveClimbShelterGraceSeconds =>
+            HostAuthority.Resolve("ClimbShelterGraceSeconds", ClimbShelterGraceSeconds.Value);
     }
 }

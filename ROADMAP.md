@@ -208,7 +208,9 @@ once and left alone).
 
 | Mechanic | Preset 1 — Subtle | Preset 2 — Balanced (default) | Preset 3 — Generous | Preset 4 — Tame |
 |---|---|---|---|---|
-| New: climb-to-counter-wind | ✅ on | ✅ on | ✅ on | ✅ on |
+| New: climb-to-counter-wind (full wind immunity while holding on — see below) | ❌ off (too strong for Subtle — vanilla behavior kept) | ✅ on | ✅ on | ✅ on |
+| New: climb-to-counter-wind cost (climb speed while wind is pushing / extra upward / extra into-wind, each faded in by live wind pressure) | — (mechanic off) | ×0.90 / ×0.85 / ×0.85 (playtest-tuned) | ×0.93 / ×0.89 / ×0.89 | ×0.96 / ×0.94 / ×0.94 |
+| New: let-go grace window (wind force just after releasing a climb; window length is a flat 0.5s setting, not preset-gated) | — (mechanic off) | ×0.15 | ×0.12 | ×0.08 |
 | New: cover-mouth vs. spore areas | ✅ on | ✅ on | ✅ on | ✅ on |
 | Wind force / frequency (two independent config entries as of 2026-07-22 — `force-multiplier` and `gust-duration-multiplier` — but the same numbers per preset below, so presets 1-4 behave identically to the original combined row) | −10% | −20% | −40% | −65% |
 | Wind: items/backpack immunity (backpack immunity itself is now player-toggleable via the flat `Wind/backpack-always-immune` setting, added 2026-07-22 — on by default on every preset, as below) | backpack only | backpack + reduced item force | backpack immune, items −60% | backpack + items fully immune |
@@ -272,6 +274,58 @@ you jumped badly," this mod needs to decide whether to dampen it for every
 fall in Roots (simpler) or only fall episodes preceded by a recent wind-force
 application (closer to the original complaint, more implementation
 complexity — see "Open questions" below, not yet decided).
+
+**Climb to shelter from wind** (implemented 2026-07-27; supersedes the earlier
+"this already exists natively, nothing to build" reading). The complaint it
+answers: climbing is *supposed* to be the counter to wind, but in practice
+walking into the gust and hoping your stamina holds is the better tactic,
+because a gust that catches you mid-climb ragdolls you off the wall and the
+uncontrolled fall that follows is worse than anything the wind does to you on
+foot. Vanilla only exempts climb *handles* from wind force, not the ordinary
+grab-the-wall climbing players spend Roots doing (nor ropes or vines).
+
+The mechanic makes holding onto anything — wall, rope, vine, handle — grant
+**full** immunity from wind force rather than a reduced chance of being
+shoved: a coin flip on being launched isn't counterplay, it's a reason not to
+climb. The balance cost is paid in speed instead: while the wind is actually
+pushing on you, climbing is much slower in every direction, slower still
+climbing upward, and slower still climbing toward where the wind is blowing
+from. Since the game charges climbing stamina per second rather than per
+metre, a slower climb is automatically a more expensive one — no separate
+stamina dial needed (and vanilla already raises `climbingStamMinimumMultiplier`
+during wind on top of that).
+
+The cost is gated on **live wind pressure**, computed from the same terms the
+native force formula uses (light-volume exposure, intensity curve, the
+obstacle-occlusion raycast, the gust's ramp-in). A player the wind couldn't
+have reached anyway — behind a rock, between gusts — is at pressure 0 and
+climbs at exactly vanilla speed. The slowdown only ever applies in the moments
+it's actually buying something, so the mechanic can never be a stealth nerf to
+climbing in general.
+
+**The let-go grace window** (added 2026-07-27 after the first playtest) closes
+the mechanic's remaining hole: finishing a climb was still the worst moment in
+a gust. The game's own release path (`CharacterClimbing.StopClimbingRpc`) hands
+the player back to physics already flagged airborne — it sets `sinceGrounded`
+to a fake fall time — so full wind force lands at the exact instant they have
+the least control, stacking onto whatever momentum the climb left them with,
+which is frequently lethal and just as lethal when the release was an accident.
+For a short window after letting go (0.5s by default) wind force is scaled to a
+fraction of normal — enough time to start sprinting out of it or re-grab the
+wall. It's deliberately *not* full immunity: a player could otherwise wall-tap
+their way across an exposed stretch wind-free, turning the shelter into a
+movement exploit. The window holds at the reduced strength for its first 60%
+and then ramps back to full, so it doesn't end in a cliff — a snap from
+near-immune to full force would be its own unexplained shove.
+
+Two tuning decisions came out of the first playtest (2026-07-27). **Subtle
+turns the mechanic off entirely** — that preset exists to leave vanilla
+mechanics alone, and handing out outright wind immunity is the least subtle
+thing in the mod. And **the cost is much lighter than first estimated**
+(Balanced ×0.90/×0.85/×0.85, down from ×0.55/×0.60/×0.60): the immunity itself
+is the real prize, so a heavy slowdown just made waiting the gust out strictly
+better than climbing through it — which is the exact failure mode the mechanic
+exists to remove.
 
 ## Mechanic notes (implementation feasibility, from `RESEARCH.md`)
 
@@ -480,11 +534,16 @@ other PEAK mods already use.
 5. **Phase 5 (done, fog scaling reverted):** Wind — force/frequency scaling,
    backpack/item immunity, obstacle occlusion tuning, and the wind-induced-
    fall camera spin dampening (scoped to wind-preceded falls only, per the
-   maintainer's decision below). The climb-to-counter-wind mechanic turned
-   out to already exist natively (`WindChillZone.AddWindForceToCharacter`
-   already fully suppresses wind force while actively gripping a climb
-   handle) — tune-not-build, no patch needed; see `CODEBASE.md`'s `Wind/`
-   section. **Fog-while-active density scaling was implemented and reverted
+   maintainer's decision below). The climb-to-counter-wind mechanic **is
+   implemented (2026-07-27), correcting an earlier misreading** that it
+   already existed natively: `WindChillZone.AddWindForceToCharacter`'s early
+   return only covers `currentClimbHandle != null` — hanging off a climb
+   *handle* prop — while ordinary wall climbing (`CharacterData.isClimbing`),
+   rope climbing and vine climbing all take full wind force in vanilla, and
+   a shove mid-climb drops the climb outright (`CharacterClimbing.Update`
+   lets go below 0.25 ragdoll control). See "Climb to shelter from wind"
+   below and `CODEBASE.md`'s `Wind/` section.
+   **Fog-while-active density scaling was implemented and reverted
    as a precaution (2026-07-22):** scaling `FogConfig.windFogDensity`/
    `WindFogTextureDensity` relies on decompiled-C#-only assumptions about
    what those shader globals actually mean, with no way to verify against

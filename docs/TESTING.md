@@ -73,6 +73,30 @@ Two layers, per ROADMAP.md's testing strategy:
      disabled clamp, is always left at vanilla's value; a wind-preceded fall
      within the configured window raises the floor but never lowers an
      already-higher vanilla result (e.g. the carrier/passed-out branches).
+   - **Climb-to-shelter-from-wind cost** (`ClimbWindResistanceTests`): zero
+     wind pressure (sheltered behind a rock, or no gust) leaves climb speed
+     *exactly* untouched no matter how harsh the multipliers are — the
+     mechanic can never be a stealth nerf to climbing in general; the
+     slowdown fades in proportionally with pressure and is monotonic in it;
+     climbing upward is slower than climbing down, climbing into the wind is
+     slower than climbing with it, and climbing with the wind is never
+     *faster* than vanilla (a cost, not a sail); the into-wind penalty scales
+     with how much of the wind actually lies along the axis being moved
+     along; out-of-range pressures clamp instead of extrapolating and a
+     negative multiplier can never reverse a movement's direction; every
+     preset (including Custom) slows climbing without ever freezing a climber
+     in place, and Tame charges less for the shelter than Balanced, while Subtle
+     turns the mechanic off entirely, matching
+     every other preset row's direction; and the pressure-freshness window
+     (how "the gust ended" is detected, since nothing fires an event for it)
+     accepts a reading from a reset clock rather than reporting a live gust
+     as calm. Also the **let-go grace window** (`GraceForceMultiplier`):
+     wind is at its weakest the instant a climb is released and back to full
+     strength once the window elapses, never weaker again in between
+     (monotonic), never *zero* (full immunity would make wall-tapping across
+     exposed ground a free crossing), never above 1 (it's a reduction, not an
+     amplifier), and it ramps rather than ending in a cliff; a zero-length
+     window disables the feature outright.
 2. **Manual in-game loop** (this doc) — for anything only observable at
    runtime (feel, visual clutter, screen shake, actual spawn positions in a
    real level).
@@ -437,6 +461,64 @@ fog/visibility looked unchanged from vanilla throughout.
 whether a non-wind fall was completely unaffected, and whether 0.35 is a good
 default or needs adjusting (the maintainer's own framing: strong enough to
 let you react, not so strong it removes all sense of falling).
+
+### Climb to shelter from wind
+
+**Pre-req:** debug logging on, in a Roots run, defaults
+(`climb-shelters-from-wind = true`, Balanced → ×0.90 base / ×0.85 upward /
+×0.85 into-wind). Find a climbable wall inside the wind zone with clear
+exposure (no rock between you and the gust). Note the mechanic is **off
+entirely on Subtle** — test on Balanced or later.
+
+1. Grab the wall and hold on through a full gust. You should **not** be pushed
+   off at all — no ragdoll, no losing the wall — where before the gust would
+   typically rip you off. The log should show
+   `[ClimbWindShelter] climbing wind pressure engaged (...)` once per gust
+   (and `released` when it passes), not per frame.
+2. During that same gust, climb **upward**: it should feel dramatically
+   slower, and (because the game charges climbing stamina per second) burn
+   noticeably more stamina for the same height than the same climb between
+   gusts. Then traverse sideways *into* the wind vs. *with* it — into should
+   be clearly slower.
+3. Climb **down** during a gust — slowed by the base multiplier only, not the
+   extra upward penalty; it shouldn't feel like the wall is holding you up.
+4. Climb the same wall with **no gust active**, and again while behind a rock
+   / under cover mid-gust: both should feel exactly like vanilla climbing.
+   This is the important one — the slowdown must only exist in the moments
+   it's actually buying you immunity.
+5. Repeat step 1 on a rope and (if you can find one) a vine — same immunity,
+   same flat slowdown while pulling yourself up.
+6. Let go mid-gust and fall: the wind-preceded-fall camera dampening should
+   *not* kick in (you were sheltered, so nothing pushed you), while getting
+   blown off on foot still triggers it as before.
+7. **The let-go grace window.** Climb a wall mid-gust, then deliberately let
+   go while the wind is still blowing. You should get a noticeable moment
+   (~0.5s) of much weaker wind — enough to start sprinting away from the
+   ledge or re-grab the wall — instead of the vanilla catapult, and the wind
+   should come back smoothly rather than snapping to full. The log shows
+   `[ClimbWindShelter] let-go grace window started/ended`. Then check it
+   can't be abused: repeatedly tap-grab and release a wall while trying to
+   cross an exposed stretch — the wind should still clearly push you the
+   whole way (reduced, never absent), so this isn't a free crossing.
+   `climb-shelter-grace-seconds = 0` should restore the vanilla catapult
+   exactly.
+8. Set `climb-shelters-from-wind = false` and repeat step 1 — vanilla
+   behavior should return immediately (pushed off the wall, no slowdown),
+   without a level reload.
+9. Switch to the `Subtle` preset and repeat step 1 — the mechanic is off there
+   regardless of `climb-shelters-from-wind`, so the gust should rip you off
+   the wall exactly like vanilla. Turning the toggle back on under Subtle must
+   change nothing.
+
+**Report back:** whether full immunity feels right or too strong, whether the
+0.5s / ×0.15 grace window is enough to survive finishing a climb (and not so
+generous that wall-tapping trivialises exposed ground), and whether
+Balanced's ×0.90/×0.85/×0.85 is enough of a cost — the intent is "holding on
+is always the safe option, but it costs you real time and stamina," so it's
+wrong if either climbing through a gust still feels free, or the climb is so
+slow that waiting the gust out is strictly better (the first playtest's
+verdict on the original ×0.55/×0.60/×0.60: too slow, exactly that failure
+mode).
 
 ### Host authority (multiplayer — needs a second player/PC, can't be verified solo)
 

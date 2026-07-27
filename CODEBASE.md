@@ -298,6 +298,15 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       separate, which would defeat the feature. Adopting the hue outright puts
       real blue in the result, and blue is the channel red-green colorblindness
       leaves intact.
+    - `ClimbWindResistance.cs` — the pure cost model behind the
+      climb-to-shelter-from-wind mechanic (`Wind/ClimbWindShelterPatch.cs`
+      above): scales a climb step, decomposed onto the climbed surface's own
+      plane, by a base multiplier plus extra penalties for climbing upward and
+      for climbing into the wind — each faded in by live wind pressure, so a
+      climber the wind can't reach pays nothing. Also owns the
+      pressure-freshness rule and the let-go grace window's force curve
+      (`GraceForceMultiplier` — hold, then ramp back to full, never zero).
+      Not seed-gated, same as `WindTuning`.
     - `Presets/PresetId.cs` — the preset enum: 1-4 are the fixed presets
       (Balanced is default), 5 is Custom (ignores the catalog and uses the
       player's own config directly).
@@ -386,13 +395,47 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
     RESEARCH.md Q6 traced as the source of the "0 the instant any fall
     starts" camera-spin mechanism), raising its floor only when the fall is
     within the configured recency window of a real wind-force application.
-  - **Note (runtime-confirmed, no patch needed):** the ROADMAP "climb to
-    counter wind" mechanic already exists natively —
-    `WindChillZone.AddWindForceToCharacter` returns immediately whenever
-    `character.data.currentClimbHandle != null` (actively gripping a climb
-    handle), and `ApplyStatus` already raises climbing stamina cost during
-    wind regardless. See `Core/Presets/PresetCatalog.cs`'s
-    `ClimbToCounterWind` remarks.
+  - `ClimbWindShelterPatch.cs` — the climb-to-shelter-from-wind mechanic
+    (ROADMAP.md's "New: climb-to-counter-wind" row). **Corrects an earlier
+    claim in this file that the mechanic already existed natively and needed
+    no patch:** `WindChillZone.AddWindForceToCharacter`'s early return only
+    covers `currentClimbHandle != null` (hanging off a climb *handle* prop),
+    not `CharacterData.isClimbing` (ordinary wall climbing), rope climbing or
+    vine climbing — all of which take full wind force in vanilla, and being
+    shoved mid-climb drops the climb entirely (`CharacterClimbing.Update`
+    lets go below 0.25 ragdoll control). Four patches:
+    `ClimbWindShelterPatch` (prefix on `AddWindForceToCharacter`) suppresses
+    the push outright while the player holds onto anything and records how
+    hard it *would* have pushed as a 0-1 "pressure";
+    `ClimbWindWallSlowdownPatch` (postfix on
+    `CharacterClimbing.GetRequestedPostition` — the game's own misspelling)
+    charges for that immunity by scaling the climb step, split onto the
+    climbed surface's plane so upward and into-the-wind movement can cost
+    more than the rest; `ClimbWindRopeSlowdownPatch`/`ClimbWindVineSlowdownPatch`
+    do the same flatly for rope/vine climbing by *temporarily* scaling
+    `climbSpeedMod` around the native method and restoring it after (never
+    writing a computed value into it — the game's own climbing-speed
+    affliction adjusts that field additively and a write would clobber it).
+    The same prefix also runs the **let-go grace window**: for a short window
+    after the local player releases a climb (flat
+    `Wind/climb-shelter-grace-seconds`, 0.5s), the original method *does* run
+    but with `windForce` temporarily scaled down around it and restored in the
+    postfix — never written with a computed value, since
+    `WindChillZoneTuningPatch` owns that field's real value. Fixes the
+    catapult on finishing a climb mid-gust (the game's own
+    `StopClimbingRpc` sets `sinceGrounded` to a fake fall time, so full wind
+    force lands the instant the player has least control). Reduced, not
+    immune, so wall-tapping can't be used to cross exposed ground for free.
+    Preset-gated as of 2026-07-27: **off entirely on Subtle** (folded into
+    `EffectiveClimbSheltersFromWind`, so the player-facing
+    `Wind/climb-shelters-from-wind` toggle can switch it off elsewhere but
+    can't switch it on under Subtle).
+    Pressure is recorded for the local character only and expires after
+    `ClimbWindResistance.PressureFreshnessSeconds`; a stale reading is what
+    "the gust ended" looks like, since nothing fires an event for it. All the
+    arithmetic is in `Core/ClimbWindResistance.cs`. `WindRecentForceTrackerPatch`
+    also re-checks the shelter, so a fall right after letting go of a wall
+    isn't misattributed to wind.
 - `tests/Fairoots.Tests/` — xUnit project. Links `src/Fairoots/Core/**/*.cs`
   directly (no game/BepInEx dependency, runs anywhere). One test file per Core
   area; see `docs/TESTING.md` for what each covers.
