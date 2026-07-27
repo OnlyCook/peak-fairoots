@@ -668,6 +668,18 @@ is currently the only feedback that it engaged.
 10. Spore *bombs* should still hit you normally while covering (a setting to
     include their temporary mini areas is planned, not built).
 
+11. **The pose.** Both hands should come up over your mouth with a real
+    hand/finger shape, and *only* the arms should change — walk, jump and look
+    around while covering: legs and head must animate completely normally, and
+    releasing the key must snap straight back with nothing lingering.
+12. Restart the game and check the pose looks the same as it did last session
+    (it used to bake in whatever idle animation was playing at the first cover),
+    and that neither hand drops out while holding an item or wearing cosmetics.
+13. For tuning, set `Debug/cover-mouth-pose-preview = true` to hold the pose on
+    permanently — it's visual only, so the mechanic still behaves normally
+    while it's on. The seven `cover-mouth-pose-*` values apply live, except the
+    clip and its frame, which force a re-capture when changed.
+
 **Report back:** whether 0.03 stamina/second feels like the intended "small
 amount," and whether the immunity feels worth the hands-busy cost.
 

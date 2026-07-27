@@ -462,6 +462,51 @@ namespace Fairoots
         /// <summary>Draw a 3D wireframe (red) over every nearby kept spore bomb's current trigger hitbox. Off by default.</summary>
         public ConfigEntry<bool> ShowSporeBombTriggerRadius { get; }
 
+        // --- Cover-mouth pose tuning (Debug) ------------------------------
+        // Six knobs for one pose, which needs justifying: the pose is pure
+        // visuals, so the only way to judge it is to look at it, and every
+        // value here (which clip, which frame of it, where the hands sit) is
+        // Unity *asset*-dependent - none of it can be derived from the
+        // decompiled code or checked by a test. Live knobs turn "rebuild,
+        // relaunch, load a run, look" into "drag a slider," which is why they
+        // live in Debug rather than being hardcoded constants. Expect them to
+        // collapse into constants once the pose is locked in.
+
+        /// <summary>
+        /// Holds the cover-mouth pose on permanently so it can be tuned without keeping
+        /// a key held. <b>Visual only</b> - no immunity, no stamina drain, no hands-busy
+        /// restrictions, and nothing is published to other players; the mechanic itself
+        /// is untouched. Local player only.
+        /// </summary>
+        public ConfigEntry<bool> CoverMouthPosePreview { get; }
+
+        /// <summary>Animator state to freeze as the cover-mouth pose. Empty = auto-detect the "it's so over" emote.</summary>
+        public ConfigEntry<string> CoverMouthPoseEmote { get; }
+
+        /// <summary>Normalised time (0-1) within the pose clip to freeze on.</summary>
+        public ConfigEntry<float> CoverMouthPoseEmoteTime { get; }
+
+        /// <summary>How far in front of the head the hands sit, in centimetres.</summary>
+        public ConfigEntry<float> CoverMouthPoseForwardCm { get; }
+
+        /// <summary>How far below the head (mouth height) the hands sit, in centimetres.</summary>
+        public ConfigEntry<float> CoverMouthPoseBelowHeadCm { get; }
+
+        /// <summary>Vertical gap between the two stacked hands, in centimetres.</summary>
+        public ConfigEntry<float> CoverMouthPoseHandGapCm { get; }
+
+        /// <summary>Sideways offset of each hand from the centre line, in centimetres.</summary>
+        public ConfigEntry<float> CoverMouthPoseSideCm { get; }
+
+        /// <summary>Extra hand turn about the body's vertical axis, in degrees, mirrored per hand (thumbs out vs. thumbs to the face).</summary>
+        public ConfigEntry<float> CoverMouthPoseHandYawDeg { get; }
+
+        /// <summary>Extra hand tilt about the body's forward axis, in degrees, mirrored per hand.</summary>
+        public ConfigEntry<float> CoverMouthPoseHandRollDeg { get; }
+
+        /// <summary>Extra hand pitch about the body's sideways axis, in degrees (not mirrored - both hands pitch the same way).</summary>
+        public ConfigEntry<float> CoverMouthPoseHandPitchDeg { get; }
+
         /// <summary>
         /// For before/after comparison screenshots: when on, spore-bomb trigger
         /// hitboxes are left at vanilla size instead of being shrunk, and the
@@ -978,6 +1023,111 @@ namespace Fairoots
                 "configured radius multiplier is applied) for spore bombs within 10m - useful " +
                 "for eyeballing how much the trigger box was actually shrunk against the real " +
                 "prefab. Off by default.");
+
+            CoverMouthPosePreview = config.Bind(
+                "Debug",
+                "cover-mouth-pose-preview",
+                false,
+                "Holds the cover-your-mouth pose on permanently so you can tune the pose settings " +
+                "below without having to keep the key held down while you edit them. This is " +
+                "PURELY VISUAL: it doesn't make you immune to spores, doesn't drain stamina, " +
+                "doesn't tie up your hands, and other players don't see it - the mechanic itself " +
+                "behaves exactly as normal while this is on. Off by default.");
+
+            CoverMouthPoseEmote = config.Bind(
+                "Debug",
+                "cover-mouth-pose-emote",
+                string.Empty,
+                "Which animation the cover-your-mouth pose borrows its hand and finger shape " +
+                "from. Leave empty to auto-pick the \"it's so over\" emote, which is what the " +
+                "pose is designed around. With debug logging on, every available emote is listed " +
+                "in the log the first time you cover your mouth, so you can copy an exact name " +
+                "from there if you'd rather use a different one. Pose-tuning knob.");
+
+            CoverMouthPoseEmoteTime = config.Bind(
+                "Debug",
+                "cover-mouth-pose-emote-time",
+                0.6f,
+                new ConfigDescription(
+                    "Which moment of the pose animation to hold, from 0 (its first frame) to 1 " +
+                    "(its last). The pose is frozen on a single frame rather than played, so this " +
+                    "picks which one. Pose-tuning knob.",
+                    new AcceptableValueRange<float>(0f, 1f)));
+
+            CoverMouthPoseForwardCm = config.Bind(
+                "Debug",
+                "cover-mouth-pose-forward-cm",
+                80f,
+                new ConfigDescription(
+                    "How far in front of the face your hands are held while covering your mouth, " +
+                    "in centimetres. Default is the maintainer's own playtest-tuned value. " +
+                    "Pose-tuning knob.",
+                    new AcceptableValueRange<float>(0f, 80f)));
+
+            CoverMouthPoseBelowHeadCm = config.Bind(
+                "Debug",
+                "cover-mouth-pose-below-head-cm",
+                0f,
+                new ConfigDescription(
+                    "How far below eye level your hands are held while covering your mouth, in " +
+                    "centimetres - i.e. mouth height. Pose-tuning knob.",
+                    new AcceptableValueRange<float>(-20f, 40f)));
+
+            CoverMouthPoseHandGapCm = config.Bind(
+                "Debug",
+                "cover-mouth-pose-hand-gap-cm",
+                7f,
+                new ConfigDescription(
+                    "Vertical gap between your two hands while covering your mouth, in " +
+                    "centimetres - they're stacked one above the other so they don't intersect. " +
+                    "Default is the maintainer's own playtest-tuned value. Pose-tuning knob.",
+                    new AcceptableValueRange<float>(0f, 40f)));
+
+            CoverMouthPoseSideCm = config.Bind(
+                "Debug",
+                "cover-mouth-pose-side-cm",
+                13f,
+                new ConfigDescription(
+                    "How far to each side of centre your hands sit while covering your mouth, in " +
+                    "centimetres. Near 0 means both hands are on the centre line, which is what " +
+                    "makes the pose read as covering your mouth rather than gesturing. " +
+                    "Pose-tuning knob.",
+                    new AcceptableValueRange<float>(0f, 25f)));
+
+            CoverMouthPoseHandYawDeg = config.Bind(
+                "Debug",
+                "cover-mouth-pose-hand-yaw-deg",
+                0f,
+                new ConfigDescription(
+                    "Turns both hands outward (or inward) while covering your mouth, in degrees - " +
+                    "this is the one that decides where your thumbs point. 0 leaves the hands as " +
+                    "the borrowed animation has them, which is palm-to-palm like praying; turning " +
+                    "them opens the palms toward your face so the thumbs point away from it. " +
+                    "Mirrored, so the two hands always stay symmetric. The sign is what decides " +
+                    "which side of your hands faces you: negative turns the palms toward your " +
+                    "face (correct for covering your mouth), positive turns them away. " +
+                    "Pose-tuning knob.",
+                    new AcceptableValueRange<float>(-180f, 180f)));
+
+            CoverMouthPoseHandRollDeg = config.Bind(
+                "Debug",
+                "cover-mouth-pose-hand-roll-deg",
+                10f,
+                new ConfigDescription(
+                    "Tips both hands so the thumbs ride higher or lower while covering your mouth, " +
+                    "in degrees - use it with cover-mouth-pose-hand-yaw-deg to aim the thumbs " +
+                    "up-and-out rather than straight out. Mirrored between the two hands; negate " +
+                    "it if the thumbs end up pointing down instead of up. Pose-tuning knob.",
+                    new AcceptableValueRange<float>(-180f, 180f)));
+
+            CoverMouthPoseHandPitchDeg = config.Bind(
+                "Debug",
+                "cover-mouth-pose-hand-pitch-deg",
+                -10f,
+                new ConfigDescription(
+                    "Tilts both hands' fingers up or down while covering your mouth, in degrees. " +
+                    "Not mirrored - both hands tilt the same way. Pose-tuning knob.",
+                    new AcceptableValueRange<float>(-180f, 180f)));
 
             KeepVanillaTriggerRadius = config.Bind(
                 "Debug",

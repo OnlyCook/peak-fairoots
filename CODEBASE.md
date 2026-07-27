@@ -309,6 +309,26 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       vanilla's own re-entry path (`timeSinceLastTick = -extraWarningTime`, a fresh
       1.5s grace every time the emitter thinks you re-entered), and the first fix
       for it failed on a one-frame ordering detail also documented there.
+    - `CoverMouthPosePatch.cs` — the visible half: both hands over the mouth, on
+      every client. Three systems, each doing the part it can: **hand/finger
+      shape** is captured from an existing emote clip (finger curl is
+      unreachable from a Harmony mod — it's animation data, and arm IK solves
+      only three bones); **the clip is never left playing**, its wrist/finger
+      rotations are captured once and re-applied per frame, so the emote's legs
+      and head motion never happen and there's no animation state to reset; and
+      **arm IK** places the hands via `HandleIK` (weights) / `ConfigureIK`
+      (targets). Neither method is gated to the local character, so remote
+      players' poses come free off the replicated player property — no animation
+      networking. Three findings worth not rediscovering, all documented at
+      their fields: the clip is `A_Scout_Emote_Defeat` (the emote *labelled*
+      "it's so over" — the wheel shows `LocalizedText.GetText(key)`, so keys
+      don't resemble labels, and only the `PlayEmote` probe could resolve it);
+      the wrist must be stored **body-relative and applied via the IK target**,
+      not stored forearm-relative and written to the bone (that flips the hands
+      and starts a solver-feedback oscillation — "twitching"); and the capture
+      must be **synchronous with other layers muted** (`Animator.Update(0)`),
+      or it silently captures the clip blended with the session's idle state and
+      the six other weight-1 layers, making the pose differ per session.
     - `CoverMouthRestrictionPatches.cs` — what covering costs besides stamina: no
       interaction (`Interaction.canInteract`, the single gate every interaction
       passes through — which is also how rope/vine/climb-handle grabs are covered,

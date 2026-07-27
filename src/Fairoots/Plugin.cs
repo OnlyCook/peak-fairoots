@@ -103,6 +103,15 @@ namespace Fairoots
             Cfg.SporeAreaRadiusMultiplierOverride.SettingChanged += reapplySporeAreaTuning;
             Cfg.SporeAreaStatusRateMultiplierOverride.SettingChanged += reapplySporeAreaTuning;
 
+            // The pose's clip choice is cached after its first lookup (it logs the
+            // whole emote list, so it shouldn't re-run every frame) - drop that cache
+            // when the setting changes so a new clip name applies without a restart.
+            // Both of these are baked into the captured pose rather than read per frame
+            // (the capture freezes one frame of one clip), so changing either has to
+            // force a re-capture or it would look like the setting did nothing.
+            Cfg.CoverMouthPoseEmote.SettingChanged += (s, e) => CoverMouthPose.InvalidateEmote();
+            Cfg.CoverMouthPoseEmoteTime.SettingChanged += (s, e) => CoverMouthPose.InvalidateEmote();
+
             // Cosmetic, client-side, and always immediate (see its remarks in
             // PluginConfig) - a scene-wide repaint in both directions, so
             // turning it off restores the vanilla green right away rather than

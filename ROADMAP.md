@@ -534,7 +534,28 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   of safety. Progress toward the next spore tick is now *paused* by covering and
   resumed on release, never reset: spores accrue in proportion to uncovered time
   and stamina in proportion to covered time, so you pay for what you get. Leaving
-  the area is still a genuine reset. Live-verified: 66 releases, 66 resumes, with
+  the area is still a genuine reset.
+
+  **The pose (implemented 2026-07-27).** Both hands come up over the mouth, for
+  the covering player and everyone else in the lobby. Hand and finger shape is
+  borrowed from the emote the game labels "it's so over", captured once and
+  re-applied per frame rather than played — so the emote's legs and head motion
+  never happen (the maintainer's requirement) and there is no animation state
+  left to reset. Arm placement is the game's own two-bone arm IK. Remote players
+  see it for free: the pose patches aren't gated to the local character, so the
+  one replicated bool per player is all the "animation networking" there is.
+  `Debug/cover-mouth-pose-preview` holds the pose on permanently for tuning
+  (purely visual — no immunity, no stamina, no restrictions), and the seven pose
+  offsets under `Debug` are playtest-tuned defaults rather than estimates.
+
+  **Known limitation:** the pose still shifts slightly depending on which idle
+  animation the character is in. The gross session-to-session variance is fixed
+  (the capture is synchronous with the other animator layers muted, so it no
+  longer bakes in whatever else was playing), but the *live* pose is placed
+  relative to the head and solved from a shoulder that idle animations keep
+  moving, so some drift is inherent to the IK approach. Accepted as good enough
+  for now; a rework would have to anchor the hands to something steadier than
+  the animated head. Live-verified: 66 releases, 66 resumes, with
   ticks landing throughout.
 - **Creatures**: zombies currently have **no distance-based deaggro at
   all** once they've targeted a player (confirmed absent in code, not just
