@@ -41,8 +41,11 @@ namespace Fairoots
     /// never diverge from the host's. Purely local per-player feel settings -
     /// <see cref="EffectiveWindFallCameraDampenClamp"/>,
     /// <see cref="WindRecentForceWindowSeconds"/>,
-    /// <see cref="RecolorSporeBombs"/> (purely cosmetic - see its own remarks),
-    /// and everything in <c>Debug</c> - are deliberately excluded, since they
+    /// <see cref="RecolorSporeBombs"/>, <see cref="SporeAreaCloudOpacity"/>,
+    /// <see cref="SporeBombCloudOpacity"/> and
+    /// <see cref="ShowOverlayInSporeBombClouds"/> and
+    /// <see cref="ShowSporeCloudLabel"/> (all five purely cosmetic - see
+    /// their own remarks), and everything in <c>Debug</c> - are deliberately excluded, since they
     /// don't affect anyone but the player who set them.
     /// </summary>
     public class PluginConfig
@@ -71,6 +74,74 @@ namespace Fairoots
         /// waiting for a level reload would just be confusing).
         /// </summary>
         public ConfigEntry<bool> RecolorSporeBombs { get; }
+
+        /// <summary>
+        /// How opaque the persistent spore areas' cloud VFX is drawn, as a fraction
+        /// of what the artist authored (1.0 = vanilla). See
+        /// <see cref="Core.SporeCloudOpacity"/> for why a *readability* setting
+        /// belongs here at all and <c>SporeAreas/SporeCloudOpacityPatch</c> for how
+        /// it's applied.
+        ///
+        /// <b>Client-side and cosmetic</b>, the same category as
+        /// <see cref="RecolorSporeBombs"/> - it changes nothing about where the
+        /// hazard is or what it does (that's
+        /// <see cref="SporeAreaRadiusMultiplierOverride"/>'s and
+        /// <see cref="SporeAreaStatusRateMultiplierOverride"/>'s business), only how
+        /// densely one player's own screen draws it. So: no <c>Effective*</c>
+        /// accessor, no host lookup, no level-load snapshot, and it always applies
+        /// immediately regardless of <see cref="ApplyChangesLive"/>.
+        /// </summary>
+        public ConfigEntry<double> SporeAreaCloudOpacity { get; }
+
+        /// <summary>
+        /// The same translucency dial as <see cref="SporeAreaCloudOpacity"/>, for the
+        /// temporary cloud a detonating spore bomb leaves behind. Split into its own
+        /// setting because the two hazards read very differently on screen - a bomb's
+        /// cloud is a brief burst right on top of the player, a spore area is a
+        /// permanent landmark seen from a distance - so the density that makes one
+        /// readable isn't automatically right for the other. Applied by
+        /// <see cref="SporeBombs.SporeBombCloudOpacity"/>; client-side and cosmetic
+        /// on the same terms as the spore-area one.
+        /// </summary>
+        public ConfigEntry<double> SporeBombCloudOpacity { get; }
+
+        /// <summary>
+        /// Whether the game's own "you are standing in spores" screen overlay is held
+        /// up for as long as the local player is inside a spore bomb's cloud, the way
+        /// it already is inside a persistent spore area.
+        ///
+        /// <b>This is a gap in the vanilla feedback, not a new effect.</b> The game
+        /// has exactly one such warning (<c>GUIManager.sporesWarning</c>), but only
+        /// <c>StatusEmitter</c> raises it - and a spore bomb's cloud isn't a
+        /// <c>StatusEmitter</c>, it's a repeating <c>AOE</c> (see
+        /// <see cref="SporeBombs.SporeBombDetonationMarker"/>). So standing in a
+        /// bomb's cloud gives only the per-tick damage flash every couple of seconds,
+        /// with nothing in between saying you're still in it. This raises the same
+        /// warning the same way for the same reason; the per-tick flash is a separate
+        /// overlay layer and is left exactly as the game plays it, so it still reads
+        /// as a spike on top.
+        ///
+        /// Client-side and cosmetic, on the same terms as
+        /// <see cref="SporeAreaCloudOpacity"/> - it shows the player something that
+        /// was already true rather than changing it, and only on their own screen.
+        /// </summary>
+        public ConfigEntry<bool> ShowOverlayInSporeBombClouds { get; }
+
+        /// <summary>
+        /// Whether an on-screen text warning is shown while the local player is
+        /// standing in spores - either hazard, see <see cref="SporePresence"/>.
+        /// Applied by <see cref="Ui.SporeWarningLabel"/>.
+        ///
+        /// <b>Off by default, unlike the rest of this group.</b> The other
+        /// readability settings make the game's <em>own</em> feedback legible - they
+        /// thin a cloud the game already drew, or raise a warning the game already
+        /// owns. This one adds a HUD element PEAK never had, which is a much louder
+        /// intervention and a matter of taste rather than of fairness, so it's opt-in.
+        ///
+        /// Client-side and cosmetic on the same terms as
+        /// <see cref="SporeAreaCloudOpacity"/>.
+        /// </summary>
+        public ConfigEntry<bool> ShowSporeCloudLabel { get; }
 
         // --- Spore-Bombs ---------------------------------------------------
         /// <summary>
@@ -581,6 +652,62 @@ namespace Fairoots
                 "what you see on your own screen, so set it however you like regardless of what " +
                 "the host or anyone else in the lobby has. Applies immediately, regardless of " +
                 "apply-changes-live.");
+
+            SporeAreaCloudOpacity = config.Bind(
+                "General",
+                "spore-area-cloud-opacity",
+                0.35,
+                new ConfigDescription(
+                    "How opaque the mushroom spore clouds are drawn, as a fraction of vanilla " +
+                    "(1.0 = untouched, 0 = fully invisible). Lower makes them see-through, so the " +
+                    "game's own green Spores screen overlay is readable through them - in vanilla " +
+                    "the cloud and the overlay are the same colour and blend together, so it's " +
+                    "hard to tell whether you're actually inside one and taking spores or just " +
+                    "standing next to it. The cloud stays visible enough to spot and walk around; " +
+                    "the hazard itself (its size and how fast it applies spores) is NOT changed - " +
+                    "that's what the Spore-Areas settings are for. Purely cosmetic and PER-PLAYER: " +
+                    "not host-authoritative, set it however you like. Applies immediately, " +
+                    "regardless of apply-changes-live.",
+                    new AcceptableValueRange<double>(0.0, 1.0)));
+
+            SporeBombCloudOpacity = config.Bind(
+                "General",
+                "spore-bomb-cloud-opacity",
+                0.5,
+                new ConfigDescription(
+                    "The same see-through-cloud setting as spore-area-cloud-opacity, but for the " +
+                    "temporary spore cloud a spore bomb leaves when it goes off (1.0 = vanilla, " +
+                    "0 = fully invisible). Separate from the spore-area one because a bomb's cloud " +
+                    "erupts right on top of you while a spore area is a landmark seen from a " +
+                    "distance. Cosmetic only - the blast, the knockback and the spores it applies " +
+                    "are unchanged. Purely cosmetic and PER-PLAYER: not host-authoritative. " +
+                    "Applies immediately, regardless of apply-changes-live.",
+                    new AcceptableValueRange<double>(0.0, 1.0)));
+
+            ShowOverlayInSporeBombClouds = config.Bind(
+                "General",
+                "show-overlay-in-spore-bomb-clouds",
+                true,
+                "Keeps the game's green 'you're standing in spores' screen overlay up for as " +
+                "long as you're inside the cloud a spore bomb leaves behind - the same way it " +
+                "already stays up inside a mushroom spore cloud. In vanilla a bomb's cloud only " +
+                "gives you the brief flash each time it damages you, with nothing in between " +
+                "telling you you're still standing in it. The damage flash is untouched, so it " +
+                "still stands out on top of the steady overlay. Purely a readability fix and " +
+                "PER-PLAYER: not host-authoritative, and it changes nothing about the cloud " +
+                "itself. Applies immediately, regardless of apply-changes-live.");
+
+            ShowSporeCloudLabel = config.Bind(
+                "General",
+                "show-spore-cloud-label",
+                false,
+                "Shows a text warning on screen, in the game's own font and in the Spores " +
+                "status colour, whenever you're standing in spores - both the mushroom spore " +
+                "clouds and the cloud a spore bomb leaves. Off by default: the other " +
+                "readability settings just make the game's own feedback legible, while this " +
+                "adds a HUD element PEAK doesn't have, which is more a matter of taste. " +
+                "Purely cosmetic and PER-PLAYER: not host-authoritative. Applies immediately, " +
+                "regardless of apply-changes-live.");
 
             SporeBombCullFractionOverride = config.Bind(
                 "Spore-Bombs",

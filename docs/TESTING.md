@@ -75,6 +75,29 @@ Two layers, per ROADMAP.md's testing strategy:
      applies the status. The load-bearing one: `innerFade` stays the same
      *fraction* of the radius at every multiplier, so the falloff shape is
      preserved and the radius dial can't quietly double as a lethality dial.
+   - **Spore-cloud translucency** (`SporeCloudOpacityTests`): not seed-gated, so
+     invariant proofs again — a multiplier of 1.0 is *exactly* vanilla (the
+     restore path depends on it), 0 is fully invisible, thinning can never make a
+     cloud denser than vanilla, negatives clamp to 0 rather than writing a
+     negative color channel, and >1 counts as vanilla so restoring stays exact.
+     The load-bearing one: two particles authored at different alphas still
+     differ by the same *ratio* afterwards, so the cloud stays a soft volume
+     rather than flattening into a uniform sheet.
+   - **Spore-bomb cloud presence** (`SporeBombCloudPresenceTests`): the rule behind
+     the persistent spore-bomb overlay. Proves it agrees with the native
+     `AOE.Explode` falloff rather than the advertised radius — the outer shell of
+     the radius, where `factor < minFactor` and nothing is applied, must *not*
+     count as inside — plus the cutoff moving with a scaled radius (so the overlay
+     can't disagree with the hazard), a zero range never counting as inside, and a
+     non-positive falloff exponent not silently degrading to "anywhere in range"
+     (`Math.Pow(x, 0)` is 1 for every x).
+   - **Label outline color** (`LabelColorsTests`): the stroke behind the
+     spore-cloud warning label stays the same hue and saturation as the text while
+     being unambiguously darker (a black outline would read as pasted on, no
+     outline would let pink text vanish into a pink cloud), clamps to black at full
+     darkening instead of wrapping back to a bright color, and tracks whatever
+     color the text is rather than assuming pink — the label reads its color live
+     off the game's Spores status color.
    - **Cover-mouth input/cost** (`CoverMouthTests`): hold mode follows the key
      exactly; toggle mode flips only on the key-*down* edge (a held key must not
      re-toggle every frame) and survives being held or released; the outside veto
@@ -282,6 +305,129 @@ object it shouldn't have"
 (the report shows an override on something that isn't a spore bomb at all).
 A report showing *no* overrides means the mod isn't involved and whatever
 looks off is vanilla.
+
+### Spore-cloud translucency (`General/spore-area-cloud-opacity`, `General/spore-bomb-cloud-opacity`)
+
+**Pre-req:** in a Roots run. Debug logging optional but useful — it adds a
+`[SporeCloudOpacity]` line per pass (how many areas and particle systems were
+thinned, at what multiplier), a one-time `[ParticleOpacity]` inventory per cloud
+material (its shader, render mode, every property that shader declares, and
+which one is being used as the opacity lever), and a one-time
+`[SporeBombCloudOpacity]` dump of a live detonation's structure.
+
+1. With both at their default (`0.35`), walk up to a mushroom spore cloud. It
+   should still be obviously *there* from a distance — visible enough to route
+   around — but thin enough to see terrain and other players through.
+2. Walk into it and watch the moment the green Spores screen overlay comes up.
+   **This is the whole point of the setting:** "inside, taking spores" and
+   "standing next to it" must now look clearly different. If you still can't
+   tell the two apart, lower the value.
+3. Back out again — the overlay should visibly clear while the cloud stays
+   drawn where it is.
+4. Change the value **without leaving the run** (e.g. to `1.0`): every cloud in
+   the level should snap to full vanilla density immediately, and back to thin
+   when you set it low again — not progressively fainter each time, which would
+   mean the authored baseline wasn't cached correctly.
+5. Set off a spore bomb and repeat 1-3 for its temporary cloud
+   (`spore-bomb-cloud-opacity`). Check the *whole* cloud, not just its first
+   second: the detonation keeps spawning VFX after the initial burst, so a
+   cloud that starts thin and then goes opaque means the re-apply interval
+   isn't catching the late systems.
+6. Confirm the hazard itself is unchanged: you should still take spores over
+   the same area, at the same rate, from the same distance. This setting must
+   never move the hazard — a cloud that looks smaller than it really is would
+   be worse than an opaque one.
+7. Multiplayer check: like the recolor, these are deliberately **not**
+   host-authoritative. Set them differently on two clients in the same run —
+   each should see their own value.
+
+**Report back:** whether step 2 actually resolves the "am I in it?" ambiguity,
+and whether the default 0.35 is too faint (clouds stop reading as landmarks) or
+still too dense.
+
+**If a cloud doesn't get thinner at all**, check the verbose
+`[ParticleOpacity] material ...` line for that system. Particle shaders are Unity
+assets, not code, so nothing in the decompile says whether a given one honours
+per-particle alpha or exposes an opacity float of its own — that line lists
+everything the shader actually declares and marks which property is being used,
+so a no-op says exactly which lever is missing rather than requiring another
+guess. (This is not hypothetical: the first version of this feature scaled only
+per-particle alpha, which the spore areas' Shader Graph clouds ignore
+completely.) Likewise, if a spore *bomb*'s cloud is untouched,
+the `[SporeBombCloudOpacity] structure of a live detonation` dump says whether
+the visible cloud is even a particle system (it may be mesh-based
+`ExplosionEffect` orbs, which this feature does not reach).
+
+### Persistent spores overlay in bomb clouds (`General/show-overlay-in-spore-bomb-clouds`)
+
+**Pre-req:** in a Roots run, setting on (the default). Debug logging optional —
+it logs each entry/exit with the reason.
+
+1. Set off a spore bomb and stand in its cloud. The green spores overlay should
+   come up and **stay** up the whole time you're in it, instead of only flashing
+   each time the cloud ticks damage.
+2. The per-tick damage flash should still read as a distinct spike on top of the
+   steady overlay — it's a separate overlay layer the mod doesn't touch, so it
+   should behave exactly as it does inside a mushroom spore cloud. **If it
+   doesn't stand out enough, say so** — that's a dial worth adding, not
+   something to live with.
+3. Walk out. The overlay should fade out promptly, and it must not linger.
+4. **Edge case worth its own check** — set off a bomb while standing *inside* a
+   mushroom spore cloud. Entering the bomb's cloud must not make the already-up
+   overlay dip or flicker, and walking out of the bomb's cloud (while still in
+   the spore area) must **not** clear the overlay: the area's own warning only
+   raises on the frame you enter it, so a wrong clear here would blank it for as
+   long as you stand there.
+5. Stand near the edge of a cloud, just outside where it damages you. The
+   overlay should be off — it follows the radius that actually applies spores,
+   which is smaller than the cloud's nominal range.
+6. If `Spore-Bombs/cover-mouth-blocks-spore-bombs` is on, cover your mouth
+   inside a bomb cloud: the overlay should drop, the same way it does in a spore
+   area, since the cloud can't reach you.
+7. Turn the setting off mid-run — the overlay should stop behaving persistently
+   immediately, and vanilla flashing should be all that's left.
+
+### Spore-cloud warning label (`General/show-spore-cloud-label`)
+
+**Pre-req:** in a Roots run. The setting is **off** by default, so turn it on.
+
+1. Walk into a mushroom spore cloud. "Breathing in spores!" should fade in
+   between the top of the screen and the crosshair, in the game's own font, in
+   the same pink/red as the Spores status, with a darker outline of the same
+   hue.
+2. Walk out — it should fade out promptly and leave nothing behind.
+3. Set off a spore bomb and stand in its cloud: the same label, on the same
+   terms. The label and the green overlay must never disagree — if one says
+   you're in spores and the other doesn't, that's a bug, not a tuning question.
+4. Check it against a bright background (looking at the sky) and a dark one
+   (deep in the biome). The outline exists so pink text stays readable over a
+   pink cloud, which is exactly the situation this label is shown in.
+5. Confirm it never blocks clicks or shows in menus/pause — it has no raycaster
+   at all, so anything to the contrary is worth reporting.
+6. Turn the setting off mid-run: it should disappear immediately.
+
+**Report back:** the wording (it's a placeholder pick, not a decided string),
+the size, and the vertical position. English only for now — localization into
+the game's other 13 languages is a later pass and doesn't change any of the
+above.
+
+### Bomb cloud VFX vs. its spore radius (`Spore-Bombs/spore-area-radius-multiplier`)
+
+**Pre-req:** preset `Custom` (5) so the `Spore-Bombs` entries apply, in a Roots
+run.
+
+1. Set the multiplier well above 1 (e.g. `2.0`) and detonate a bomb: the visible
+   cloud should be visibly bigger, and the distance at which you start taking
+   spores should grow with it.
+2. Set it well below 1 (e.g. `0.4`) and detonate another: visibly smaller, and
+   the spore radius should shrink to match.
+3. The check that matters is **agreement**, not size: walk to the visible edge of
+   the cloud at each setting and confirm the spores overlay (step 1 of the
+   section above) turns on roughly where the cloud looks like it ends. A cloud
+   that looks smaller than it really is would be worse than no scaling at all.
+4. This is applied per detonation at spawn time, so it only affects bombs set off
+   *after* the change — a cloud already in the air keeps the size it was born
+   with. That's expected, not a bug.
 
 ### Live vs. level-load-only setting updates (`Debug/apply-changes-live`)
 

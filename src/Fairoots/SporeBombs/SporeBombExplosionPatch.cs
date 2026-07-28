@@ -81,6 +81,8 @@ namespace Fairoots.SporeBombs
                 }
             }
 
+            int cloudVfxScaled = ScaleCloudVfx(spawned, sporeAreaRadiusMultiplier);
+
             double vfxMultiplier = Plugin.Cfg.EffectiveSporeBombVfxCountMultiplier;
             foreach (var vfx in spawned.GetComponentsInChildren<ExplosionEffect>(true))
             {
@@ -104,6 +106,21 @@ namespace Fairoots.SporeBombs
             {
                 spawned.AddComponent<SporeBombDetonationMarker>();
             }
+
+            // Cosmetic, per-client: thins the cloud's particles so the Spores screen
+            // overlay stays readable through it. A component rather than a call here
+            // because the detonation keeps creating VFX after this frame - see
+            // SporeBombCloudOpacity's remarks.
+            if (spawned.GetComponent<SporeBombCloudOpacity>() == null)
+            {
+                spawned.AddComponent<SporeBombCloudOpacity>();
+            }
+
+            // Also client-side: lets the game's "you're in spores" screen overlay stay
+            // up while the player stands in this cloud, the way it already does in a
+            // spore area. Registered here because the registry is what avoids a
+            // per-frame scene scan - see SporeBombCloudWarning.
+            SporeBombCloudWarning.Register(spawned);
 
             bool forcePositional = SporeBombExplosionTuning.ShouldForcePositionalScreenshake(shakeCapMeters);
 
@@ -136,7 +153,53 @@ namespace Fairoots.SporeBombs
                 $"(knockback x{knockbackMultiplier:0.##}, vfx x{vfxMultiplier:0.##}, " +
                 $"shake-cap={(shakeCapMeters <= SporeBombExplosionTuning.NoScreenshakeCap ? "vanilla" : $"{shakeCapMeters:0}m")} " +
                 $"across {shakeCount} AddScreenshake, " +
-                $"spore-area-radius x{sporeAreaRadiusMultiplier:0.##})");
+                $"spore-area-radius x{sporeAreaRadiusMultiplier:0.##} across {cloudVfxScaled} cloud VFX transform(s))");
+        }
+
+        /// <summary>
+        /// Resizes the detonation's visible cloud to match the spore-area radius the
+        /// AOEs above were just given, so what the player sees is the extent that can
+        /// actually spore them. Same requirement, same reasoning and the same
+        /// <see cref="SporeAreaTuning.ScaleVisual"/> arithmetic as the persistent
+        /// spore areas' cloud scaling in <c>SporeAreas/SporeAreaTuningPatch</c> - a
+        /// hazard whose visible extent disagrees with its real one is worse than
+        /// either size on its own.
+        ///
+        /// <b>Only the outermost particle systems are scaled</b>, and this is the one
+        /// non-obvious part. Unlike a spore area - whose two systems are siblings -
+        /// a detonation has a <see cref="ParticleSystem"/> on the spawned root *and*
+        /// more on children beneath it, so scaling every system found would apply the
+        /// multiplier twice to the nested ones (a transform scale is inherited).
+        /// Scaling only the systems with no particle-system ancestor lets the
+        /// hierarchy propagate it exactly once.
+        ///
+        /// No baseline caching here, unlike the spore-area version: this runs against
+        /// a freshly instantiated object exactly once, before Unity has even called
+        /// its <c>Start</c>, so there is no previous scaling of its own to compound
+        /// with and nothing that outlives the cloud to restore.
+        /// </summary>
+        private static int ScaleCloudVfx(GameObject spawned, double multiplier)
+        {
+            if (multiplier == 1.0)
+            {
+                return 0;
+            }
+
+            float scale = SporeAreaTuning.ScaleVisual(multiplier);
+            int count = 0;
+            foreach (var ps in spawned.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                var parent = ps.transform.parent;
+                if (parent != null && parent.GetComponentInParent<ParticleSystem>(true) != null)
+                {
+                    continue; // nested - its ancestor's scale already covers it.
+                }
+
+                ps.transform.localScale *= scale;
+                count++;
+            }
+
+            return count;
         }
     }
 }

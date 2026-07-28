@@ -86,6 +86,8 @@ namespace Fairoots
                 SporeAreas.SporeAreaDisablePatch.ClearLevelState();
                 SporeAreas.SporeAreaCullPatch.ClearLevelState();
                 SporeAreas.CoverMouthImmunityPatch.ClearLevelState();
+                SporeBombCloudWarning.ClearLevelState();
+                SporePresence.ClearLevelState();
             }
 
             if (currentlyActive)
@@ -118,6 +120,12 @@ namespace Fairoots
             SporeAreas.SporeAreaCullPatch.Run(found.transform);
             SporeAreas.SporeAreaDisablePatch.Run(found.transform);
             SporeAreas.SporeAreaTuningPatch.Run(found.transform);
+            SporeAreas.SporeCloudOpacityPatch.Run(found.transform);
+
+            // Last: caches this level's spore areas for the per-frame "is the player
+            // in spores?" query, after every pass that could have removed or
+            // deactivated one has already run.
+            SporePresence.CaptureLevel(found.transform);
 
             if (Plugin.Cfg.EnableDebugLogging.Value && Plugin.Cfg.LogSceneScanOnLoad.Value)
             {

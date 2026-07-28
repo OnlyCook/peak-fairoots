@@ -118,6 +118,12 @@ namespace Fairoots
             // waiting for the objects to be reloaded.
             Cfg.RecolorSporeBombs.SettingChanged += (s, e) => SporeBombRecolorPatch.ReapplyToAll();
 
+            // Same category (cosmetic, client-side, immediate in both directions) as
+            // the recolor above. Only the spore-area half needs a hook: a spore bomb's
+            // cloud is transient and its SporeBombCloudOpacity component re-reads the
+            // setting on its own tick, so there's nothing scene-wide to refresh.
+            Cfg.SporeAreaCloudOpacity.SettingChanged += (s, e) => SporeCloudOpacityPatch.ReapplyToAll();
+
             // Host authority (ROADMAP.md, locked in 2026-07-22): whenever ANY
             // setting changes, republish to the room's custom properties so
             // every other client picks it up immediately - a no-op on any
@@ -158,6 +164,12 @@ namespace Fairoots
 
             RootsLevelWatcher.CheckAndRun();
             CoverMouthController.Tick();
+
+            // Presence-driven, so it has to be polled: a spore bomb's cloud raises no
+            // enter/exit event of its own (it isn't a StatusEmitter) - see
+            // SporeBombCloudWarning.
+            SporeBombCloudWarning.Tick();
+            Ui.SporeWarningLabel.Tick();
 
             // Capture the cover-mouth hand pose while the player is still standing in
             // the airport, not the first time they need it - see CoverMouthPose.Prewarm.

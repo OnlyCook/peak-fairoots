@@ -137,6 +137,74 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       TraditionalChinese, matching that same convention since the game's own
       `LANGUAGE_COUNT` is 14, one less than the 15-value enum).
   - `PluginInfo.cs` — GUID/name/version constants.
+  - `SporePresence.cs` — the one answer to "is the local player standing in
+    spores right now?", across both hazards (persistent areas and bomb clouds).
+    Shared by `SporeBombCloudWarning` and `Ui/SporeWarningLabel` for the same
+    reason `SporeAreaScan` is one copy: two slightly different answers would mean
+    the overlay and the label disagreeing about whether the player is in danger.
+    The spore-area list is **captured per level** by `RootsLevelWatcher` rather
+    than searched per frame — its callers ask every frame, and a per-frame
+    `FindObjectsOfType` is the unconditional full-scene sweep that already cost
+    this mod a mod-wide framerate drop once. Areas the removal/disable passes
+    deactivate later stay in the list and are skipped by an `isActiveAndEnabled`
+    check, so nothing has to invalidate it. Honors the game's own
+    `emitterDisabledByWind`, which means wind dispersal *and* a covered mouth both
+    correctly stop a warning claiming the player is being spored when they aren't.
+  - **`Ui/`** — Fairoots' own on-screen elements (game-facing, TMP/uGUI):
+    - `NativeUiAssets.cs` — finds the game's UI font and outlined text material at
+      runtime by scanning live `TextMeshProUGUI` for the material name
+      `DarumaDropOne-Regular SDF Outline`, taking that label's font with it (which
+      also guarantees the two match). They have to be discovered rather than
+      loaded by name: a font and a material are Unity *assets*, so nothing in the
+      decompile references them. Same technique and same key as
+      `peak-sense-of-direction`'s `Labels/NativeAssets`. Retried until it succeeds,
+      since no native label necessarily exists yet at plugin load.
+    - `SporeWarningLabel.cs` — the opt-in `General/show-spore-cloud-label` text
+      warning, centred between the top of the screen and the crosshair. Says in
+      words what the green overlay says in colour, because a colored tint is
+      exactly the signal that competes with a colored cloud while text competes
+      with nothing in the scene. Text color is the live Spores status color (the
+      same field `SporeBombRecolorPatch` reads, so label, status and recolored
+      hazards agree by construction) over a darkened-but-same-hue outline from
+      `Core/LabelColors`. The outline is written into an **instanced** copy of the
+      native material — writing the shared asset would repaint the outline of
+      every native label in the game. Off by default: unlike the rest of the
+      readability group it adds a HUD element PEAK never had, rather than making
+      the game's own feedback legible.
+  - `ParticleOpacity.cs` — the shared "thin out this VFX" applier behind both
+    spore-cloud translucency settings (`SporeAreas/SporeCloudOpacityPatch` and
+    `SporeBombs/SporeBombCloudOpacity`), game-facing so deliberately outside
+    `Core/` — same root-level placement, and same reason, as `GameUnits.cs`.
+    **There is no single lever that thins every particle system, so it picks one
+    per system:** if the shader declares an opacity float of its own
+    (`_Opacity`/`_Alpha`/`_Transparency`, matched exactly — the same materials
+    also declare `_AlphaClip`/`_AlphaCutoff`/`_AlphaRemap`/`_ClampAlpha`, none of
+    which are opacity), that's scaled through a per-renderer
+    `MaterialPropertyBlock`; otherwise it falls back to scaling the alpha of
+    `ParticleSystem.main.startColor`, the per-particle vertex color every stock
+    particle shader multiplies in. Exactly one path is ever live on a system and
+    the other is actively restored, since a shader honoring both would dim twice
+    and land at the *square* of the requested opacity. The split is not
+    hypothetical: the first version was vertex-alpha only, which thinned a spore
+    bomb's cloud perfectly and did nothing at all to a spore area's at any value
+    down to zero (live-confirmed 2026-07-28) — the areas' clouds are drawn by
+    custom Shader Graph shaders (`SmokeParticle` / `GD/FireParticle`) that never
+    wired up a vertex-color node but do expose `_Opacity`. Properties are
+    enumerated off the **`Shader`**, never the material's serialized values: a
+    Unity material keeps stale entries from every shader it has ever been
+    assigned (these two carry a dozen URP Lit leftovers), so "the material has a
+    float called `_Opacity`" doesn't mean the shader reads one. Property blocks
+    rather than `Renderer.material` because these materials are shared across
+    every cloud in the level — the same allocation-per-object problem
+    `SporeBombRecolorPatch` avoids. Handles all five `MinMaxGradient` modes
+    explicitly (the struct carries a different pair of its fields per mode and
+    reading the wrong one returns garbage rather than throwing), baseline-caches
+    both an authored `startColor` and an authored opacity float (same pattern as
+    `SporeAreaTuningPatch`), and always builds a scaled *copy* of a gradient
+    rather than mutating the cached one, which is what keeps a multiplier of 1.0
+    an exact restore. Also owns the one-time verbose per-material inventory
+    (shader, render mode, every declared property, which one is the lever) — the
+    line that answers "why didn't this cloud thin?" instead of the next guess.
   - `RootsLevelWatcher.cs` — detects a freshly-loaded Roots level (Roots prop
     placement is baked into the scene at author time, not regenerated at
     runtime — see `SporeBombCullPatch`'s remarks) and triggers the spore-bomb
@@ -201,7 +269,16 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       spore-bomb name check; otherwise the original method runs untouched.
       Scales knockback, particle/VFX-orb count, and caps the screen-shake
       range via `Core/SporeBombExplosionTuning.cs`, and records the detonation
-      in `DetonationScreenshakeRegistry` for the shake patch below.
+      in `DetonationScreenshakeRegistry` for the shake patch below. Also resizes
+      the visible cloud to match the spore-area radius it just gave the AOEs
+      (`ScaleCloudVfx`, reusing `Core/SporeAreaTuning.ScaleVisual` — same
+      what-you-see-is-what-can-hurt-you requirement as the persistent areas).
+      Only the **outermost** particle systems are scaled: unlike a spore area's
+      two sibling systems, a detonation has one on the spawned root *and* more on
+      children, so scaling every system found would apply the multiplier twice to
+      the nested ones. No baseline caching, unlike the spore-area version — this
+      runs once against a freshly instantiated object, so there's nothing to
+      compound with and nothing outliving the cloud to restore.
     - `DetonationScreenshakePatch.cs` + `DetonationScreenshakeRegistry.cs` —
       the other half of the screen-shake distance cap. `AddScreenshake` only
       honours its `range` when its `positional` flag is set; otherwise it calls
@@ -261,6 +338,39 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       baseline-caching pattern as `SporeBombCullPatch`'s vanilla trigger radii.
       **The only client-side, non-host-authoritative gameplay-adjacent feature in
       the mod** (it's cosmetic — see `PluginConfig.cs` above).
+    - `SporeBombCloudWarning.cs` — `General/show-overlay-in-spore-bomb-clouds`:
+      holds the game's own "you are standing in spores" screen overlay up while the
+      local player is inside a spore bomb's cloud. Fills a genuine vanilla gap
+      rather than adding an effect — the game has exactly one such warning
+      (`GUIManager.sporesWarning`) and only `StatusEmitter` ever raises it, so a
+      bomb's cloud (an `AOE`, not an emitter) gives the per-tick damage flash and
+      nothing in between. Raises the native warning through the native
+      `StartFX`/`EndFX`, inheriting its look, fade timing and photosensitivity
+      handling for free (same reuse-the-game's-own-mechanism approach as
+      `CoverMouthImmunityPatch`); the damage flash is a separate overlay layer and
+      is left untouched, so it still spikes on top. Presence is judged by
+      `Core/SporeBombCloudPresence`'s port of the native falloff rule, **not** by
+      `AOE.range` — the radius that actually applies status is meaningfully smaller
+      than the advertised one. Live clouds are a registry populated at detonation
+      (`SporeBombExplosionPatch`), never a per-frame `FindObjectsOfType` — that
+      kind of unconditional sweep already cost this mod a mod-wide framerate drop
+      once. Two coordination rules with the spore areas that share the one overlay:
+      it only ever ends a warning it started, and it neither raises nor lowers the
+      overlay while a spore area is also in range (raising would reset the tween to
+      0 and read as a dip; lowering would blank the area's warning with nothing to
+      re-raise it, since the emitter only calls `StartFX` on the entry frame).
+    - `SporeBombCloudOpacity.cs` — the spore-bomb half of the cloud-translucency
+      readability fix (`General/spore-bomb-cloud-opacity`): a component attached
+      to the spawned explosion by `SporeBombExplosionPatch`, re-applying
+      `ParticleOpacity` on a 0.25s interval for the object's lifetime rather than
+      once at spawn. A detonation isn't a single instant — its `AOE` re-explodes
+      on a timer and `ExplosionEffect` keeps instantiating VFX on a staggered
+      coroutine — so anything created after a one-shot spawn-time pass would come
+      out at full vanilla density; polling ends by itself when the object is
+      destroyed. Also owns the one-time verbose structure dump of a live
+      detonation (same purpose as `SporeAreaTuningPatch`'s: the explosion is a
+      prefab, i.e. an asset, so the decompile can't say what a bomb's cloud is
+      built from).
   - **`SporeAreas/`** — the Phase 6 spore-area mechanics (the persistent
     "Mushroom Spore Clouds", a different hazard from spore bombs):
     - `SporeAreaDisablePatch.cs` — the `Spore-Areas/disable-spore-areas` master
@@ -305,6 +415,20 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       reapplies can't compound and 1.0 always restores true vanilla.
       Live-updatable, unlike removal. Also owns the one-time verbose structure
       dump that established the prefab layout above.
+    - `SporeCloudOpacityPatch.cs` — the spore-area half of the cloud-translucency
+      readability fix (`General/spore-area-cloud-opacity`): thins the cloud VFX so
+      the game's own Spores screen overlay is readable through it — in vanilla the
+      cloud and the overlay are the same color, so "next to a cloud" and "inside
+      one, taking spores" look nearly identical. Not a Harmony patch (same reason
+      as `SporeAreaDisablePatch`): driven once per level from `RootsLevelWatcher`
+      plus a scene-wide `ReapplyToAll()` on the setting changing. Deliberately
+      **not** folded into `SporeAreaTuningPatch` despite walking the same particle
+      systems — that one applies host-authoritative gameplay values gated on
+      `apply-changes-live`, this one is per-client cosmetics that must apply
+      immediately in both directions (the `recolor-spore-bombs` treatment). They
+      write different properties (transform scale vs. particle start color), so
+      they compose. The hazard volume is untouched on purpose: a cloud that
+      *looked* smaller than it is would be worse than an opaque one.
     - `CoverMouthController.cs` — the cover-your-mouth mechanic's driver (polled
       from `Plugin.Update`): reads the key, runs `Core/CoverMouth.NextState`,
       charges stamina, empties the player's hands as the cover starts (a slot item
@@ -417,6 +541,26 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       rate dial scales `amount` rather than the tick interval (the native
       per-tick amount is proportional to the interval, so the rate doesn't
       contain it - scaling the interval changes granularity only, not rate).
+    - `LabelColors.cs` — the outline color for Fairoots' own on-screen text:
+      same hue and saturation as the text, HSV value scaled down. Darkened rather
+      than flattened to black (the rule `peak-sense-of-direction`'s `ColorUtil`
+      uses) so the stroke reads as part of the text instead of a black shape
+      pasted behind it, while still separating pink text from a pink cloud.
+    - `SporeBombCloudPresence.cs` — "is the player somewhere a spore bomb's cloud
+      would actually apply spores?", the geometry behind `SporeBombCloudWarning`.
+      Mirrors the native `AOE.Explode` rule (falloff factor
+      `(1 - distance/range)^factorPow` vs. `minFactor`) rather than doing a plain
+      distance check: an AOE does not affect everything inside its `range`, so an
+      overlay driven by the advertised radius would light up in a ring where
+      nothing can hurt you — worse than no overlay, given the setting exists to
+      make the overlay trustworthy.
+    - `SporeCloudOpacity.cs` — the pure alpha arithmetic behind both
+      cloud-translucency settings, plus the "is this multiplier vanilla?" rule the
+      restore path depends on. Multiplicative rather than absolute so a cloud's
+      *internal* alpha variation survives — flattening every particle to one alpha
+      would replace a soft volume with a uniform sheet, which is the look the
+      setting exists to remove. Not seed-gated (every cloud gets the identical flat
+      treatment), same shape as `SporeAreaTuning.cs`.
     - `SporeAreaCull.cs` — the spore-area thinning decision. Simpler than
       `SporeBombCull`: no foliage pass (a spore cloud is a 16-unit-radius volume
       around a mushroom, not a small prop that can get buried in a fern), just

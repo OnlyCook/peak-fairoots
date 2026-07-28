@@ -152,7 +152,11 @@ authority:** the wind-preceded-fall camera-dampening clamp/window (a
 camera-feel/accessibility setting — it only affects how *your own* camera
 reacts to *your own* fall, never anyone else's experience or the shared
 world state), the spore-bomb recolor (`General/recolor-spore-bombs`, added
-2026-07-26 — purely cosmetic, see the spore-bomb mechanic note below), and
+2026-07-26 — purely cosmetic, see the spore-bomb mechanic note below), the
+spore-cloud translucency pair (`General/spore-area-cloud-opacity` and
+`General/spore-bomb-cloud-opacity`, added 2026-07-28 — likewise purely
+cosmetic, changing how densely one player's own screen draws a cloud and
+nothing about the hazard itself), and
 the entire `Debug` section (diagnostics/overlays, never gameplay-affecting;
 this is also where `apply-changes-live` lives, since freezing values
 mid-run is a comparison-testing tool). Everything else that decides what
@@ -233,7 +237,7 @@ once and left alone).
 | Spore area count (seeded removal — see below) | 0% | 0% | 20% | 35% |
 | Spore area radius (hazard + visible cloud — see below) | vanilla | −15% | −30% | −45% |
 | Spore area lethality (status/sec) | vanilla | −15% | −35% | −55% |
-| Spore area screen-filter opacity | vanilla | −20% | −40% | −60% |
+| Spore area screen-filter opacity (superseded — see the cloud-translucency note below) | vanilla | −20% | −40% | −60% |
 | Wind disperses spore areas | if not already vanilla behavior, on | on | on | on, generous |
 | Zombie/beetle move speed | vanilla | −10% | −20% | −35% |
 | Zombie deaggro (currently: never) | none (still never, matches vanilla) | deaggro past a large distance | deaggro past a moderate distance | deaggro quickly past a short distance |
@@ -416,15 +420,92 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   the surface (confirmed in-game — it looks like pink veins over a green
   mushroom).
 
-  This is **the one setting in the mod that is deliberately not
-  host-authoritative** (see the Host authority section above). The rule
-  there is that no client may unilaterally alter shared gameplay; a color
+  This is one of the **client-side, deliberately not host-authoritative**
+  settings (see the Host authority section above; the cloud-translucency pair
+  below are the others). The rule there is that no client may unilaterally
+  alter shared gameplay; a color
   changes nothing shared, only what one player sees on their own screen, so
   there is nothing to keep consistent and no reason a host should get to
   dictate it — the same reasoning that already exempts the wind-fall camera
   dampening clamp. It's also always immediate, ignoring
   `Debug/apply-changes-live`: a cosmetic toggle that waits for a level
   reload would just read as broken.
+
+  **Cloud translucency (implemented 2026-07-28, not in the preset table — a
+  readability fix, not a balance dial, same category as the recolor above):**
+  `General/spore-area-cloud-opacity` and `General/spore-bomb-cloud-opacity`
+  (both 0.35 by default, 1.0 = vanilla) scale down the alpha of the spore
+  cloud VFX — the persistent mushroom clouds and the temporary one a spore
+  bomb leaves, respectively.
+
+  **The problem is that the game already answers "are you taking spores right
+  now?" and its answer is invisible.** The Spores status puts a colored filter
+  over the screen while the status is being applied, but the cloud VFX is
+  dense and the *same* color, so being next to a cloud and being inside one
+  look nearly identical: the overlay reads as "there's green in front of me,"
+  which is also exactly what a cloud looks like from outside. Thinning the
+  cloud's own alpha separates the two — the overlay becomes the only thing
+  that fills the frame, while the cloud stays clearly visible as a landmark to
+  spot and route around, which is why this is a translucency dial and not the
+  existing disable switch.
+
+  **Cosmetic in the strict sense: the hazard is untouched.** Neither setting
+  moves a radius, a falloff or a status rate — a cloud that *looked* smaller
+  than its real hazard volume would be worse than an opaque one. Size and
+  lethality stay with `Spore-Areas`/`Spore-Bombs`, which are host-authoritative;
+  these two are per-client and always immediate, exactly like the recolor.
+
+  **How it's applied is per-shader, not one universal lever** (the first build
+  learned this the hard way — see `CODEBASE.md`'s `ParticleOpacity.cs` entry).
+  Scaling per-particle vertex alpha thins a spore bomb's cloud perfectly and
+  does nothing whatsoever to a spore area's, because the areas' clouds are drawn
+  by custom Shader Graph shaders that never wired up a vertex-color node but do
+  expose an `_Opacity` float. So each particle system uses whichever lever its
+  shader actually offers, and only one of the two, since a shader honoring both
+  would dim twice.
+
+  Two settings rather than one because the two hazards read differently on
+  screen: a bomb's cloud erupts on top of the player for a few seconds, a spore
+  area is a permanent landmark seen from a distance, so the density that makes
+  one readable isn't automatically right for the other.
+
+  **Persistent overlay in bomb clouds (implemented 2026-07-28):**
+  `General/show-overlay-in-spore-bomb-clouds` (on by default) holds the game's
+  own spores screen warning up for as long as the player stands in a spore
+  bomb's cloud. This is the same readability goal from the other direction and
+  it fills a genuine vanilla gap rather than adding an effect: the game has
+  exactly one such warning (`GUIManager.sporesWarning`) and only `StatusEmitter`
+  ever raises it, so a spore *area* warns you continuously while a spore *bomb*'s
+  cloud — an `AOE` on a repeating timer, not an emitter — gives you the per-tick
+  damage flash and nothing in between. The mod raises the native warning through
+  the native methods, and leaves the damage flash (a separate overlay layer)
+  completely alone so it still spikes on top. Client-side and cosmetic on the
+  same terms as the translucency pair; presence follows the radius that actually
+  applies spores, not the AOE's advertised `range`.
+
+  **On-screen warning label (implemented 2026-07-28, opt-in):**
+  `General/show-spore-cloud-label` (**off** by default) shows "Breathing in
+  spores!" between the top of the screen and the crosshair whenever the player is
+  in spores, from either hazard — in the game's own font, in the live Spores
+  status colour, over a darkened-but-same-hue outline. It says in words what the
+  overlay says in colour, which matters because a coloured tint is precisely the
+  signal that competes with a coloured cloud, while text competes with nothing in
+  the scene.
+
+  **Off by default, unlike the rest of this group, and that distinction is the
+  principle here.** Everything else listed above makes the game's *own* feedback
+  legible — it thins a cloud the game already drew, or raises a warning the game
+  already owns. This adds a HUD element PEAK never had, which is a louder
+  intervention and a matter of taste rather than fairness. English only for now;
+  localization into the other 13 languages is a later pass and lands the way
+  `Networking/ModPresenceLocalization` already does it.
+
+  **This supersedes the preset table's "Spore area screen-filter opacity" row**
+  as a plan. That row would reduce the opacity of the *overlay* — the one
+  signal this feature exists to make readable — so implementing both as written
+  would have them cancelling out. If the overlay ever does turn out to be too
+  strong, the fix belongs in the same client-side cosmetic group as these, not
+  in the preset table.
 - **Spore areas** (the status-effect gas clouds — a different hazard from
   spore bombs, despite the similar name) run through a single generic
   radius-based hazard-zone component with public radius/lethality/falloff
