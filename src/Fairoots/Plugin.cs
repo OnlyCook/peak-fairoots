@@ -91,6 +91,16 @@ namespace Fairoots
             // Applies in both directions (hides, and restores what it hid).
             Cfg.DisableSporeAreas.SettingChanged += (s, e) => SporeAreaDisablePatch.ReapplyToAll();
 
+            // Same treatment again, for the same reason: a creature either exists in
+            // this run or it doesn't. The zombie switch is included even though its
+            // own effect is a Harmony prefix that reads the setting live - flipping it
+            // off has to bring beetles/spiders back in the same pass, and the reapply
+            // is what logs the resulting state for all three.
+            EventHandler reapplyCreatureDisable = (s, e) => Creatures.CreatureDisablePatch.ReapplyToAll();
+            Cfg.DisableZombies.SettingChanged += reapplyCreatureDisable;
+            Cfg.DisableBeetles.SettingChanged += reapplyCreatureDisable;
+            Cfg.DisableSpiders.SettingChanged += reapplyCreatureDisable;
+
             // A resize or a rate change can be undone, unlike a removal, so both
             // spore-area tuning dials get the same immediate-reapply treatment as
             // the wind/trigger-radius multipliers - only while live updates are on

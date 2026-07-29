@@ -307,6 +307,49 @@ namespace Fairoots
         /// </summary>
         public ConfigEntry<double> SporeAreaStatusRateMultiplierOverride { get; }
 
+        // --- Creatures ------------------------------------------------------
+        /// <summary>
+        /// Master kill switch for the Roots biome's NPC mushroom zombies. When on,
+        /// no zombie is ever spawned and any already-live one is despawned -
+        /// <c>Creatures/CreatureDisablePatch</c>'s <c>ZombieSpawnSuppressionPatch</c>
+        /// does the work, at the game's own spawn loop rather than by writing over
+        /// <c>ZombieManager.maxActiveZombies</c>.
+        ///
+        /// Deliberately scoped to <em>NPC</em> zombies: a zombie raised from a dead
+        /// player is that player's death state, not an ambient hazard, and is never
+        /// touched. <b>Host-authoritative</b> (read via
+        /// <see cref="EffectiveDisableZombies"/>) - and unavoidably so, since vanilla
+        /// only ever spawns zombies on the master client. Flat (no preset ever turns
+        /// it on) and always immediate regardless of <see cref="ApplyChangesLive"/>,
+        /// exactly like <see cref="DisableSporeAreas"/>.
+        /// </summary>
+        public ConfigEntry<bool> DisableZombies { get; }
+
+        /// <summary>
+        /// Master kill switch for the Roots biome's beetles (runtime-confirmed: ~15
+        /// per level). When on, every beetle object is deactivated outright, so
+        /// there's nothing to walk into and nothing to knock you off a ledge. Same
+        /// shape as <see cref="DisableZombies"/>: <b>host-authoritative</b> (read via
+        /// <see cref="EffectiveDisableBeetles"/>), flat, off by default, always
+        /// immediate, and restorable - turning it back off restores exactly the
+        /// beetles Fairoots hid.
+        /// </summary>
+        public ConfigEntry<bool> DisableBeetles { get; }
+
+        /// <summary>
+        /// Master kill switch for the Roots biome's ceiling spiders (runtime-confirmed:
+        /// ~90 per level). When on, a spider never drops and never grabs, and its mesh
+        /// and web are hidden.
+        ///
+        /// Note the asymmetry with <see cref="DisableBeetles"/>, explained in
+        /// <c>Creatures/CreatureDisablePatch</c>: a spider's own distance culling
+        /// re-drives its root GameObject's active state, so this suppresses the
+        /// behavior at its two entry points and hides only the mesh child, rather
+        /// than deactivating the root the way a beetle's is. Same
+        /// <b>host-authoritative</b>/flat/off-by-default/immediate shape otherwise.
+        /// </summary>
+        public ConfigEntry<bool> DisableSpiders { get; }
+
         /// <summary>
         /// Master kill switch for the whole cover-your-mouth mechanic. When on, the
         /// key does nothing at all: no immunity, no stamina drain, no hand
@@ -893,6 +936,39 @@ namespace Fairoots
                     "above; this only changes the rate. Only takes effect when preset is set to " +
                     "Custom (5) - ignored under presets 1-4.",
                     new AcceptableValueRange<double>(0.0, 3.0)));
+
+            DisableZombies = config.Bind(
+                "Creatures",
+                "disable-zombies",
+                false,
+                "Master switch: when on, the Roots biome's mushroom zombies never spawn, and any " +
+                "already wandering around are removed. A zombie raised from a dead player is NOT " +
+                "affected - that's a player's death, not a hazard. HOST-AUTHORITATIVE: if you're " +
+                "not the host, this has no effect at all - only the host's value counts for the " +
+                "whole lobby (the game only ever spawns zombies on the host in the first place). " +
+                "Off by default; no preset ever turns this on automatically. Applies immediately, " +
+                "regardless of apply-changes-live.");
+
+            DisableBeetles = config.Bind(
+                "Creatures",
+                "disable-beetles",
+                false,
+                "Master switch: when on, the Roots biome's beetles (about 15 per level) are removed " +
+                "entirely - nothing to walk into, nothing to knock you off a ledge. Turning it back " +
+                "off brings back exactly the beetles this mod removed. HOST-AUTHORITATIVE: if " +
+                "you're not the host, this has no effect at all - only the host's value counts for " +
+                "the whole lobby. Off by default; no preset ever turns this on automatically. " +
+                "Applies immediately, regardless of apply-changes-live.");
+
+            DisableSpiders = config.Bind(
+                "Creatures",
+                "disable-spiders",
+                false,
+                "Master switch: when on, the Roots biome's ceiling spiders (about 90 per level) " +
+                "never drop and never grab you, and their webs and bodies are hidden. " +
+                "HOST-AUTHORITATIVE: if you're not the host, this has no effect at all - only the " +
+                "host's value counts for the whole lobby. Off by default; no preset ever turns this " +
+                "on automatically. Applies immediately, regardless of apply-changes-live.");
 
             DisableCoverMouth = config.Bind(
                 "Spore-Areas",
@@ -1627,6 +1703,30 @@ namespace Fairoots
         /// </summary>
         public bool EffectiveDisableSporeAreas =>
             HostAuthority.Resolve("DisableSporeAreas", DisableSporeAreas.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="DisableZombies"/>.Value. Host-authoritative - flat, same shape
+        /// as <see cref="EffectiveDisableSporeAreas"/>.
+        /// </summary>
+        public bool EffectiveDisableZombies =>
+            HostAuthority.Resolve("DisableZombies", DisableZombies.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="DisableBeetles"/>.Value. Host-authoritative - flat, same shape
+        /// as <see cref="EffectiveDisableSporeAreas"/>.
+        /// </summary>
+        public bool EffectiveDisableBeetles =>
+            HostAuthority.Resolve("DisableBeetles", DisableBeetles.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="DisableSpiders"/>.Value. Host-authoritative - flat, same shape
+        /// as <see cref="EffectiveDisableSporeAreas"/>.
+        /// </summary>
+        public bool EffectiveDisableSpiders =>
+            HostAuthority.Resolve("DisableSpiders", DisableSpiders.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of
