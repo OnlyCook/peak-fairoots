@@ -5,8 +5,9 @@ same way `peak-sense-of-direction/CODEBASE.md` and `peak-checkpoint-save`'s
 structure do, so a reader can find where a given mechanic lives without
 re-scanning the whole tree.
 
-**Phase 2 (seed/preset core), Phase 4 (spore bombs), and Phase 5 (wind) are
-in; Phase 6 (spore areas) is in progress.** Creatures are not written yet; see
+**Phase 2 (seed/preset core), Phase 4 (spore bombs), Phase 5 (wind), Phase 6
+(spore areas) and Phase 7 (creatures) are in.** Phase 8 (achievement spawn-rate
+nudges) and Phase 9 (preset tuning pass, packaging) are not started; see
 `ROADMAP.md`'s phased plan.
 
 **Host authority (locked in 2026-07-22 — read `ROADMAP.md`'s "Host authority"
@@ -171,6 +172,14 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       every native label in the game. Off by default: unlike the rest of the
       readability group it adds a HUD element PEAK never had, rather than making
       the game's own feedback legible.
+    - `SpiderWarningLabel.cs` — the opt-in `General/show-spider-warning-label`
+      text warning shown while a spider is dropping on the local player. A
+      deliberate copy of `SporeWarningLabel`'s look and placement (60px lower, so
+      both can be on screen at once) so the two read as one HUD language. Colored
+      from the live **Poison** status color, poison being what a spider does to
+      you — same "the label matches the status it warns about" rule as the spore
+      label's `colorSpores`; there is no `colorWeb` in the build. Presence comes
+      from `Creatures/SpiderStrikeWarning`, never a scene scan.
   - `ParticleOpacity.cs` — the shared "thin out this VFX" applier behind both
     spore-cloud translucency settings (`SporeAreas/SporeCloudOpacityPatch` and
     `SporeBombs/SporeBombCloudOpacity`), game-facing so deliberately outside
@@ -491,6 +500,71 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       removed-vs-kept median comparison, which is what makes the cluster-first
       claim checkable against a real level instead of taken on faith (the
       per-removal lines alone are in scene order, so they can't show it).
+  - **`Creatures/`** — the Phase 7 creature mechanics. **Read this first: the
+    three Roots creatures share no code whatsoever**, and nearly every quirk in
+    this folder comes from that. A beetle is a `Beetle : Mob` (a rigidbody prop
+    that is also a `MobItem : Item`); a zombie is a `MushroomZombie` wrapping a
+    full `Character` with its own state machine, spawned at runtime rather than
+    placed; a spider is a plain `MonoBehaviour` that culls itself by toggling its
+    own root GameObject. So "do X to creatures" is always three
+    implementations, and `Core/` holds three sets of rules rather than one.
+    - `CreatureScan.cs` — the shared "which GameObject *is* this creature"
+      answers, the same one-copy-on-purpose rule as `SporeAreas/SporeAreaScan`.
+    - `CreatureDisablePatch.cs` — the three `Creatures/disable-*` kill switches,
+      one mechanism each: zombies are suppressed at `ZombieManager.Update`, the
+      game's own (master-client-only) spawn loop, with player-turned zombies
+      spared; beetles are deactivated and restored; spiders have `Scan`,
+      `GrabCharacter` **and** `LateUpdate` suppressed plus their mesh hidden,
+      because their own distance culling re-drives the root's active state and
+      `RopeRender.DisplayRope` re-enables the web every frame (a `SetActive(false)`
+      on a spider root is silently undone the moment a player walks up to it —
+      i.e. exactly when it matters).
+    - `CreatureSpeedPatch.cs` — zombie/beetle move speed. Two fields with the same
+      meaning: `Mob.movementSpeed` and, for zombies,
+      `CharacterMovement.movementForce` (**resolves RESEARCH.md Q8's open
+      question** — `CharacterMovementZombie` declares no speed field of its own).
+      Deliberately *not* the sibling `movementModifier`, which the game's own
+      energy-drink affliction adjusts additively; same trap as `climbSpeedMod`.
+    - `CreatureKnockbackPatch.cs` — beetle knockback (`bonkForce`/`bonkForceUp`
+      scaled together so the shove keeps its angle). Its remarks record **why
+      there is no zombie counterpart**: zombies apply no scripted knockback
+      anywhere, and `MushroomZombie.reachForce` is a dead field.
+    - `CreatureRagdollPatch.cs` — how long a beetle hit or zombie bite keeps the
+      player down. Scales the two fields rather than patching `Character.Fall`,
+      which is the game's universal knockdown; each field has exactly one caller,
+      which is what makes that safe.
+    - `ZombieDeaggroPatch.cs` / `BeetleDeaggroPatch.cs` — the two deaggro dials.
+      Both files document a non-obvious load-bearing detail: the zombie hook must
+      be `TargetIsValid` because that also gates *re-acquisition*
+      (`TryLookForTarget` re-picks the nearest player every 10s with no distance
+      limit, so clearing the target alone accomplishes nothing), and the beetle
+      one needs a suppression window for the mirror-image reason.
+    - `CreatureAggroLog.cs` / `ZombieAggroLogPatch.cs` — verbose aggro-lifecycle
+      logging for both dials, including whether a deaggro came from Fairoots' rule
+      or vanilla's. Exists because these two mechanics are close to unverifiable
+      by eye; see `docs/TESTING.md`.
+    - `SpiderStrikeWarning.cs` — "is a spider coming for me right now?", behind
+      `Ui/SpiderWarningLabel`. Registry-driven off the drop RPC, never a scan
+      (Roots has ~90 spiders). Its window deliberately excludes
+      `spiderWaitTime`, because `SpiderState.Dropped` persists through the
+      spider's whole retreat.
+    - `CreatureKnockoutPatch.cs` — thrown-item knockouts. Both creatures detect the
+      hit themselves rather than relying on `Bonkable`, which is a component on
+      *particular item prefabs* rather than items in general. Beetles are put into
+      `MobState.RigidbodyControlled` (vanilla's own tumbling state, which already
+      stops them attacking and targeting); zombies are held down against their own
+      `TestCharacterFell`, which otherwise stamps `fallSeconds` back to 3.
+    - `BlowgunCreaturePatch.cs` — darts kill zombies and stun spiders/beetles.
+      Hooked on `RPC_DartImpact`, not `FireDart`, because the effects need each
+      creature's *owner* to apply them and that RPC runs on every client while
+      carrying the dart's origin/endpoint.
+    - `CreatureStunIndicator.cs` — the "out cold" marker for both creatures, cloned
+      from `Spider.stunnedParticle` (it's an asset, so it can't be constructed in
+      code). Placed over a beetle's head via `bonkPoint` and replicated by one
+      `[PunRPC]` on the beetle's existing `PhotonView`.
+    - `CreatureWindPatch.cs` — wind on creatures; see the "1.0 is not always
+      vanilla" note under "Planned structure" above.
+
   - **`Core/`** — the pure, Unity-free decision layer (see split rule above):
     - `WorldUnits.cs` (+ the game-facing `GameUnits.cs` wrapper in the project
       root) — **read this before adding any `*-meters` setting.** PEAK's world
@@ -610,6 +684,27 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       pressure-freshness rule and the let-go grace window's force curve
       (`GraceForceMultiplier` — hold, then ramp back to full, never zero).
       Not seed-gated, same as `WindTuning`.
+    - `CreatureTuning.cs` — the flat creature arithmetic (speed, knockback,
+      ragdoll duration, beetle deaggro distance). Not seed-gated; same shape as
+      `SporeBombExplosionTuning`.
+    - `ZombieDeaggro.cs` — the zombie deaggro rule, and **the one dial in the mod
+      where 1.0 is not vanilla**: vanilla zombies never deaggro, so 1.0 is the
+      toughest setting and 0 is excluded. Its 30-second base at 1.0 is the game's
+      own `Scoutmaster` lost-track constant, not an invented number.
+    - `BeetleDeaggro.cs` — the beetle half (1.0 *is* vanilla here, since beetles
+      genuinely do give up). Documents why the first version was inert at both
+      extremes and why the suppression window is load-bearing.
+    - `CreatureKnockout.cs` — durations and the hard-throw gate for thrown-item
+      knockouts, plus the blowgun stun. Carries the **live-measured throw speeds**
+      the 36 m/s threshold was calibrated from; those five measurements are
+      regression tests.
+    - `CreatureWind.cs` — wind on creatures, and the other place the vanilla point
+      isn't 1.0: zombies already take wind (0.6× a player's) so theirs is a true
+      multiplier, while beetles are immovable by force (`Mob.FixedUpdate` zeroes
+      their velocity every tick) so theirs is a susceptibility with **0** as
+      vanilla. Beetle drift is expressed relative to the beetle's own walking
+      speed rather than the zone's `windForce`, which is an acceleration and would
+      fling them across the map.
     - `Presets/PresetId.cs` — the preset enum: 1-4 are the fixed presets
       (Balanced is default), 5 is Custom (ignores the catalog and uses the
       player's own config directly).
@@ -749,9 +844,18 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
 
 ## Planned structure (fills in as phases land — see ROADMAP.md)
 
-`SporeBombs/`, `Wind/` and `SporeAreas/` (above) are the mechanic-group folders
-so far; expect one more per remaining mechanic group, mirroring `OVERVIEW.md`'s
-sections: `Creatures/` — each holding the Harmony patches that
-scan the scene and apply removals/tweaks, delegating every seeded decision to
-`Core/`. New per-mechanic preset values land in `Core/Presets/PresetCatalog.cs`
-as each phase is implemented.
+`SporeBombs/`, `Wind/`, `SporeAreas/` and `Creatures/` (above) are the
+mechanic-group folders, one per section of `OVERVIEW.md`, each holding the
+Harmony patches that scan the scene and apply removals/tweaks and delegating
+every seeded decision to `Core/`. All four are now in. What's left
+(`ROADMAP.md` Phases 8-9) needs no new folder: the achievement spawn-weight
+nudge intercepts the game's own weighted item selection, and the preset tuning
+pass only changes numbers in `Core/Presets/PresetCatalog.cs`.
+
+**Note for Phase 7 readers:** the creature dials are the one group where
+"1.0 = vanilla" is not universal, because two of the mechanics have no vanilla
+value to scale. `zombie-deaggro-multiplier` makes 1.0 the *toughest* setting
+(vanilla is "never deaggro", which no finite multiplier expresses) and
+`beetle-wind-susceptibility` makes **0** vanilla (beetles are wind-immune by
+construction). Both are documented at length in their `Core/` files; don't
+"fix" either back to the usual convention.
