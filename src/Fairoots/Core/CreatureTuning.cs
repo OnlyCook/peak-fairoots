@@ -85,6 +85,34 @@ namespace Fairoots.Core
         }
 
         /// <summary>
+        /// Scales the distance at which a beetle will <em>keep</em> a target it has
+        /// already picked, from its vanilla <c>Mob.aggroDistance</c> (5 world units,
+        /// i.e. ~8m). 1.0 = vanilla, 0.5 = twice as easy to shake off, 2.0 = twice as
+        /// hard.
+        ///
+        /// <b>Unlike the zombie, a beetle already deaggros in vanilla</b>, which is why
+        /// this dial keeps the mod's usual "1.0 means vanilla" convention while
+        /// <see cref="ZombieDeaggro"/> can't. <c>Mob.Targeting()</c> re-picks the
+        /// nearest character within <c>aggroDistance</c> that it also has line of sight
+        /// to, and assigns <c>null</c> when nothing qualifies - so leaving that radius,
+        /// or simply breaking line of sight, already drops a beetle's target. What it
+        /// lacks is any way to tune how sticky that is.
+        ///
+        /// Applied only while the beetle already <em>has</em> a target, so this changes
+        /// how hard a beetle is to shake off without also changing how far away it can
+        /// notice you from - two different complaints that a single
+        /// <c>aggroDistance</c> write would fuse into one.
+        ///
+        /// Clamped at zero (a negative radius would make <c>Targeting</c> drop every
+        /// candidate, i.e. permanent deaggro, which is a disabled beetle rather than a
+        /// tuned one).
+        /// </summary>
+        public static float ScaleDeaggroDistance(float vanillaAggroDistance, double multiplier)
+        {
+            return (float)(vanillaAggroDistance * Math.Max(0.0, multiplier));
+        }
+
+        /// <summary>
         /// Whether a multiplier is close enough to 1.0 to be treated as "leave the
         /// game alone". Used by the restore paths so a dial sitting at vanilla puts
         /// the exact authored value back rather than a float-rounded near-miss of it.

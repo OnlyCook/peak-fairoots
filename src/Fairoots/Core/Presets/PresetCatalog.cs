@@ -337,6 +337,64 @@ namespace Fairoots.Core.Presets
         }
 
         /// <summary>
+        /// Whether zombies can lose a target at all, per ROADMAP.md's "Zombie deaggro
+        /// (currently: never)" row, whose Subtle column is explicitly "none (still
+        /// never, matches vanilla)".
+        ///
+        /// This is why the mechanic needs an on/off row and not just a multiplier:
+        /// vanilla zombies never deaggro, so <em>any</em> multiplier is a behavior
+        /// change, and Subtle's whole identity is "vanilla except the always-on bug
+        /// fixes". Off on Subtle, on everywhere else.
+        /// </summary>
+        public static bool ZombieDeaggroEnabled(PresetId preset)
+        {
+            return CatalogKey(preset) != PresetId.Subtle;
+        }
+
+        /// <summary>
+        /// How hard it is for a player to shake a zombie, per ROADMAP.md's
+        /// "Zombie deaggro" row (large / moderate / short distance).
+        /// <b>1.0 is the toughest setting here, not vanilla</b> - see
+        /// <see cref="ZombieDeaggro"/> for why this one dial has to invert the mod's
+        /// usual convention. Subtle's value is unused (the mechanic is off there per
+        /// <see cref="ZombieDeaggroEnabled"/>) but is kept at the maximum so that
+        /// turning it on by hand under Subtle gives the toughest behavior rather than
+        /// the most forgiving.
+        /// </summary>
+        public static double ZombieDeaggroMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.85;
+                case PresetId.Generous: return 0.60;
+                case PresetId.Tame: return 0.35;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
+        /// How hard it is for a player to shake a beetle - a multiplier on the
+        /// distance at which it keeps an existing target
+        /// (<see cref="CreatureTuning.ScaleDeaggroDistance"/>). 1.0 = vanilla
+        /// (Subtle), lower = easier to escape, matching the direction of
+        /// <see cref="ZombieDeaggroMultiplier"/> even though only this one is
+        /// vanilla-anchored. Beetles already deaggro in vanilla, so unlike the zombie
+        /// row this needs no on/off companion. Starting estimates pending playtest.
+        /// </summary>
+        public static double BeetleDeaggroMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.90;
+                case PresetId.Generous: return 0.75;
+                case PresetId.Tame: return 0.55;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
         /// The unconditional bush/grass placement-removal pass is on for every
         /// preset, including Subtle (ROADMAP.md - the game never prevents a spore
         /// bomb landing in foliage, so this gap is always fixed). Kept as a method

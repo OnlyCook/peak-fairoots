@@ -123,6 +123,14 @@ namespace Fairoots
                 if (Cfg.ApplyChangesLive.Value) Creatures.CreatureRagdollPatch.ReapplyToAll();
             };
 
+            // The two deaggro dials need no reapply hook at all: both patches read
+            // their Effective* value fresh at the moment the game asks a targeting
+            // question (ZombieDeaggroPatch on every TargetIsValid call,
+            // BeetleDeaggroPatch around every Targeting scan), rather than writing a
+            // scaled value onto a field that would then need refreshing. Live updates
+            // still work - and apply-changes-live is still honoured, via the snapshot
+            // inside those same Effective* accessors.
+
             // A resize or a rate change can be undone, unlike a removal, so both
             // spore-area tuning dials get the same immediate-reapply treatment as
             // the wind/trigger-radius multipliers - only while live updates are on

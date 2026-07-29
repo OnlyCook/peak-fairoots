@@ -1,4 +1,5 @@
 using BepInEx.Configuration;
+using Fairoots.Core;
 using Fairoots.Core.Presets;
 using Fairoots.Networking;
 using UnityEngine;
@@ -405,6 +406,35 @@ namespace Fairoots
         /// (see <c>Creatures/CreatureKnockbackPatch</c>).
         /// </summary>
         public ConfigEntry<double> CreatureRagdollMultiplierOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for whether zombies can lose a target at all. Vanilla
+        /// zombies never do (see <see cref="Core.ZombieDeaggro"/>), so this exists to
+        /// let a Custom player keep that behavior; presets 1-4 decide it via
+        /// <see cref="PresetCatalog.ZombieDeaggroEnabled"/>, which is off on Subtle
+        /// only. Only takes effect under <see cref="PresetId.Custom"/>.
+        /// </summary>
+        public ConfigEntry<bool> ZombieDeaggroEnabledOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for how hard it is to shake a zombie.
+        /// <b>Unlike every other multiplier in this config, 1.0 is not vanilla</b> -
+        /// it's the toughest setting, and the range stops at 0.1 rather than 0. See
+        /// <see cref="Core.ZombieDeaggro"/> for the full reasoning; the short version
+        /// is that vanilla is "never deaggro", which no finite multiplier can express.
+        /// Only takes effect under <see cref="PresetId.Custom"/>.
+        /// </summary>
+        public ConfigEntry<double> ZombieDeaggroMultiplierOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for how hard it is to shake a beetle - a multiplier on
+        /// the distance at which it keeps a target it already has
+        /// (<see cref="Core.CreatureTuning.ScaleDeaggroDistance"/>). 1.0 = vanilla
+        /// here, unlike <see cref="ZombieDeaggroMultiplierOverride"/>, because beetles
+        /// genuinely do deaggro in vanilla. Only takes effect under
+        /// <see cref="PresetId.Custom"/>.
+        /// </summary>
+        public ConfigEntry<double> BeetleDeaggroMultiplierOverride { get; }
 
         /// <summary>
         /// Master kill switch for the whole cover-your-mouth mechanic. When on, the
@@ -1082,6 +1112,49 @@ namespace Fairoots
                     "effect when preset is set to Custom (5) - ignored under presets 1-4.",
                     new AcceptableValueRange<double>(0.0, 3.0)));
 
+            ZombieDeaggroEnabledOverride = config.Bind(
+                "Creatures",
+                "zombie-deaggro-enabled",
+                true,
+                "Whether zombies can ever lose track of you. In the unmodded game they CANNOT: " +
+                "once a zombie has seen you it chases you forever, at any distance, with no way " +
+                "to shake it. Turn this off to keep that vanilla behavior. Only takes effect when " +
+                "preset is set to Custom (5) - under presets 1-4 this is off on Subtle (which is " +
+                "meant to be vanilla) and on for the other three.");
+
+            ZombieDeaggroMultiplierOverride = config.Bind(
+                "Creatures",
+                "zombie-deaggro-multiplier",
+                0.85,
+                new ConfigDescription(
+                    "How hard it is to shake a zombie once it's after you. NOTE: unlike every " +
+                    "other multiplier in this file, 1.0 does NOT mean vanilla - vanilla zombies " +
+                    "never lose you at all, so there's no vanilla number to scale. Here 1.0 is " +
+                    "the TOUGHEST setting (you must stay out of the zombie's sight for a full 30 " +
+                    "seconds, or get about 120m away) and 0.1 is the most forgiving (about 3 " +
+                    "seconds or 12m). Either escape works on its own. 0 is not allowed - a zombie " +
+                    "that deaggros instantly is a disabled zombie, which is what disable-zombies " +
+                    "is for. Only takes effect when preset is set to Custom (5) - ignored under " +
+                    "presets 1-4.",
+                    new AcceptableValueRange<double>(0.1, 1.0)));
+
+            BeetleDeaggroMultiplierOverride = config.Bind(
+                "Creatures",
+                "beetle-deaggro-multiplier",
+                0.9,
+                new ConfigDescription(
+                    "How hard it is to shake a beetle once it's after you, as a multiplier on the " +
+                    "distance it will keep chasing you from. 1.0 means vanilla (about 8m), 0.5 is " +
+                    "twice as easy to escape, 2.0 twice as hard. Unlike zombies, beetles DO give " +
+                    "up on their own in the unmodded game - both by distance and by losing sight " +
+                    "of you - so this only tunes how sticky that already is. It doesn't change how " +
+                    "far away a beetle can first notice you. Once a beetle does give up, it " +
+                    "ignores everyone for 5 seconds, so it can't instantly re-notice you. 0.1 is " +
+                    "the minimum - a beetle that can never hold a target at all is a disabled " +
+                    "beetle, which is what disable-beetles is for. Only takes effect when preset " +
+                    "is set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.1, 3.0)));
+
             DisableCoverMouth = config.Bind(
                 "Spore-Areas",
                 "disable-cover-mouth",
@@ -1608,6 +1681,28 @@ namespace Fairoots
                 CreatureRagdollMultiplierOverride.Value,
                 UseCustomOverrides);
 
+        /// <summary>Whether zombies can lose a target at all.</summary>
+        public bool ZombieDeaggroEnabled =>
+            UseCustomOverrides
+                ? ZombieDeaggroEnabledOverride.Value
+                : PresetCatalog.ZombieDeaggroEnabled(Preset.Value);
+
+        /// <summary>The effective zombie deaggro difficulty (1.0 = toughest, NOT vanilla).</summary>
+        public double ZombieDeaggroMultiplier =>
+            ZombieDeaggro.ClampMultiplier(
+                OverrideResolution.Resolve(
+                    PresetCatalog.ZombieDeaggroMultiplier(Preset.Value),
+                    ZombieDeaggroMultiplierOverride.Value,
+                    UseCustomOverrides));
+
+        /// <summary>The effective beetle deaggro-distance multiplier (1.0 = vanilla).</summary>
+        public double BeetleDeaggroMultiplier =>
+            BeetleDeaggro.ClampMultiplier(
+                OverrideResolution.Resolve(
+                    PresetCatalog.BeetleDeaggroMultiplier(Preset.Value),
+                    BeetleDeaggroMultiplierOverride.Value,
+                    UseCustomOverrides));
+
         /// <summary>The effective wind-force (and gust-timing) multiplier.</summary>
         public double WindForceMultiplier =>
             OverrideResolution.Resolve(
@@ -1693,6 +1788,9 @@ namespace Fairoots
         private double _snapBeetleSpeedMultiplier;
         private double _snapBeetleKnockbackMultiplier;
         private double _snapCreatureRagdollMultiplier;
+        private bool _snapZombieDeaggroEnabled;
+        private double _snapZombieDeaggroMultiplier;
+        private double _snapBeetleDeaggroMultiplier;
         private double _snapWindForceMultiplier;
         private double _snapWindGustDurationMultiplier;
         private double _snapWindItemForceMultiplier;
@@ -1725,6 +1823,9 @@ namespace Fairoots
             _snapBeetleSpeedMultiplier = BeetleSpeedMultiplier;
             _snapBeetleKnockbackMultiplier = BeetleKnockbackMultiplier;
             _snapCreatureRagdollMultiplier = CreatureRagdollMultiplier;
+            _snapZombieDeaggroEnabled = ZombieDeaggroEnabled;
+            _snapZombieDeaggroMultiplier = ZombieDeaggroMultiplier;
+            _snapBeetleDeaggroMultiplier = BeetleDeaggroMultiplier;
             _snapWindForceMultiplier = WindForceMultiplier;
             _snapWindGustDurationMultiplier = WindGustDurationMultiplier;
             _snapWindItemForceMultiplier = WindItemForceMultiplier;
@@ -1887,6 +1988,30 @@ namespace Fairoots
         /// </summary>
         public double EffectiveCreatureRagdollMultiplier =>
             HostAuthority.Resolve("CreatureRagdollMultiplier", UseLiveValue ? CreatureRagdollMultiplier : _snapCreatureRagdollMultiplier);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="ZombieDeaggroEnabled"/>. Host-authoritative - whether a chase can
+        /// be escaped at all is shared balance, not local feel.
+        /// </summary>
+        public bool EffectiveZombieDeaggroEnabled =>
+            HostAuthority.Resolve("ZombieDeaggroEnabled", UseLiveValue ? ZombieDeaggroEnabled : _snapZombieDeaggroEnabled);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="ZombieDeaggroMultiplier"/>. Host-authoritative and
+        /// level-load-snapshotted.
+        /// </summary>
+        public double EffectiveZombieDeaggroMultiplier =>
+            HostAuthority.Resolve("ZombieDeaggroMultiplier", UseLiveValue ? ZombieDeaggroMultiplier : _snapZombieDeaggroMultiplier);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="BeetleDeaggroMultiplier"/>. Host-authoritative and
+        /// level-load-snapshotted.
+        /// </summary>
+        public double EffectiveBeetleDeaggroMultiplier =>
+            HostAuthority.Resolve("BeetleDeaggroMultiplier", UseLiveValue ? BeetleDeaggroMultiplier : _snapBeetleDeaggroMultiplier);
 
         /// <summary>
         /// Game-facing code should read this instead of
