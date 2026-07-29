@@ -310,6 +310,33 @@ namespace Fairoots.Core.Presets
         }
 
         /// <summary>
+        /// Multiplier applied to how long a beetle's or a zombie's hit keeps the
+        /// player ragdolled (<c>Beetle.ragdollTime</c> 2s /
+        /// <c>MushroomZombie.biteStunTime</c> 3s - see
+        /// <see cref="CreatureTuning.ScaleRagdollTime"/>). 1.0 = vanilla (Subtle),
+        /// 0 = never lose control.
+        ///
+        /// One row for both creatures on purpose: this is the player's own
+        /// "how long am I not in control of my character" budget, which is the same
+        /// complaint regardless of what hit them - unlike speed, where a chase you
+        /// can't outrun and a beetle you can't sidestep are separate problems.
+        ///
+        /// New mechanic, so it has no ROADMAP.md row; values are starting estimates
+        /// pending playtest, in line with the neighbouring rows.
+        /// </summary>
+        public static double CreatureRagdollMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.85;
+                case PresetId.Generous: return 0.65;
+                case PresetId.Tame: return 0.40;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
         /// The unconditional bush/grass placement-removal pass is on for every
         /// preset, including Subtle (ROADMAP.md - the game never prevents a spore
         /// bomb landing in foliage, so this gap is always fixed). Kept as a method

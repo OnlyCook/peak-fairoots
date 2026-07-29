@@ -68,6 +68,7 @@ namespace Fairoots
                     SporeAreaTuningPatch.ReapplyToAll();
                     Creatures.CreatureSpeedPatch.ReapplyToAll();
                     Creatures.CreatureKnockbackPatch.ReapplyToAll();
+                    Creatures.CreatureRagdollPatch.ReapplyToAll();
                 }
             };
 
@@ -116,6 +117,10 @@ namespace Fairoots
             Cfg.BeetleKnockbackMultiplierOverride.SettingChanged += (s, e) =>
             {
                 if (Cfg.ApplyChangesLive.Value) Creatures.CreatureKnockbackPatch.ReapplyToAll();
+            };
+            Cfg.CreatureRagdollMultiplierOverride.SettingChanged += (s, e) =>
+            {
+                if (Cfg.ApplyChangesLive.Value) Creatures.CreatureRagdollPatch.ReapplyToAll();
             };
 
             // A resize or a rate change can be undone, unlike a removal, so both

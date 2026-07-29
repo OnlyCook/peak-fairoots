@@ -89,6 +89,7 @@ namespace Fairoots
                 Creatures.CreatureDisablePatch.ClearLevelState();
                 Creatures.CreatureSpeedPatch.ClearLevelState();
                 Creatures.CreatureKnockbackPatch.ClearLevelState();
+                Creatures.CreatureRagdollPatch.ClearLevelState();
                 SporeBombCloudWarning.ClearLevelState();
                 SporePresence.ClearLevelState();
             }
@@ -131,6 +132,7 @@ namespace Fairoots
             // whose creatures started before the config was ready.
             Creatures.CreatureSpeedPatch.ReapplyToAll();
             Creatures.CreatureKnockbackPatch.ReapplyToAll();
+            Creatures.CreatureRagdollPatch.ReapplyToAll();
 
             // Last: caches this level's spore areas for the per-frame "is the player
             // in spores?" query, after every pass that could have removed or

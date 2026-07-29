@@ -391,6 +391,22 @@ namespace Fairoots
         public ConfigEntry<double> BeetleKnockbackMultiplierOverride { get; }
 
         /// <summary>
+        /// Custom-preset value for the multiplier applied to how long a beetle's or a
+        /// zombie's hit keeps the player ragdolled (<c>Beetle.ragdollTime</c> 2s and
+        /// <c>MushroomZombie.biteStunTime</c> 3s). 1.0 = vanilla; 0 = you are never
+        /// knocked off your feet by either creature and always keep control. Only
+        /// takes effect under <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
+        ///
+        /// One dial for both creatures deliberately - see
+        /// <see cref="PresetCatalog.CreatureRagdollMultiplier"/>. This is also what
+        /// stands in for a "zombie knockback" setting: zombies apply no scripted
+        /// knockback at all, so their hit's actual cost to the player is this ragdoll
+        /// (see <c>Creatures/CreatureKnockbackPatch</c>).
+        /// </summary>
+        public ConfigEntry<double> CreatureRagdollMultiplierOverride { get; }
+
+        /// <summary>
         /// Master kill switch for the whole cover-your-mouth mechanic. When on, the
         /// key does nothing at all: no immunity, no stamina drain, no hand
         /// restrictions, no pose. <b>Host-authoritative</b> (read via
@@ -1050,6 +1066,22 @@ namespace Fairoots
                     "set to Custom (5) - ignored under presets 1-4.",
                     new AcceptableValueRange<double>(0.0, 3.0)));
 
+            CreatureRagdollMultiplierOverride = config.Bind(
+                "Creatures",
+                "creature-ragdoll-multiplier",
+                0.85,
+                new ConfigDescription(
+                    "Multiplier applied to how long a beetle's hit or a zombie's bite knocks you " +
+                    "off your feet, e.g. 0.5 gets you back up twice as fast. 0 means you are " +
+                    "never ragdolled by either creature and always keep control. 1.0 always means " +
+                    "vanilla (2 seconds for a beetle, 3 for a zombie bite). The hit still lands " +
+                    "either way: you still take the injury and spores, and a beetle still shoves " +
+                    "you (that's beetle-knockback-multiplier above) - this only decides whether " +
+                    "you lose control of your character. Zombies have no separate knockback " +
+                    "setting because this ragdoll IS what a zombie's hit costs you. Only takes " +
+                    "effect when preset is set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 3.0)));
+
             DisableCoverMouth = config.Bind(
                 "Spore-Areas",
                 "disable-cover-mouth",
@@ -1569,6 +1601,13 @@ namespace Fairoots
                 BeetleKnockbackMultiplierOverride.Value,
                 UseCustomOverrides);
 
+        /// <summary>The effective ragdoll-duration multiplier for beetle hits and zombie bites.</summary>
+        public double CreatureRagdollMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.CreatureRagdollMultiplier(Preset.Value),
+                CreatureRagdollMultiplierOverride.Value,
+                UseCustomOverrides);
+
         /// <summary>The effective wind-force (and gust-timing) multiplier.</summary>
         public double WindForceMultiplier =>
             OverrideResolution.Resolve(
@@ -1653,6 +1692,7 @@ namespace Fairoots
         private double _snapZombieSpeedMultiplier;
         private double _snapBeetleSpeedMultiplier;
         private double _snapBeetleKnockbackMultiplier;
+        private double _snapCreatureRagdollMultiplier;
         private double _snapWindForceMultiplier;
         private double _snapWindGustDurationMultiplier;
         private double _snapWindItemForceMultiplier;
@@ -1684,6 +1724,7 @@ namespace Fairoots
             _snapZombieSpeedMultiplier = ZombieSpeedMultiplier;
             _snapBeetleSpeedMultiplier = BeetleSpeedMultiplier;
             _snapBeetleKnockbackMultiplier = BeetleKnockbackMultiplier;
+            _snapCreatureRagdollMultiplier = CreatureRagdollMultiplier;
             _snapWindForceMultiplier = WindForceMultiplier;
             _snapWindGustDurationMultiplier = WindGustDurationMultiplier;
             _snapWindItemForceMultiplier = WindItemForceMultiplier;
@@ -1837,6 +1878,15 @@ namespace Fairoots
         /// </summary>
         public double EffectiveBeetleKnockbackMultiplier =>
             HostAuthority.Resolve("BeetleKnockbackMultiplier", UseLiveValue ? BeetleKnockbackMultiplier : _snapBeetleKnockbackMultiplier);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="CreatureRagdollMultiplier"/>. Host-authoritative and
+        /// level-load-snapshotted, same shape as
+        /// <see cref="EffectiveBeetleKnockbackMultiplier"/>.
+        /// </summary>
+        public double EffectiveCreatureRagdollMultiplier =>
+            HostAuthority.Resolve("CreatureRagdollMultiplier", UseLiveValue ? CreatureRagdollMultiplier : _snapCreatureRagdollMultiplier);
 
         /// <summary>
         /// Game-facing code should read this instead of

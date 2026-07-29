@@ -60,6 +60,31 @@ namespace Fairoots.Core
         }
 
         /// <summary>
+        /// Scales how long a creature's hit keeps the player ragdolled - the argument
+        /// both creatures pass to <c>Character.Fall(seconds)</c>:
+        /// <c>Beetle.ragdollTime</c> (vanilla 2s) and <c>MushroomZombie.biteStunTime</c>
+        /// (vanilla 3s). Lower means you get back on your feet sooner, i.e. it is
+        /// harder for a creature to take control away from you.
+        ///
+        /// <b>Zero genuinely means "never ragdoll", not "ragdoll for an instant"</b>,
+        /// and that falls out of vanilla's own code rather than needing a special
+        /// case: <c>Character.RPCA_Fall</c> only ever raises the timer
+        /// (<c>if (seconds &gt; data.fallSeconds) data.fallSeconds = seconds;</c>), so a
+        /// scaled-to-zero duration can never satisfy that comparison and the player's
+        /// ragdoll control is left exactly as it was. That same one-way rule is also
+        /// why this can only ever shorten a *new* knockdown and never cuts an
+        /// in-progress one short.
+        ///
+        /// Only the ragdoll is affected. The hit still lands, still applies its
+        /// status/afflictions, and still shoves you - being pushed around while
+        /// keeping control is the point of the dial.
+        /// </summary>
+        public static float ScaleRagdollTime(float vanillaSeconds, double multiplier)
+        {
+            return (float)(vanillaSeconds * Math.Max(0.0, multiplier));
+        }
+
+        /// <summary>
         /// Whether a multiplier is close enough to 1.0 to be treated as "leave the
         /// game alone". Used by the restore paths so a dial sitting at vanilla puts
         /// the exact authored value back rather than a float-rounded near-miss of it.
