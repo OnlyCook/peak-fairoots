@@ -376,6 +376,21 @@ namespace Fairoots
         public ConfigEntry<double> BeetleSpeedMultiplierOverride { get; }
 
         /// <summary>
+        /// Custom-preset value for the multiplier applied to how hard a beetle's hit
+        /// throws you (<c>Beetle.bonkForce</c>/<c>bonkForceUp</c>, both vanilla 100).
+        /// 1.0 = vanilla, 0 = the hit still lands (and still ragdolls you - that's a
+        /// separate dial) but doesn't move you. Only takes effect under
+        /// <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
+        ///
+        /// Both force components are scaled together so the shove keeps its vanilla
+        /// angle - see <see cref="Core.CreatureTuning.ScaleKnockback"/>. There is no
+        /// zombie equivalent because zombies have no scripted knockback to scale; see
+        /// <c>Creatures/CreatureKnockbackPatch</c>.
+        /// </summary>
+        public ConfigEntry<double> BeetleKnockbackMultiplierOverride { get; }
+
+        /// <summary>
         /// Master kill switch for the whole cover-your-mouth mechanic. When on, the
         /// key does nothing at all: no immunity, no stamina drain, no hand
         /// restrictions, no pose. <b>Host-authoritative</b> (read via
@@ -1020,6 +1035,21 @@ namespace Fairoots
                     "presets 1-4.",
                     new AcceptableValueRange<double>(0.0, 3.0)));
 
+            BeetleKnockbackMultiplierOverride = config.Bind(
+                "Creatures",
+                "beetle-knockback-multiplier",
+                0.8,
+                new ConfigDescription(
+                    "Multiplier applied to how hard a beetle's hit throws you, e.g. 0.5 halves " +
+                    "the shove, 0 means it doesn't move you at all. 1.0 always means vanilla. " +
+                    "This is only the force - whether the hit knocks you off your feet is the " +
+                    "separate creature-ragdoll-resistance-multiplier below. Zombies have no " +
+                    "equivalent setting because the game gives them no knockback of their own: " +
+                    "what a zombie does is ragdoll you (see that other setting) and shove you " +
+                    "with its body, which is ordinary physics. Only takes effect when preset is " +
+                    "set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 3.0)));
+
             DisableCoverMouth = config.Bind(
                 "Spore-Areas",
                 "disable-cover-mouth",
@@ -1532,6 +1562,13 @@ namespace Fairoots
                 BeetleSpeedMultiplierOverride.Value,
                 UseCustomOverrides);
 
+        /// <summary>The effective knockback multiplier for every beetle.</summary>
+        public double BeetleKnockbackMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.BeetleKnockbackMultiplier(Preset.Value),
+                BeetleKnockbackMultiplierOverride.Value,
+                UseCustomOverrides);
+
         /// <summary>The effective wind-force (and gust-timing) multiplier.</summary>
         public double WindForceMultiplier =>
             OverrideResolution.Resolve(
@@ -1615,6 +1652,7 @@ namespace Fairoots
         private double _snapSporeAreaStatusRateMultiplier;
         private double _snapZombieSpeedMultiplier;
         private double _snapBeetleSpeedMultiplier;
+        private double _snapBeetleKnockbackMultiplier;
         private double _snapWindForceMultiplier;
         private double _snapWindGustDurationMultiplier;
         private double _snapWindItemForceMultiplier;
@@ -1645,6 +1683,7 @@ namespace Fairoots
             _snapSporeAreaStatusRateMultiplier = SporeAreaStatusRateMultiplier;
             _snapZombieSpeedMultiplier = ZombieSpeedMultiplier;
             _snapBeetleSpeedMultiplier = BeetleSpeedMultiplier;
+            _snapBeetleKnockbackMultiplier = BeetleKnockbackMultiplier;
             _snapWindForceMultiplier = WindForceMultiplier;
             _snapWindGustDurationMultiplier = WindGustDurationMultiplier;
             _snapWindItemForceMultiplier = WindItemForceMultiplier;
@@ -1789,6 +1828,15 @@ namespace Fairoots
         /// </summary>
         public double EffectiveBeetleSpeedMultiplier =>
             HostAuthority.Resolve("BeetleSpeedMultiplier", UseLiveValue ? BeetleSpeedMultiplier : _snapBeetleSpeedMultiplier);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="BeetleKnockbackMultiplier"/>. Host-authoritative and
+        /// level-load-snapshotted, same shape as
+        /// <see cref="EffectiveBeetleSpeedMultiplier"/>.
+        /// </summary>
+        public double EffectiveBeetleKnockbackMultiplier =>
+            HostAuthority.Resolve("BeetleKnockbackMultiplier", UseLiveValue ? BeetleKnockbackMultiplier : _snapBeetleKnockbackMultiplier);
 
         /// <summary>
         /// Game-facing code should read this instead of

@@ -287,6 +287,29 @@ namespace Fairoots.Core.Presets
         }
 
         /// <summary>
+        /// Multiplier applied to a beetle's knockback shove
+        /// (<c>Beetle.bonkForce</c>/<c>bonkForceUp</c>, both vanilla 100), per
+        /// ROADMAP.md's "Beetle knockback force" row (-20%/-35%/-50%). 1.0 = vanilla
+        /// (Subtle).
+        ///
+        /// There is deliberately no zombie counterpart in this catalog: a zombie
+        /// applies no scripted knockback at all (decompile-confirmed - see
+        /// <c>Creatures/CreatureKnockbackPatch</c>), so there is no vanilla number for
+        /// a zombie row to scale.
+        /// </summary>
+        public static double BeetleKnockbackMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.80;
+                case PresetId.Generous: return 0.65;
+                case PresetId.Tame: return 0.50;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
         /// The unconditional bush/grass placement-removal pass is on for every
         /// preset, including Subtle (ROADMAP.md - the game never prevents a spore
         /// bomb landing in foliage, so this gap is always fixed). Kept as a method

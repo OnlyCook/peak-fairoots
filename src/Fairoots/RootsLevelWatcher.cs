@@ -88,6 +88,7 @@ namespace Fairoots
                 SporeAreas.CoverMouthImmunityPatch.ClearLevelState();
                 Creatures.CreatureDisablePatch.ClearLevelState();
                 Creatures.CreatureSpeedPatch.ClearLevelState();
+                Creatures.CreatureKnockbackPatch.ClearLevelState();
                 SporeBombCloudWarning.ClearLevelState();
                 SporePresence.ClearLevelState();
             }
@@ -129,6 +130,7 @@ namespace Fairoots
             // (and so have been scaled by MobStartSpeedPatch); this catches a level
             // whose creatures started before the config was ready.
             Creatures.CreatureSpeedPatch.ReapplyToAll();
+            Creatures.CreatureKnockbackPatch.ReapplyToAll();
 
             // Last: caches this level's spore areas for the per-frame "is the player
             // in spores?" query, after every pass that could have removed or

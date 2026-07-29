@@ -37,6 +37,29 @@ namespace Fairoots.Core
         }
 
         /// <summary>
+        /// Scales a creature's vanilla knockback impulse. Currently the beetle's
+        /// <c>bonkForce</c>/<c>bonkForceUp</c> (both vanilla 100), the horizontal and
+        /// vertical components of the shove in <c>Beetle.InflictAttack</c>. Both are
+        /// scaled by the same multiplier so the shove keeps its vanilla *angle* and
+        /// only changes in magnitude - scaling one alone would turn a knockback dial
+        /// into a "beetles now launch you straight up" dial.
+        ///
+        /// Deliberately does not touch the third parameter of that same call,
+        /// <c>bonkRange</c>: that's the radius over which the impulse falls off across
+        /// the player's bodyparts (see <c>Character.RPCA_AddForceAtPosition</c>), i.e.
+        /// how the hit is distributed, not how hard it is.
+        ///
+        /// Same baseline rule as <see cref="ScaleMovementSpeed"/>: pass the cached
+        /// vanilla value, never the field's current one. Clamped at zero, so a
+        /// negative multiplier means "no knockback" rather than "beetles now pull you
+        /// towards them".
+        /// </summary>
+        public static float ScaleKnockback(float vanillaForce, double multiplier)
+        {
+            return (float)(vanillaForce * Math.Max(0.0, multiplier));
+        }
+
+        /// <summary>
         /// Whether a multiplier is close enough to 1.0 to be treated as "leave the
         /// game alone". Used by the restore paths so a dial sitting at vanilla puts
         /// the exact authored value back rather than a float-rounded near-miss of it.

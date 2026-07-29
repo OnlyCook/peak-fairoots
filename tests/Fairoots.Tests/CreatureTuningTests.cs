@@ -17,6 +17,7 @@ namespace Fairoots.Tests
         // Decompile-confirmed vanilla values.
         private const float VanillaBeetleSpeed = 5f;      // Mob.movementSpeed
         private const float VanillaZombieForce = 10f;     // CharacterMovement.movementForce
+        private const float VanillaBeetleBonkForce = 100f; // Beetle.bonkForce / bonkForceUp
 
         [Fact]
         public void MultiplierOfOne_IsExactlyVanilla()
@@ -71,6 +72,48 @@ namespace Fairoots.Tests
             Assert.False(CreatureTuning.IsVanilla(1.01));
         }
 
+        [Fact]
+        public void Knockback_MultiplierOfOne_IsExactlyVanilla()
+        {
+            Assert.Equal(VanillaBeetleBonkForce, CreatureTuning.ScaleKnockback(VanillaBeetleBonkForce, 1.0));
+        }
+
+        [Fact]
+        public void Knockback_ScalesBothComponentsIdentically_SoTheShoveKeepsItsAngle()
+        {
+            // bonkForce and bonkForceUp are the horizontal and vertical halves of one
+            // shove. Scaling them by the same factor must preserve their ratio, or the
+            // knockback dial quietly becomes a "beetles launch you upwards" dial.
+            const float forward = 100f;
+            const float up = 100f;
+            const double multiplier = 0.35;
+
+            float scaledForward = CreatureTuning.ScaleKnockback(forward, multiplier);
+            float scaledUp = CreatureTuning.ScaleKnockback(up, multiplier);
+
+            Assert.Equal(forward / up, scaledForward / scaledUp, 5);
+        }
+
+        [Fact]
+        public void Knockback_AsymmetricBaselineKeepsItsOwnAsymmetry()
+        {
+            // A beetle authored off the class default must keep its own ratio, which is
+            // why both components are cached rather than one plus a shared ratio.
+            float scaledForward = CreatureTuning.ScaleKnockback(120f, 0.5);
+            float scaledUp = CreatureTuning.ScaleKnockback(80f, 0.5);
+
+            Assert.Equal(60f, scaledForward, 4);
+            Assert.Equal(40f, scaledUp, 4);
+            Assert.Equal(120f / 80f, scaledForward / scaledUp, 5);
+        }
+
+        [Fact]
+        public void Knockback_ZeroAndNegativeBothMeanNoShove_NeverAPull()
+        {
+            Assert.Equal(0f, CreatureTuning.ScaleKnockback(VanillaBeetleBonkForce, 0.0));
+            Assert.Equal(0f, CreatureTuning.ScaleKnockback(VanillaBeetleBonkForce, -2.0));
+        }
+
         [Theory]
         [InlineData(PresetId.Subtle)]
         [InlineData(PresetId.Balanced)]
@@ -81,6 +124,8 @@ namespace Fairoots.Tests
         {
             double zombie = PresetCatalog.ZombieSpeedMultiplier(preset);
             double beetle = PresetCatalog.BeetleSpeedMultiplier(preset);
+            double knockback = PresetCatalog.BeetleKnockbackMultiplier(preset);
+            Assert.InRange(knockback, 0.0, 1.0);
 
             // ROADMAP.md's row only ever slows creatures down; a preset that sped one
             // up would be a typo, not a balance choice.
@@ -93,6 +138,7 @@ namespace Fairoots.Tests
         {
             Assert.Equal(1.0, PresetCatalog.ZombieSpeedMultiplier(PresetId.Subtle));
             Assert.Equal(1.0, PresetCatalog.BeetleSpeedMultiplier(PresetId.Subtle));
+            Assert.Equal(1.0, PresetCatalog.BeetleKnockbackMultiplier(PresetId.Subtle));
 
             Assert.True(PresetCatalog.ZombieSpeedMultiplier(PresetId.Balanced) > PresetCatalog.ZombieSpeedMultiplier(PresetId.Generous));
             Assert.True(PresetCatalog.ZombieSpeedMultiplier(PresetId.Generous) > PresetCatalog.ZombieSpeedMultiplier(PresetId.Tame));

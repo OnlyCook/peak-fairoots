@@ -67,6 +67,7 @@ namespace Fairoots
                     WindChillZoneTuningPatch.ReapplyAll();
                     SporeAreaTuningPatch.ReapplyToAll();
                     Creatures.CreatureSpeedPatch.ReapplyToAll();
+                    Creatures.CreatureKnockbackPatch.ReapplyToAll();
                 }
             };
 
@@ -112,6 +113,10 @@ namespace Fairoots
             };
             Cfg.ZombieSpeedMultiplierOverride.SettingChanged += reapplyCreatureSpeed;
             Cfg.BeetleSpeedMultiplierOverride.SettingChanged += reapplyCreatureSpeed;
+            Cfg.BeetleKnockbackMultiplierOverride.SettingChanged += (s, e) =>
+            {
+                if (Cfg.ApplyChangesLive.Value) Creatures.CreatureKnockbackPatch.ReapplyToAll();
+            };
 
             // A resize or a rate change can be undone, unlike a removal, so both
             // spore-area tuning dials get the same immediate-reapply treatment as
