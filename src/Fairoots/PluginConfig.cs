@@ -506,6 +506,28 @@ namespace Fairoots
         public ConfigEntry<double> CreatureKnockoutMaxThrowDistance { get; }
 
         /// <summary>
+        /// Whether a blowgun dart takes a creature out of the fight: zombies die, spiders
+        /// and beetles are stunned for <see cref="BlowgunCreatureStunSeconds"/>. See
+        /// <c>Creatures/BlowgunCreaturePatch</c> for why the outcomes differ (only the
+        /// zombie has a death state to reach) and why vanilla darts can't hit a spider or
+        /// beetle at all.
+        ///
+        /// On by default: the dart is a consumable fired from an uncommon item, so the
+        /// mechanic is self-limiting, and its whole purpose is to give the blowgun a use
+        /// against creatures it currently passes straight through. Host-authoritative and
+        /// flat.
+        /// </summary>
+        public ConfigEntry<bool> BlowgunAffectsCreatures { get; }
+
+        /// <summary>
+        /// How long a blowgun dart stuns a spider or a beetle, in seconds. Zombies aren't
+        /// covered by this - they die outright, which has no duration - so turning this to
+        /// 0 leaves darts lethal to zombies while harmless to the other two.
+        /// Host-authoritative and flat.
+        /// </summary>
+        public ConfigEntry<double> BlowgunCreatureStunSeconds { get; }
+
+        /// <summary>
         /// Master kill switch for the whole cover-your-mouth mechanic. When on, the
         /// key does nothing at all: no immunity, no stamina drain, no hand
         /// restrictions, no pose. <b>Host-authoritative</b> (read via
@@ -1288,7 +1310,7 @@ namespace Fairoots
                     "genuinely committed throw. This is a flat setting, so it is the same under " +
                     "every preset including Balanced. HOST-AUTHORITATIVE: only the host's value " +
                     "counts for the whole lobby.",
-                    new AcceptableValueRange<double>(0.0, 100.0)));
+                    new AcceptableValueRange<double>(0.0, 50.0)));
 
             CreatureKnockoutMaxThrowDistance = config.Bind(
                 "Creatures",
@@ -1303,6 +1325,32 @@ namespace Fairoots
                     "off from somewhere safe. 0 removes the distance requirement. " +
                     "HOST-AUTHORITATIVE: only the host's value counts for the whole lobby.",
                     new AcceptableValueRange<double>(0.0, 200.0)));
+
+            BlowgunAffectsCreatures = config.Bind(
+                "Creatures",
+                "blowgun-affects-creatures",
+                true,
+                "When on, shooting a creature with a blowgun dart takes it out of the fight: a " +
+                "zombie dies (exactly the way it already does on its own after two minutes, " +
+                "skeleton included), while a spider or a beetle is knocked out for a long time " +
+                "(see blowgun-creature-stun-seconds). Spiders and beetles get stunned rather than " +
+                "killed because the game has no death state for them at all. In the unmodded game " +
+                "a dart passes straight through a spider or beetle and merely poisons a zombie. On " +
+                "by default - darts are consumable and the blowgun is uncommon, so this can't be " +
+                "spammed. HOST-AUTHORITATIVE: only the host's value counts for the whole lobby.");
+
+            BlowgunCreatureStunSeconds = config.Bind(
+                "Creatures",
+                "blowgun-creature-stun-seconds",
+                60.0,
+                new ConfigDescription(
+                    "How many seconds a blowgun dart knocks out a spider or a beetle for. Doesn't " +
+                    "apply to zombies, which die outright instead; set this to 0 if you want darts " +
+                    "to kill zombies but leave spiders and beetles alone. Much longer than a " +
+                    "thrown item's knockout on purpose - a dart costs you a consumable and only " +
+                    "works if you actually hit. HOST-AUTHORITATIVE: only the host's value counts " +
+                    "for the whole lobby.",
+                    new AcceptableValueRange<double>(0.0, 600.0)));
 
             DisableCoverMouth = config.Bind(
                 "Spore-Areas",
@@ -2167,6 +2215,20 @@ namespace Fairoots
         /// </summary>
         public double EffectiveCreatureKnockoutMaxThrowDistance =>
             HostAuthority.Resolve("CreatureKnockoutMaxThrowDistance", CreatureKnockoutMaxThrowDistance.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="BlowgunAffectsCreatures"/>. Host-authoritative, flat.
+        /// </summary>
+        public bool EffectiveBlowgunAffectsCreatures =>
+            HostAuthority.Resolve("BlowgunAffectsCreatures", BlowgunAffectsCreatures.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="BlowgunCreatureStunSeconds"/>. Host-authoritative, flat.
+        /// </summary>
+        public double EffectiveBlowgunCreatureStunSeconds =>
+            HostAuthority.Resolve("BlowgunCreatureStunSeconds", BlowgunCreatureStunSeconds.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of

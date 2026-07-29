@@ -166,6 +166,37 @@ namespace Fairoots.Tests
             Assert.Equal((float)expected, CreatureKnockout.ResolveMinThrowSpeedMeters(configured), 4);
         }
 
+        // --- Blowgun -----------------------------------------------------------
+
+        [Fact]
+        public void BlowgunStunIsFarLongerThanAThrownItemKnockout()
+        {
+            // A dart costs a consumable and has to actually hit, so it should be
+            // decisive rather than an interruption. If these ever converge, the blowgun
+            // has stopped being worth the item.
+            Assert.True(CreatureKnockout.MaxBlowgunStunSeconds > CreatureKnockout.MaxSeconds);
+            Assert.True(CreatureKnockout.ResolveBlowgunStunSeconds(60.0)
+                      > CreatureKnockout.ResolveSeconds(4.0) * 10f);
+        }
+
+        [Fact]
+        public void BlowgunStunOfZeroSparesSpidersAndBeetles()
+        {
+            // Documented behaviour: 0 leaves darts lethal to zombies (governed by the
+            // on/off toggle, since "die" has no duration) while harmless to the other two.
+            Assert.Equal(0f, CreatureKnockout.ResolveBlowgunStunSeconds(0.0));
+        }
+
+        [Theory]
+        [InlineData(-1.0, 0.0)]
+        [InlineData(double.NaN, 0.0)]
+        [InlineData(60.0, 60.0)]
+        [InlineData(99999.0, CreatureKnockout.MaxBlowgunStunSeconds)]
+        public void BlowgunStunIsClampedToASaneRange(double configured, double expected)
+        {
+            Assert.Equal((float)expected, CreatureKnockout.ResolveBlowgunStunSeconds(configured), 4);
+        }
+
         [Fact]
         public void ThresholdIsSharedSoBothCreaturesAgreeOnWhatAHardThrowIs()
         {

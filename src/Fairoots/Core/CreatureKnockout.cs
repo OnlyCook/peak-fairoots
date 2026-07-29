@@ -60,11 +60,40 @@ namespace Fairoots.Core
         /// </summary>
         public const float VanillaBonkableThresholdUnits = 5f;
 
-        /// <summary>The largest throw speed the setting will accept, in meters per second.</summary>
-        public const double MaxMinThrowSpeedMeters = 100.0;
+        /// <summary>
+        /// The largest throw speed the setting will accept, in meters per second. Capped at
+        /// 50 because the game itself can't produce a throw beyond roughly that (the fastest
+        /// logged full-strength throw was 42.5 m/s), so anything higher would only be a way
+        /// to switch the mechanic off by accident while looking like a tuning value.
+        /// </summary>
+        public const double MaxMinThrowSpeedMeters = 50.0;
 
         /// <summary>The largest throw distance the setting will accept, in meters.</summary>
         public const double MaxThrowDistanceMeters = 200.0;
+
+        /// <summary>
+        /// Longest blowgun stun the setting will honour. Far higher than
+        /// <see cref="MaxSeconds"/> because the blowgun is meant to be decisive rather
+        /// than a brief interruption - it costs a rare item and a consumable dart, and
+        /// the maintainer's spec is that spiders and beetles go down "for a long time"
+        /// where zombies die outright.
+        /// </summary>
+        public const double MaxBlowgunStunSeconds = 600.0;
+
+        /// <summary>
+        /// Clamps the configured blowgun stun, in seconds. 0 means a dart leaves
+        /// spiders and beetles alone (zombies are governed by the on/off toggle
+        /// instead, since "die" has no duration to zero out).
+        /// </summary>
+        public static float ResolveBlowgunStunSeconds(double configuredSeconds)
+        {
+            if (double.IsNaN(configuredSeconds))
+            {
+                return 0f;
+            }
+
+            return (float)Math.Min(MaxBlowgunStunSeconds, Math.Max(0.0, configuredSeconds));
+        }
 
         /// <summary>
         /// Measured impact speeds from live testing (2026-07-29), in m/s, kept because

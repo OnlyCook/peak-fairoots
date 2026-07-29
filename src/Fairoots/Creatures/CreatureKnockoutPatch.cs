@@ -67,9 +67,9 @@ namespace Fairoots.Creatures
         /// players still see the zombie go down rather than watching it stand upright
         /// while it lies down on the owner's screen.
         /// </summary>
-        internal static bool KnockOutZombie(MushroomZombie zombie, float seconds)
+        internal static bool KnockOutZombie(MushroomZombie zombie, float seconds, bool force = false)
         {
-            if (zombie == null || seconds <= 0f || RemainingZombieKnockout(zombie) > 0f)
+            if (zombie == null || seconds <= 0f || (!force && RemainingZombieKnockout(zombie) > 0f))
             {
                 return false;
             }
@@ -251,9 +251,9 @@ namespace Fairoots.Creatures
         /// still calls <c>Attacking()</c>, so it would keep hitting anyone in reach while
         /// "unconscious".
         /// </summary>
-        internal static bool KnockOutBeetle(Beetle beetle, float seconds)
+        internal static bool KnockOutBeetle(Beetle beetle, float seconds, bool force = false)
         {
-            if (beetle == null || seconds <= 0f || IsBeetleKnockedOut(beetle))
+            if (beetle == null || seconds <= 0f || (!force && IsBeetleKnockedOut(beetle)))
             {
                 return false;
             }
@@ -265,6 +265,11 @@ namespace Fairoots.Creatures
 
             BeetleKnockedOutUntil[beetle.GetInstanceID()] = Time.time + seconds;
             MobStateAccess.SetRigidbodyControlled(beetle);
+
+            // Tell every client to show the stun marker for this long. Sent from here
+            // rather than driven by polling the registry above, because that registry only
+            // exists on the beetle's owner - see BeetleStunIndicator.
+            beetle.GetComponent<BeetleStunIndicator>()?.Broadcast(seconds);
 
             Diag.V($"[Creatures] beetle \"{beetle.gameObject.name}\" knocked out for {seconds:0.##}s");
             return true;
