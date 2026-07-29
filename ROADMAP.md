@@ -239,11 +239,14 @@ once and left alone).
 | Spore area lethality (status/sec) | vanilla | −15% | −35% | −55% |
 | Spore area screen-filter opacity (superseded — see the cloud-translucency note below) | vanilla | −20% | −40% | −60% |
 | Wind disperses spore areas | if not already vanilla behavior, on | on | on | on, generous |
-| Zombie/beetle move speed | vanilla | −10% | −20% | −35% |
-| Zombie deaggro (currently: never) | none (still never, matches vanilla) | deaggro past a large distance | deaggro past a moderate distance | deaggro quickly past a short distance |
+| Zombie move speed (split from the beetle row — different fields, different classes) | vanilla | −10% | −20% | −35% |
+| Beetle move speed | vanilla | −10% | −20% | −35% |
+| Zombie deaggro (vanilla: never) | off (still never, matches vanilla) | 0.85 | 0.60 | 0.35 |
+| Beetle deaggro stickiness | vanilla | 0.90 | 0.75 | 0.55 |
 | Beetle knockback force | vanilla | −20% | −35% | −50% |
-| Spider attack audio telegraph | ✅ on (uses existing ~0.25s pre-attack window) | ✅ on | ✅ on, slightly earlier | ✅ on, earliest |
-| Full zombie disable option | available, off by default | available, off by default | available, off by default | available, **on by default** |
+| Creature ragdoll duration (beetle hit + zombie bite) | vanilla | −15% | −35% | −60% |
+| Spider attack telegraph (on-screen label, **not** audio — see below) | flat setting, off by default | flat, off by default | flat, off by default | flat, off by default |
+| Creature disable options (zombies / beetles / spiders, three switches) | available, off by default | available, off by default | available, off by default | available, off by default |
 | Honeycomb / stove spawn-weight nudge | none | slight increase | moderate increase | generous increase |
 
 Preset 2's specific numbers are meant to represent "the tuning the maintainer
@@ -649,17 +652,49 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   for now; a rework would have to anchor the hands to something steadier than
   the animated head. Live-verified: 66 releases, 66 resumes, with
   ticks landing throughout.
-- **Creatures**: zombies currently have **no distance-based deaggro at
-  all** once they've targeted a player (confirmed absent in code, not just
-  hard to find) — this is the one creature change that's genuinely new
-  logic rather than a field tweak. Beetles already deaggro past a fixed
-  sleep distance, so tuning that existing distance is simpler. A
-  full-zombie-disable option is a very cheap win — the spawner system
-  already has an internal mechanism that discards most placed zombie
-  spawners at random on level load, and a global cap that's trivial to zero
-  out. Spiders already have a ~0.25-second animation-trigger window before
-  their attack lands, which the new audio-telegraph mechanic can hook
-  directly instead of inventing attack-phase detection from scratch.
+- **Creatures — implemented 2026-07-29 (Phase 7). Several of this section's
+  original assumptions turned out to be wrong; what actually shipped, and
+  why, is below.** Confirmed correct: zombies have **no distance-based
+  deaggro at all** once they've targeted a player, so that dial is genuinely
+  new logic rather than a field tweak, and it cannot use "1.0 = vanilla"
+  because vanilla is *never* — 1.0 is instead the toughest setting and 0 is
+  excluded. Its 30-second base is the game's own `Scoutmaster` lost-track
+  constant rather than an invented number. Corrections and additions:
+  - **Zombies have no knockback to scale.** Their only attack applies status
+    plus `Character.Fall`; the lunge is plain ragdoll physics; and
+    `MushroomZombie.reachForce` is a dead field (the only `reachForce`
+    actually read belongs to `Scoutmaster`). So there is no zombie
+    counterpart to the beetle knockback row — what reads as zombie knockback
+    is the bite's ragdoll, which the new creature-ragdoll row covers.
+  - **The spider telegraph is visual, not audio.** The plan assumed a
+    "~0.25-second animation-trigger window" to hook. There is no such
+    window: the grab is `SpiderTrigger.OnTriggerEnter`, instant on contact,
+    and the only existing cue plays in the *same frame* the drop begins. The
+    usable lead time is the drop's own travel time, so the mechanic surfaces
+    that as an on-screen label instead.
+  - **"Full zombie disable" became three switches**, one per creature, since
+    a beetle, a zombie and a spider are three different complaints and each
+    needs an entirely different mechanism (spawn-loop suppression,
+    deactivate-and-restore, and behaviour suppression respectively — a
+    spider's own distance culling re-drives its root's active state, so it
+    can't simply be deactivated). All flat and off by default; no preset
+    turns one on, which supersedes the old Preset 4 default.
+  - **Beetles do deaggro in vanilla, but not via sleep distance** as assumed
+    — `Mob.Targeting` re-picks the nearest player within `aggroDistance`
+    *that it also has line of sight to*, and assigns the result including
+    `null`. Line of sight is the binding constraint in Roots terrain, not
+    distance (the Roots prefab's `aggroDistance` is already ~22.4m, not the
+    class default's ~8m), which is why tuning the radius alone did nothing
+    and the dial holds a target directly instead.
+  - **New mechanics with no preset rows** (all flat + host-authoritative,
+    since they are player counterplay rather than difficulty curves):
+    thrown-item knockouts for beetles and zombies, gated on a charged throw
+    from close range; blowgun darts killing zombies and stunning spiders and
+    beetles; and wind affecting creatures. The wind item needed **two**
+    settings, not one: zombies already take wind at 0.6× a player's force so
+    theirs is a true multiplier, whereas beetles are wind-immune by
+    construction (`Mob.FixedUpdate` zeroes their velocity every tick) so
+    theirs is a susceptibility with 0 as vanilla.
 - **Achievements** (honeycomb/Gourmand, stove/Cryptogastronomy): the
   achievement logic itself has no RNG in it — the actual rarity is entirely
   in level-gen spawn-pool weight data, which lives in Unity scene assets, not
@@ -797,9 +832,11 @@ other PEAK mods already use.
    the new cover-mouth mechanic. Screen-filter opacity and any UI/indicator
    work are explicitly **not** in this phase's scope (maintainer's call,
    2026-07-27).
-7. **Phase 7:** Creatures — zombie deaggro (new logic), zombie/beetle speed
-   and knockback scaling, full-disable option, spider attack telegraph
-   audio.
+7. **Phase 7:** Creatures (**done**, 2026-07-29 — see the creatures note
+   above for what changed against this plan). Shipped: three disable
+   switches, zombie/beetle speed, beetle knockback, creature ragdoll
+   duration, zombie and beetle deaggro, the spider strike indicator,
+   thrown-item knockouts, blowgun creature effects, and wind on creatures.
 8. **Phase 8:** Achievement spawn-rate nudges (honeycomb, stove) — lowest
    priority per `OVERVIEW.md`'s own parenthetical framing of these two
    bullets.
@@ -825,10 +862,13 @@ AssetRipper, not more decompilation). At the design level, still undecided:
   shared gameplay — an individual client's own local config for those
   settings is always overridden. `OVERVIEW.md`'s original "host-only
   (probably)" framing is now locked in with that clarification.
-- Whether the "full zombie disable" option (Preset 4 default) should also be
-  exposed as a standalone toggle independent of presets, given it overlaps
-  with the game's own pre-existing (cosmetic-only) `ZombiePhobiaSetting`
-  accessibility option.
+- **Creature disable options — RESOLVED (2026-07-29).** Shipped as three
+  standalone, flat toggles (`disable-zombies`/`disable-beetles`/
+  `disable-spiders`), independent of presets and off by default, rather than
+  a single preset-driven "full zombie disable". No preset turns any of them
+  on. They don't overlap with the game's own `ZombiePhobiaSetting`, which is
+  cosmetic only — it swaps the zombie's model and mutes its grunts but leaves
+  AI, aggro and attacks fully intact.
 - **Wind-induced fall camera-spin dampening scope — RESOLVED (2026-07-22).**
   The maintainer chose the wind-preceded-only option, not the simpler
   every-fall version: an ordinary fall is generally the player's own fault,

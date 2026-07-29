@@ -17,7 +17,7 @@ Two layers, per ROADMAP.md's testing strategy:
    ```
 
    Current coverage (Phase 2 seed/preset core + Phase 4 spore bombs + Phase 5
-   wind, no game install required):
+   wind + Phase 6 spore areas + Phase 7 creatures, no game install required):
    - **Determinism** (`DeterministicHashTests`): the `(seed, mechanic,
      position) → value` hash is stable for identical inputs, uniform enough to
      use as a probability, and decorrelated across different seeds and
@@ -148,6 +148,51 @@ Two layers, per ROADMAP.md's testing strategy:
      exposed ground a free crossing), never above 1 (it's a reduction, not an
      amplifier), and it ramps rather than ending in a cliff; a zero-length
      window disables the feature outright.
+   - **Creature dials** (`CreatureTuningTests`): the flat speed/knockback/
+     ragdoll arithmetic (not seed-gated — every zombie and beetle gets the same
+     treatment). 1.0 is an *exact* restore of the authored value, which the whole
+     baseline-caching design depends on; applying a multiplier twice from a cached
+     baseline is idempotent where applying it to the live field would square it; a
+     negative multiplier clamps to zero rather than sending a creature backwards.
+     Knockback specifically: both force components scale together so the shove
+     keeps its vanilla *angle* (scaling one alone would turn a knockback dial into
+     a "beetles launch you upwards" dial) and an asymmetric prefab keeps its own
+     ratio. Ragdoll specifically: **zero genuinely means "never knocked down"**,
+     which falls out of vanilla's `RPCA_Fall` only ever *raising* the timer, so a
+     zero-length knockdown can never satisfy that check.
+   - **Zombie/beetle deaggro** (`ZombieDeaggroTests`): pins down the fact that the
+     zombie dial's scale is **inverted** relative to every other multiplier in the
+     mod — 1.0 is the toughest setting, not vanilla, because vanilla is "never
+     deaggro" — since that's exactly what a later reader would "fix" back. Also:
+     the 30s base at 1.0 is the game's own `Scoutmaster` constant; briefly breaking
+     line of sight is *not* enough at the toughest setting (the maintainer's
+     explicit design constraint); the two escape routes (sight and distance) work
+     independently; out-of-range or NaN multipliers can never produce an instantly
+     deaggroing zombie; and the deaggro distance stays well clear of the zombie's
+     own 30-unit awareness range, so it can't give up at roughly the range it
+     starts chasing from. The beetle half covers the **2026-07-29 regression** that
+     live testing caught: its two extremes must produce behaviour more than 10×
+     apart, and the suppression window must outlast a targeting re-check — without
+     that the dial cancelled itself out and looked identical at 0.1 and 3.0.
+   - **Creature knockouts** (`CreatureKnockoutTests`): durations clamp sanely, 0 is
+     a real "leave vanilla alone" setting rather than an error, and the defaults sit
+     below the spider's vanilla 5s with the beetle's below the zombie's (the shell).
+     The load-bearing part is the **hard-throw gate, calibrated from real logged
+     impacts rather than guessed**: five measured throws are baked in as data —
+     23/26.3/30.6 m/s were judged too gentle and must fail, 36.6/42.5 were
+     near-full-strength and must pass — so nobody can retune the 36 m/s threshold
+     back across that gap without a test failing. Plus the distance gate (far throws
+     rejected even at full speed, 0 meaning "no limit" rather than "must be
+     touching") and the blowgun stun being far longer than a thrown item's.
+   - **Wind on creatures** (`CreatureWindTests`): the other place the vanilla point
+     isn't 1.0. Asserts that the zombie dial's vanilla is 1.0 while the beetle's is
+     **0**, that 0 on the zombie dial is a real change rather than "leave it alone"
+     (vanilla already pushes zombies at 0.6× a player's force), and that a NaN
+     resolves to *vanilla* rather than to zero — a malformed value should leave the
+     game as it was, not silently make zombies wind-immune. Beetle drift is
+     proportional to the beetle's own walking speed, so a differently-scaled prefab
+     drifts proportionally, and a negative speed can never produce reverse drift.
+
 2. **Manual in-game loop** (this doc) — for anything only observable at
    runtime (feel, visual clutter, screen shake, actual spawn positions in a
    real level).
@@ -834,6 +879,121 @@ is currently the only feedback that it engaged.
 
 **Report back:** whether 0.03 stamina/second feels like the intended "small
 amount," and whether the immunity feels worth the hands-busy cost.
+
+### Creatures: disable switches (`Creatures/disable-zombies` / `-beetles` / `-spiders`)
+
+**Pre-req:** debug logging on, in a Roots run. Each level load and config change
+logs `[Creatures] level load: disable-zombies=off, disable-beetles=off (15 found,
+0 newly hidden, 0 restored), disable-spiders=off (90 found, ...)`.
+
+1. Flip each switch **on** mid-run. Beetles and spiders should vanish
+   immediately; zombies should despawn and none should spawn again.
+2. Flip each back **off** — beetles and spiders return in place, with `N
+   restored` matching what was hidden.
+3. With `disable-spiders` on, look up at a ceiling a spider was on: **no web
+   stub should be left hanging.** That's the specific regression — a spider stays
+   in `SpiderState.Dropped` through its whole retreat and `DisplayRope` re-enables
+   its LineRenderer every frame, so this needs `LateUpdate` suppressed, not just
+   the renderer disabled once.
+4. Kill a teammate and let them turn into a zombie with `disable-zombies` **on**:
+   that zombie must **not** be removed. Only NPC zombies are affected.
+
+### Creatures: speed, knockback and ragdoll dials
+
+1. Set `zombie-speed-multiplier` and `beetle-speed-multiplier` to something
+   obvious (0.3, then 2.0). Both creatures should visibly change pace — including
+   a zombie's *sprint*, since the sprint is a multiple of the same field.
+2. Set `beetle-knockback-multiplier` to 0 and let a beetle hit you: it should
+   still hit and still knock you off your feet, but not move you.
+3. Set `creature-ragdoll-multiplier` to 0, then take a beetle hit and a zombie
+   bite: you should still take the shove, the injury and the spores, but **never
+   lose control**. Then 2.0 to confirm it goes the other way.
+4. With `apply-changes-live` on, all of the above should apply mid-run without a
+   level reload.
+
+**Report back:** any dial that appears to do nothing. The `[Creatures] speed
+reapply: zombie x… (N live), beetle x… (N live)` line confirms the pass ran and
+how many creatures it reached.
+
+### Creatures: deaggro (`Creatures/zombie-deaggro-multiplier` / `beetle-deaggro-multiplier`)
+
+**These two are close to unverifiable by eye** — a creature that stops chasing
+looks the same whether this mod's rule did it, vanilla lost line of sight, or it
+just wandered off. So verify from the log, not by feel. With debug logging on you
+get an aggro line, a 1/second status heartbeat while chasing, and a deaggro line
+that **names the cause**:
+
+```
+[Aggro] zombie "Zombie (NPC)" chasing You - distance=18.4m/102.0m, unseen-for=25.1s/25.5s
+[Aggro] zombie "Zombie (NPC)" DEAGGROED You - cause: Fairoots deaggro rule - stayed unseen 25.6s (limit 25.5s); ...
+[Aggro] beetle "Beetle" DEAGGROED You - cause: vanilla rule (lost sight, out of range, or target downed); ...
+```
+
+1. **Zombie, `1.0`:** it should be genuinely stubborn — 30 seconds unseen or
+   ~120m. Ducking behind it for a few seconds must *not* work.
+2. **Zombie, `0.1`:** break line of sight and it should give up in ~3s **and not
+   re-acquire you**. If it re-aggros within 10s the re-acquisition gate has
+   broken (`TryLookForTarget` re-picks the nearest player with no distance limit).
+3. **Zombie, `zombie-deaggro-enabled` off:** vanilla — it never gives up.
+4. **Beetle, `0.1` vs `3.0`:** at 0.1 it should give up almost at once and then
+   visibly lose interest for ~5s; at 3.0 it should keep coming even after you
+   break line of sight.
+5. **Check the cause field.** If a beetle stops chasing at 0.1 and the log says
+   `vanilla rule`, then this dial didn't do it and the result is coincidence.
+
+### Creatures: spider strike indicator (`General/show-spider-warning-label`)
+
+Off by default. Turn it on and walk under spiders.
+
+1. The label should appear as a spider begins dropping on **you** — a teammate
+   being jumped on across the level must not raise it.
+2. If it misses, the label should clear about a second after the spider bottoms
+   out — **well before it climbs back up.** This is the regression to watch:
+   `SpiderState.Dropped` persists through the whole retreat, so the window is the
+   descent plus a second and deliberately excludes `spiderWaitTime`. The log
+   prints the numbers: `warning for 1.43s (descent 0.43s + 1s linger; its
+   post-landing hang of 6s is excluded)`.
+3. With `disable-spiders` on, no warning should ever appear.
+
+### Creatures: thrown-item knockouts and blowgun
+
+1. **Gentle tosses must do nothing** to either creature. Rejections log the
+   measured speed next to the threshold, which is how to tune it:
+   `ignored "Rock" (too soft): 26.3/36.0 m/s, 4.2m from thrower/12.0m`.
+2. **A charged throw from close range** should knock a beetle onto its back
+   (~2s, then it rights itself with its own flip animation) and a zombie down
+   (~4s plus a few seconds to get up).
+3. **A hard throw from far away should be rejected** — the log says `thrown from
+   too far away`. Both gates exist so the knockout costs a charged throw *and*
+   closing the distance.
+4. **Blowgun dart:** a zombie should **die** (and leave a skeleton, exactly as it
+   does on its own after two minutes); a spider and a beetle should go down for
+   ~60s.
+5. **Stun markers:** the "out cold" particle should last the *whole* stun and
+   **stop when it ends** — the regression here was `StopEmitting` letting live
+   particles outlast the stun, so a 5s spider stun appeared to run a second 5s
+   cycle while the spider was already active again. Check both a 5s thrown-item
+   stun and a 60s dart stun. On a beetle the marker should sit over its **head**,
+   not its body, and be visible to other clients too.
+
+### Creatures: wind (`Creatures/zombie-wind-multiplier` / `beetle-wind-susceptibility`)
+
+**Note the two dials have different vanilla points** — 1.0 for zombies (the game
+already pushes them at 0.6× a player's force) and **0** for beetles (they're
+wind-immune by construction, since `Mob.FixedUpdate` zeroes their velocity every
+tick).
+
+1. In a storm, set `zombie-wind-multiplier` to 4.0: zombies should get shoved
+   around noticeably. The throttled log line
+   `[Creatures] wind on zombie "…": windForce 20 -> 80` confirms it's applying —
+   **if that line never appears at all, zombies aren't receiving wind and the
+   patch needs a different approach.**
+2. Set `beetle-wind-susceptibility` to 2.0: beetles should slide along the ground
+   with the wind, and should **stay on the ground** rather than being shoved
+   through it or juddering.
+3. A knocked-out or tumbling beetle must **not** drift — the push only applies
+   while it's walking, because anything else is real rigidbody control.
+4. With `Wind/disable-wind-entirely` on, neither creature should be affected.
 
 ### Host authority (multiplayer — needs a second player/PC, can't be verified solo)
 

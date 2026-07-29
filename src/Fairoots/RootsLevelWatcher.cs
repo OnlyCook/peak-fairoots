@@ -86,6 +86,16 @@ namespace Fairoots
                 SporeAreas.SporeAreaDisablePatch.ClearLevelState();
                 SporeAreas.SporeAreaCullPatch.ClearLevelState();
                 SporeAreas.CoverMouthImmunityPatch.ClearLevelState();
+                Creatures.CreatureDisablePatch.ClearLevelState();
+                Creatures.CreatureSpeedPatch.ClearLevelState();
+                Creatures.CreatureKnockbackPatch.ClearLevelState();
+                Creatures.CreatureRagdollPatch.ClearLevelState();
+                Creatures.BeetleDeaggroPatch.ClearLevelState();
+                Creatures.ZombieAggroLogPatch.ClearLevelState();
+                Creatures.CreatureAggroLog.ClearLevelState();
+                Creatures.SpiderStrikeWarning.ClearLevelState();
+                Creatures.CreatureKnockoutPatch.ClearLevelState();
+                Creatures.SpiderStunIndicatorPatch.ClearLevelState();
                 SporeBombCloudWarning.ClearLevelState();
                 SporePresence.ClearLevelState();
             }
@@ -121,6 +131,14 @@ namespace Fairoots
             SporeAreas.SporeAreaDisablePatch.Run(found.transform);
             SporeAreas.SporeAreaTuningPatch.Run(found.transform);
             SporeAreas.SporeCloudOpacityPatch.Run(found.transform);
+            Creatures.CreatureDisablePatch.Run(found.transform);
+            // After the disable pass, so a beetle it just deactivated isn't rescaled
+            // on its way out. Beetles placed in the scene have already had Start() run
+            // (and so have been scaled by MobStartSpeedPatch); this catches a level
+            // whose creatures started before the config was ready.
+            Creatures.CreatureSpeedPatch.ReapplyToAll();
+            Creatures.CreatureKnockbackPatch.ReapplyToAll();
+            Creatures.CreatureRagdollPatch.ReapplyToAll();
 
             // Last: caches this level's spore areas for the per-frame "is the player
             // in spores?" query, after every pass that could have removed or

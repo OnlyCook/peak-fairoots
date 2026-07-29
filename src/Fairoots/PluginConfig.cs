@@ -1,4 +1,5 @@
 using BepInEx.Configuration;
+using Fairoots.Core;
 using Fairoots.Core.Presets;
 using Fairoots.Networking;
 using UnityEngine;
@@ -142,6 +143,24 @@ namespace Fairoots
         /// <see cref="SporeAreaCloudOpacity"/>.
         /// </summary>
         public ConfigEntry<bool> ShowSporeCloudLabel { get; }
+
+        /// <summary>
+        /// The spider strike indicator: an on-screen warning while a spider is
+        /// descending on you (<c>Ui/SpiderWarningLabel</c>).
+        ///
+        /// Off by default, matching <see cref="ShowSporeCloudLabel"/> and the rest of
+        /// the label group: every setting that puts a HUD element on screen that PEAK
+        /// doesn't have is opted into, not out of, regardless of how well it fills a
+        /// gap. And the gap is real - vanilla gives a dropping spider no advance
+        /// warning at all, since its only cue is a sound that plays in the same frame
+        /// the drop starts and the grab that follows is instant on contact - which is
+        /// what makes it worth offering, just not worth imposing. See
+        /// <c>Creatures/SpiderStrikeWarning</c>.
+        ///
+        /// Purely cosmetic and per-client, like the spore label and the spore-bomb
+        /// recolor: it changes what one player sees, not what happens.
+        /// </summary>
+        public ConfigEntry<bool> ShowSpiderWarningLabel { get; }
 
         // --- Spore-Bombs ---------------------------------------------------
         /// <summary>
@@ -306,6 +325,225 @@ namespace Fairoots
         /// <see cref="SporeBombCullFractionOverride"/>.
         /// </summary>
         public ConfigEntry<double> SporeAreaStatusRateMultiplierOverride { get; }
+
+        // --- Creatures ------------------------------------------------------
+        /// <summary>
+        /// Master kill switch for the Roots biome's NPC mushroom zombies. When on,
+        /// no zombie is ever spawned and any already-live one is despawned -
+        /// <c>Creatures/CreatureDisablePatch</c>'s <c>ZombieSpawnSuppressionPatch</c>
+        /// does the work, at the game's own spawn loop rather than by writing over
+        /// <c>ZombieManager.maxActiveZombies</c>.
+        ///
+        /// Deliberately scoped to <em>NPC</em> zombies: a zombie raised from a dead
+        /// player is that player's death state, not an ambient hazard, and is never
+        /// touched. <b>Host-authoritative</b> (read via
+        /// <see cref="EffectiveDisableZombies"/>) - and unavoidably so, since vanilla
+        /// only ever spawns zombies on the master client. Flat (no preset ever turns
+        /// it on) and always immediate regardless of <see cref="ApplyChangesLive"/>,
+        /// exactly like <see cref="DisableSporeAreas"/>.
+        /// </summary>
+        public ConfigEntry<bool> DisableZombies { get; }
+
+        /// <summary>
+        /// Master kill switch for the Roots biome's beetles (runtime-confirmed: ~15
+        /// per level). When on, every beetle object is deactivated outright, so
+        /// there's nothing to walk into and nothing to knock you off a ledge. Same
+        /// shape as <see cref="DisableZombies"/>: <b>host-authoritative</b> (read via
+        /// <see cref="EffectiveDisableBeetles"/>), flat, off by default, always
+        /// immediate, and restorable - turning it back off restores exactly the
+        /// beetles Fairoots hid.
+        /// </summary>
+        public ConfigEntry<bool> DisableBeetles { get; }
+
+        /// <summary>
+        /// Master kill switch for the Roots biome's ceiling spiders (runtime-confirmed:
+        /// ~90 per level). When on, a spider never drops and never grabs, and its mesh
+        /// and web are hidden.
+        ///
+        /// Note the asymmetry with <see cref="DisableBeetles"/>, explained in
+        /// <c>Creatures/CreatureDisablePatch</c>: a spider's own distance culling
+        /// re-drives its root GameObject's active state, so this suppresses the
+        /// behavior at its two entry points and hides only the mesh child, rather
+        /// than deactivating the root the way a beetle's is. Same
+        /// <b>host-authoritative</b>/flat/off-by-default/immediate shape otherwise.
+        /// </summary>
+        public ConfigEntry<bool> DisableSpiders { get; }
+
+        /// <summary>
+        /// Custom-preset value for the multiplier applied to a mushroom zombie's
+        /// movement speed. 1.0 = vanilla, 0 = a zombie that can still turn, aggro and
+        /// bite but never closes any distance. Only takes effect under
+        /// <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
+        ///
+        /// Scales <c>CharacterMovement.movementForce</c> (vanilla 10) on the zombie's
+        /// own movement component - deliberately <em>not</em> the sibling
+        /// <c>movementModifier</c> field, which the game's own energy-drink affliction
+        /// adjusts additively; writing a computed value there would clobber it (the
+        /// same trap already documented for <c>climbSpeedMod</c> in
+        /// <c>ClimbWindShelterPatch</c>).
+        /// </summary>
+        public ConfigEntry<double> ZombieSpeedMultiplierOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for the multiplier applied to a beetle's movement
+        /// speed (<c>Mob.movementSpeed</c>, vanilla 5). 1.0 = vanilla, 0 = a beetle
+        /// that still turns to face you and still attacks if you walk into it, but
+        /// never chases. Only takes effect under <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
+        /// </summary>
+        public ConfigEntry<double> BeetleSpeedMultiplierOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for the multiplier applied to how hard a beetle's hit
+        /// throws you (<c>Beetle.bonkForce</c>/<c>bonkForceUp</c>, both vanilla 100).
+        /// 1.0 = vanilla, 0 = the hit still lands (and still ragdolls you - that's a
+        /// separate dial) but doesn't move you. Only takes effect under
+        /// <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
+        ///
+        /// Both force components are scaled together so the shove keeps its vanilla
+        /// angle - see <see cref="Core.CreatureTuning.ScaleKnockback"/>. There is no
+        /// zombie equivalent because zombies have no scripted knockback to scale; see
+        /// <c>Creatures/CreatureKnockbackPatch</c>.
+        /// </summary>
+        public ConfigEntry<double> BeetleKnockbackMultiplierOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for the multiplier applied to how long a beetle's or a
+        /// zombie's hit keeps the player ragdolled (<c>Beetle.ragdollTime</c> 2s and
+        /// <c>MushroomZombie.biteStunTime</c> 3s). 1.0 = vanilla; 0 = you are never
+        /// knocked off your feet by either creature and always keep control. Only
+        /// takes effect under <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
+        ///
+        /// One dial for both creatures deliberately - see
+        /// <see cref="PresetCatalog.CreatureRagdollMultiplier"/>. This is also what
+        /// stands in for a "zombie knockback" setting: zombies apply no scripted
+        /// knockback at all, so their hit's actual cost to the player is this ragdoll
+        /// (see <c>Creatures/CreatureKnockbackPatch</c>).
+        /// </summary>
+        public ConfigEntry<double> CreatureRagdollMultiplierOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for whether zombies can lose a target at all. Vanilla
+        /// zombies never do (see <see cref="Core.ZombieDeaggro"/>), so this exists to
+        /// let a Custom player keep that behavior; presets 1-4 decide it via
+        /// <see cref="PresetCatalog.ZombieDeaggroEnabled"/>, which is off on Subtle
+        /// only. Only takes effect under <see cref="PresetId.Custom"/>.
+        /// </summary>
+        public ConfigEntry<bool> ZombieDeaggroEnabledOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for how hard it is to shake a zombie.
+        /// <b>Unlike every other multiplier in this config, 1.0 is not vanilla</b> -
+        /// it's the toughest setting, and the range stops at 0.1 rather than 0. See
+        /// <see cref="Core.ZombieDeaggro"/> for the full reasoning; the short version
+        /// is that vanilla is "never deaggro", which no finite multiplier can express.
+        /// Only takes effect under <see cref="PresetId.Custom"/>.
+        /// </summary>
+        public ConfigEntry<double> ZombieDeaggroMultiplierOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for how hard it is to shake a beetle - a multiplier on
+        /// the distance at which it keeps a target it already has
+        /// (<see cref="Core.CreatureTuning.ScaleDeaggroDistance"/>). 1.0 = vanilla
+        /// here, unlike <see cref="ZombieDeaggroMultiplierOverride"/>, because beetles
+        /// genuinely do deaggro in vanilla. Only takes effect under
+        /// <see cref="PresetId.Custom"/>.
+        /// </summary>
+        public ConfigEntry<double> BeetleDeaggroMultiplierOverride { get; }
+
+        /// <summary>
+        /// How long a zombie is knocked out by a thrown item, in seconds. Vanilla
+        /// already ragdolls a zombie for about a second when an item hits it (a zombie
+        /// is a <c>Character</c>, so <c>Bonkable</c> finds it), so this extends an
+        /// existing interaction rather than inventing one - see
+        /// <see cref="Core.CreatureKnockout"/>. 0 leaves vanilla alone.
+        ///
+        /// Flat rather than preset-gated, and <b>host-authoritative</b>: this is
+        /// counterplay the player can use, so it follows
+        /// <see cref="CoverMouthStaminaPerSecond"/>'s shape - how strong a counterplay
+        /// move is, is shared balance.
+        /// </summary>
+        public ConfigEntry<double> ZombieKnockoutSeconds { get; }
+
+        /// <summary>
+        /// How long a beetle is knocked onto its back by a thrown item, in seconds.
+        /// Unlike the zombie's, this is an entirely new interaction: a beetle is a
+        /// <c>Mob</c> with no <c>Character</c> and no <c>EventOnItemCollision</c>, so
+        /// vanilla thrown items pass straight by it. 0 restores that.
+        ///
+        /// Shorter than <see cref="ZombieKnockoutSeconds"/> by default, at the
+        /// maintainer's direction - a beetle's shell should visibly shrug off a thrown
+        /// rock better than a zombie or a spider does. Same flat, host-authoritative
+        /// shape as the zombie dial.
+        /// </summary>
+        public ConfigEntry<double> BeetleKnockoutSeconds { get; }
+
+        /// <summary>
+        /// How fast a thrown item must be going, in <b>meters per second</b>, to knock out
+        /// a beetle or a zombie. Shared by both so "a hard throw" means one thing.
+        ///
+        /// Exists because matching the game's own <c>Bonkable</c> threshold (5 world
+        /// units/s) turned out to accept any contact at all - see
+        /// <see cref="Core.CreatureKnockout.VanillaBonkableThresholdUnits"/>. 0 restores
+        /// that anything-goes behaviour for anyone who wants it. Host-authoritative and
+        /// flat, like the two duration dials it gates.
+        /// </summary>
+        public ConfigEntry<double> CreatureKnockoutMinThrowSpeed { get; }
+
+        /// <summary>
+        /// How close to the creature the thrower must have been, in <b>meters</b>, for a
+        /// thrown item to knock it out. The second half of the mechanic's cost, alongside
+        /// <see cref="CreatureKnockoutMinThrowSpeed"/>: a hard throw is still travelling
+        /// fast a long way out, so speed alone would license picking creatures off from
+        /// safety. 0 removes the distance requirement.
+        ///
+        /// Measured from <c>Item.lastHolderCharacter</c> at the moment of impact.
+        /// Host-authoritative and flat, like the rest of the knockout group.
+        /// </summary>
+        public ConfigEntry<double> CreatureKnockoutMaxThrowDistance { get; }
+
+        /// <summary>
+        /// Whether a blowgun dart takes a creature out of the fight: zombies die, spiders
+        /// and beetles are stunned for <see cref="BlowgunCreatureStunSeconds"/>. See
+        /// <c>Creatures/BlowgunCreaturePatch</c> for why the outcomes differ (only the
+        /// zombie has a death state to reach) and why vanilla darts can't hit a spider or
+        /// beetle at all.
+        ///
+        /// On by default: the dart is a consumable fired from an uncommon item, so the
+        /// mechanic is self-limiting, and its whole purpose is to give the blowgun a use
+        /// against creatures it currently passes straight through. Host-authoritative and
+        /// flat.
+        /// </summary>
+        public ConfigEntry<bool> BlowgunAffectsCreatures { get; }
+
+        /// <summary>
+        /// How long a blowgun dart stuns a spider or a beetle, in seconds. Zombies aren't
+        /// covered by this - they die outright, which has no duration - so turning this to
+        /// 0 leaves darts lethal to zombies while harmless to the other two.
+        /// Host-authoritative and flat.
+        /// </summary>
+        public ConfigEntry<double> BlowgunCreatureStunSeconds { get; }
+
+        /// <summary>
+        /// Multiplier on the wind force a zombie receives. 1.0 = vanilla, which is already
+        /// nonzero: a zombie is a bot <c>Character</c>, so the game pushes it at 0.6x what
+        /// it pushes a player (see <see cref="Core.CreatureWind"/>). Host-authoritative and
+        /// flat.
+        /// </summary>
+        public ConfigEntry<double> ZombieWindMultiplier { get; }
+
+        /// <summary>
+        /// How susceptible beetles are to wind, as a fraction of their own walking speed -
+        /// so 1.0 means wind slides a beetle about as fast as it walks. <b>0 is vanilla</b>,
+        /// not 1.0, because vanilla beetles are completely wind-immune and cannot be made
+        /// otherwise by scaling: <c>Mob.FixedUpdate</c> zeroes their velocity every tick.
+        /// Any positive value grants an effect the game never had. Host-authoritative and
+        /// flat.
+        /// </summary>
+        public ConfigEntry<double> BeetleWindSusceptibility { get; }
 
         /// <summary>
         /// Master kill switch for the whole cover-your-mouth mechanic. When on, the
@@ -709,6 +947,21 @@ namespace Fairoots
                 "Purely cosmetic and PER-PLAYER: not host-authoritative. Applies immediately, " +
                 "regardless of apply-changes-live.");
 
+            ShowSpiderWarningLabel = config.Bind(
+                "General",
+                "show-spider-warning-label",
+                false,
+                "Shows a text warning on screen, in the game's own font and in the Poison status " +
+                "colour, while a spider is dropping down on you, and hides it again about a " +
+                "second after the spider lands without catching anyone. Worth turning on if " +
+                "spiders keep getting you from above: the game gives you no warning at all for " +
+                "this - the only spider sound plays at the same moment the drop starts, and " +
+                "being grabbed is instant on contact - so this turns the time the spider spends " +
+                "descending into time you can actually react in. Off by default like the other " +
+                "on-screen labels, since it adds a HUD element PEAK doesn't have. Purely " +
+                "cosmetic and PER-PLAYER: not host-authoritative. Applies immediately, " +
+                "regardless of apply-changes-live.");
+
             SporeBombCullFractionOverride = config.Bind(
                 "Spore-Bombs",
                 "cull-fraction",
@@ -893,6 +1146,259 @@ namespace Fairoots
                     "above; this only changes the rate. Only takes effect when preset is set to " +
                     "Custom (5) - ignored under presets 1-4.",
                     new AcceptableValueRange<double>(0.0, 3.0)));
+
+            DisableZombies = config.Bind(
+                "Creatures",
+                "disable-zombies",
+                false,
+                "Master switch: when on, the Roots biome's mushroom zombies never spawn, and any " +
+                "already wandering around are removed. A zombie raised from a dead player is NOT " +
+                "affected - that's a player's death, not a hazard. HOST-AUTHORITATIVE: if you're " +
+                "not the host, this has no effect at all - only the host's value counts for the " +
+                "whole lobby (the game only ever spawns zombies on the host in the first place). " +
+                "Off by default; no preset ever turns this on automatically. Applies immediately, " +
+                "regardless of apply-changes-live.");
+
+            DisableBeetles = config.Bind(
+                "Creatures",
+                "disable-beetles",
+                false,
+                "Master switch: when on, the Roots biome's beetles (about 15 per level) are removed " +
+                "entirely - nothing to walk into, nothing to knock you off a ledge. Turning it back " +
+                "off brings back exactly the beetles this mod removed. HOST-AUTHORITATIVE: if " +
+                "you're not the host, this has no effect at all - only the host's value counts for " +
+                "the whole lobby. Off by default; no preset ever turns this on automatically. " +
+                "Applies immediately, regardless of apply-changes-live.");
+
+            DisableSpiders = config.Bind(
+                "Creatures",
+                "disable-spiders",
+                false,
+                "Master switch: when on, the Roots biome's ceiling spiders (about 90 per level) " +
+                "never drop and never grab you, and their webs and bodies are hidden. " +
+                "HOST-AUTHORITATIVE: if you're not the host, this has no effect at all - only the " +
+                "host's value counts for the whole lobby. Off by default; no preset ever turns this " +
+                "on automatically. Applies immediately, regardless of apply-changes-live.");
+
+            ZombieSpeedMultiplierOverride = config.Bind(
+                "Creatures",
+                "zombie-speed-multiplier",
+                0.9,
+                new ConfigDescription(
+                    "Multiplier applied to how fast mushroom zombies move, e.g. 0.5 makes them " +
+                    "half as fast, 1.5 half again as fast. 1.0 always means vanilla. Affects both " +
+                    "their walk and their sprint, since the sprint is a multiple of the same " +
+                    "speed. 0 means a zombie can still notice you, turn towards you and bite you " +
+                    "if you stand next to it, but never closes any distance. Only takes effect " +
+                    "when preset is set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 3.0)));
+
+            BeetleSpeedMultiplierOverride = config.Bind(
+                "Creatures",
+                "beetle-speed-multiplier",
+                0.9,
+                new ConfigDescription(
+                    "Multiplier applied to how fast beetles move, e.g. 0.5 makes them half as " +
+                    "fast, 1.5 half again as fast. 1.0 always means vanilla. 0 means a beetle " +
+                    "still turns to face you and still hits you if you walk into it, but never " +
+                    "chases. Only takes effect when preset is set to Custom (5) - ignored under " +
+                    "presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 3.0)));
+
+            BeetleKnockbackMultiplierOverride = config.Bind(
+                "Creatures",
+                "beetle-knockback-multiplier",
+                0.8,
+                new ConfigDescription(
+                    "Multiplier applied to how hard a beetle's hit throws you, e.g. 0.5 halves " +
+                    "the shove, 0 means it doesn't move you at all. 1.0 always means vanilla. " +
+                    "This is only the force - whether the hit knocks you off your feet is the " +
+                    "separate creature-ragdoll-resistance-multiplier below. Zombies have no " +
+                    "equivalent setting because the game gives them no knockback of their own: " +
+                    "what a zombie does is ragdoll you (see that other setting) and shove you " +
+                    "with its body, which is ordinary physics. Only takes effect when preset is " +
+                    "set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 3.0)));
+
+            CreatureRagdollMultiplierOverride = config.Bind(
+                "Creatures",
+                "creature-ragdoll-multiplier",
+                0.85,
+                new ConfigDescription(
+                    "Multiplier applied to how long a beetle's hit or a zombie's bite knocks you " +
+                    "off your feet, e.g. 0.5 gets you back up twice as fast. 0 means you are " +
+                    "never ragdolled by either creature and always keep control. 1.0 always means " +
+                    "vanilla (2 seconds for a beetle, 3 for a zombie bite). The hit still lands " +
+                    "either way: you still take the injury and spores, and a beetle still shoves " +
+                    "you (that's beetle-knockback-multiplier above) - this only decides whether " +
+                    "you lose control of your character. Zombies have no separate knockback " +
+                    "setting because this ragdoll IS what a zombie's hit costs you. Only takes " +
+                    "effect when preset is set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 3.0)));
+
+            ZombieDeaggroEnabledOverride = config.Bind(
+                "Creatures",
+                "zombie-deaggro-enabled",
+                true,
+                "Whether zombies can ever lose track of you. In the unmodded game they CANNOT: " +
+                "once a zombie has seen you it chases you forever, at any distance, with no way " +
+                "to shake it. Turn this off to keep that vanilla behavior. Only takes effect when " +
+                "preset is set to Custom (5) - under presets 1-4 this is off on Subtle (which is " +
+                "meant to be vanilla) and on for the other three.");
+
+            ZombieDeaggroMultiplierOverride = config.Bind(
+                "Creatures",
+                "zombie-deaggro-multiplier",
+                0.85,
+                new ConfigDescription(
+                    "How hard it is to shake a zombie once it's after you. NOTE: unlike every " +
+                    "other multiplier in this file, 1.0 does NOT mean vanilla - vanilla zombies " +
+                    "never lose you at all, so there's no vanilla number to scale. Here 1.0 is " +
+                    "the TOUGHEST setting (you must stay out of the zombie's sight for a full 30 " +
+                    "seconds, or get about 120m away) and 0.1 is the most forgiving (about 3 " +
+                    "seconds or 12m). Either escape works on its own. 0 is not allowed - a zombie " +
+                    "that deaggros instantly is a disabled zombie, which is what disable-zombies " +
+                    "is for. Only takes effect when preset is set to Custom (5) - ignored under " +
+                    "presets 1-4.",
+                    new AcceptableValueRange<double>(0.1, 1.0)));
+
+            BeetleDeaggroMultiplierOverride = config.Bind(
+                "Creatures",
+                "beetle-deaggro-multiplier",
+                0.9,
+                new ConfigDescription(
+                    "How hard it is to shake a beetle once it's after you, as a multiplier on the " +
+                    "distance it will keep chasing you from. 1.0 means vanilla (about 22m in " +
+                    "Roots), 0.5 is " +
+                    "twice as easy to escape, 2.0 twice as hard. Unlike zombies, beetles DO give " +
+                    "up on their own in the unmodded game - both by distance and by losing sight " +
+                    "of you - so this only tunes how sticky that already is. It doesn't change how " +
+                    "far away a beetle can first notice you. Once a beetle does give up, it " +
+                    "ignores everyone for 5 seconds, so it can't instantly re-notice you. 0.1 is " +
+                    "the minimum - a beetle that can never hold a target at all is a disabled " +
+                    "beetle, which is what disable-beetles is for. Only takes effect when preset " +
+                    "is set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.1, 3.0)));
+
+            ZombieKnockoutSeconds = config.Bind(
+                "Creatures",
+                "zombie-knockout-seconds",
+                4.0,
+                new ConfigDescription(
+                    "How many seconds a zombie is knocked out for when you hit it with a thrown " +
+                    "item, the way you can already stun a spider by throwing something at it. " +
+                    "The unmodded game already knocks a zombie down for about a second, so this " +
+                    "mostly decides how long that lasts; 0 leaves the vanilla behaviour alone. " +
+                    "Deliberately less than the 5 seconds a spider gets. Note the zombie also " +
+                    "needs a moment to get up and re-orient afterwards, so the total time it's " +
+                    "out of the fight is a few seconds longer than this. HOST-AUTHORITATIVE: " +
+                    "only the host's value counts for the whole lobby.",
+                    new AcceptableValueRange<double>(0.0, 60.0)));
+
+            BeetleKnockoutSeconds = config.Bind(
+                "Creatures",
+                "beetle-knockout-seconds",
+                2.0,
+                new ConfigDescription(
+                    "How many seconds a beetle is knocked onto its back for when you hit it with " +
+                    "a thrown item. Unlike zombies and spiders, beetles are completely immune to " +
+                    "thrown items in the unmodded game - nothing happens at all - so this adds " +
+                    "the interaction outright; 0 turns it back off. Shortest of the three on " +
+                    "purpose: a beetle has a shell, so it should shrug off a thrown rock better " +
+                    "than a zombie or a spider does. A knocked-out beetle can't chase or attack, " +
+                    "and rights itself with its own flip animation afterwards. Only counts if " +
+                    "the item is actually thrown hard - dropping something on it does nothing. " +
+                    "HOST-AUTHORITATIVE: only the host's value counts for the whole lobby.",
+                    new AcceptableValueRange<double>(0.0, 60.0)));
+
+            CreatureKnockoutMinThrowSpeed = config.Bind(
+                "Creatures",
+                "creature-knockout-min-throw-speed",
+                36.0,
+                new ConfigDescription(
+                    "How fast a thrown item has to be travelling, in meters per second, to knock " +
+                    "out a beetle or a zombie - so a genuine throw does it and gently lobbing or " +
+                    "dropping something doesn't. Applies to both creatures, so \"a hard throw\" " +
+                    "means the same thing for each. Lower it if throws that feel hard aren't " +
+                    "landing, raise it if soft ones are. 0 means any contact counts at all, " +
+                    "however gentle. Turn on Debug/enable-debug-logging to see the measured speed " +
+                    "of each throw next to this threshold in the log, which is the easy way to " +
+                    "pick a value. The default is set from measured throws: medium throws land " +
+                    "around 23-31 m/s and near-full-strength ones around 37-43, and the default " +
+                    "of 36 was picked by play-testing as the point where a knockout needs a " +
+                    "genuinely committed throw. This is a flat setting, so it is the same under " +
+                    "every preset including Balanced. HOST-AUTHORITATIVE: only the host's value " +
+                    "counts for the whole lobby.",
+                    new AcceptableValueRange<double>(0.0, 50.0)));
+
+            CreatureKnockoutMaxThrowDistance = config.Bind(
+                "Creatures",
+                "creature-knockout-max-throw-distance",
+                12.0,
+                new ConfigDescription(
+                    "How close you have to be to a beetle or zombie, in meters, for a thrown item " +
+                    "to knock it out. Together with creature-knockout-min-throw-speed above this " +
+                    "is what the knockout costs you: a charged throw from close range, which " +
+                    "takes time to wind up and usually loses you the item. Without a distance " +
+                    "limit a hard throw is still fast a long way out, so you could pick creatures " +
+                    "off from somewhere safe. 0 removes the distance requirement. " +
+                    "HOST-AUTHORITATIVE: only the host's value counts for the whole lobby.",
+                    new AcceptableValueRange<double>(0.0, 200.0)));
+
+            BlowgunAffectsCreatures = config.Bind(
+                "Creatures",
+                "blowgun-affects-creatures",
+                true,
+                "When on, shooting a creature with a blowgun dart takes it out of the fight: a " +
+                "zombie dies (exactly the way it already does on its own after two minutes, " +
+                "skeleton included), while a spider or a beetle is knocked out for a long time " +
+                "(see blowgun-creature-stun-seconds). Spiders and beetles get stunned rather than " +
+                "killed because the game has no death state for them at all. In the unmodded game " +
+                "a dart passes straight through a spider or beetle and merely poisons a zombie. On " +
+                "by default - darts are consumable and the blowgun is uncommon, so this can't be " +
+                "spammed. HOST-AUTHORITATIVE: only the host's value counts for the whole lobby.");
+
+            BlowgunCreatureStunSeconds = config.Bind(
+                "Creatures",
+                "blowgun-creature-stun-seconds",
+                60.0,
+                new ConfigDescription(
+                    "How many seconds a blowgun dart knocks out a spider or a beetle for. Doesn't " +
+                    "apply to zombies, which die outright instead; set this to 0 if you want darts " +
+                    "to kill zombies but leave spiders and beetles alone. Much longer than a " +
+                    "thrown item's knockout on purpose - a dart costs you a consumable and only " +
+                    "works if you actually hit. HOST-AUTHORITATIVE: only the host's value counts " +
+                    "for the whole lobby.",
+                    new AcceptableValueRange<double>(0.0, 600.0)));
+
+            ZombieWindMultiplier = config.Bind(
+                "Creatures",
+                "zombie-wind-multiplier",
+                1.5,
+                new ConfigDescription(
+                    "Multiplier on how hard the wind pushes zombies around, e.g. 2.0 pushes them " +
+                    "twice as hard as normal, 0 makes them immune. 1.0 means vanilla - note that " +
+                    "vanilla is NOT zero: the game already pushes zombies at 60% of the force it " +
+                    "uses on you, because a zombie counts as a bot character. Useful for making a " +
+                    "storm a real hazard for the things chasing you and not just for you. " +
+                    "HOST-AUTHORITATIVE: only the host's value counts for the whole lobby.",
+                    new AcceptableValueRange<double>(0.0, 5.0)));
+
+            BeetleWindSusceptibility = config.Bind(
+                "Creatures",
+                "beetle-wind-susceptibility",
+                0.5,
+                new ConfigDescription(
+                    "How much the wind slides beetles around, as a fraction of their own walking " +
+                    "speed - 1.0 means wind moves a beetle about as fast as it walks, 0.5 half " +
+                    "that. NOTE: 0 is the vanilla value here, not 1.0, because beetles are " +
+                    "completely immune to wind in the unmodded game and can't be made otherwise " +
+                    "by scaling anything - the game resets a walking beetle's velocity every " +
+                    "physics tick, so any wind force on it is erased before it moves. Set 0 to " +
+                    "restore that. Only applies while a beetle is walking normally, never while " +
+                    "it's tumbling, flipped or knocked out. HOST-AUTHORITATIVE: only the host's " +
+                    "value counts for the whole lobby.",
+                    new AcceptableValueRange<double>(0.0, 5.0)));
 
             DisableCoverMouth = config.Bind(
                 "Spore-Areas",
@@ -1392,6 +1898,56 @@ namespace Fairoots
                 SporeAreaStatusRateMultiplierOverride.Value,
                 UseCustomOverrides);
 
+        /// <summary>The effective movement-speed multiplier for every mushroom zombie.</summary>
+        public double ZombieSpeedMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.ZombieSpeedMultiplier(Preset.Value),
+                ZombieSpeedMultiplierOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>The effective movement-speed multiplier for every beetle.</summary>
+        public double BeetleSpeedMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.BeetleSpeedMultiplier(Preset.Value),
+                BeetleSpeedMultiplierOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>The effective knockback multiplier for every beetle.</summary>
+        public double BeetleKnockbackMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.BeetleKnockbackMultiplier(Preset.Value),
+                BeetleKnockbackMultiplierOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>The effective ragdoll-duration multiplier for beetle hits and zombie bites.</summary>
+        public double CreatureRagdollMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.CreatureRagdollMultiplier(Preset.Value),
+                CreatureRagdollMultiplierOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>Whether zombies can lose a target at all.</summary>
+        public bool ZombieDeaggroEnabled =>
+            UseCustomOverrides
+                ? ZombieDeaggroEnabledOverride.Value
+                : PresetCatalog.ZombieDeaggroEnabled(Preset.Value);
+
+        /// <summary>The effective zombie deaggro difficulty (1.0 = toughest, NOT vanilla).</summary>
+        public double ZombieDeaggroMultiplier =>
+            ZombieDeaggro.ClampMultiplier(
+                OverrideResolution.Resolve(
+                    PresetCatalog.ZombieDeaggroMultiplier(Preset.Value),
+                    ZombieDeaggroMultiplierOverride.Value,
+                    UseCustomOverrides));
+
+        /// <summary>The effective beetle deaggro-distance multiplier (1.0 = vanilla).</summary>
+        public double BeetleDeaggroMultiplier =>
+            BeetleDeaggro.ClampMultiplier(
+                OverrideResolution.Resolve(
+                    PresetCatalog.BeetleDeaggroMultiplier(Preset.Value),
+                    BeetleDeaggroMultiplierOverride.Value,
+                    UseCustomOverrides));
+
         /// <summary>The effective wind-force (and gust-timing) multiplier.</summary>
         public double WindForceMultiplier =>
             OverrideResolution.Resolve(
@@ -1473,6 +2029,13 @@ namespace Fairoots
         private double _snapSporeAreaRemovalFraction;
         private double _snapSporeAreaRadiusMultiplierValue;
         private double _snapSporeAreaStatusRateMultiplier;
+        private double _snapZombieSpeedMultiplier;
+        private double _snapBeetleSpeedMultiplier;
+        private double _snapBeetleKnockbackMultiplier;
+        private double _snapCreatureRagdollMultiplier;
+        private bool _snapZombieDeaggroEnabled;
+        private double _snapZombieDeaggroMultiplier;
+        private double _snapBeetleDeaggroMultiplier;
         private double _snapWindForceMultiplier;
         private double _snapWindGustDurationMultiplier;
         private double _snapWindItemForceMultiplier;
@@ -1501,6 +2064,13 @@ namespace Fairoots
             _snapSporeAreaRemovalFraction = SporeAreaRemovalFraction;
             _snapSporeAreaRadiusMultiplierValue = SporeAreaRadiusMultiplier;
             _snapSporeAreaStatusRateMultiplier = SporeAreaStatusRateMultiplier;
+            _snapZombieSpeedMultiplier = ZombieSpeedMultiplier;
+            _snapBeetleSpeedMultiplier = BeetleSpeedMultiplier;
+            _snapBeetleKnockbackMultiplier = BeetleKnockbackMultiplier;
+            _snapCreatureRagdollMultiplier = CreatureRagdollMultiplier;
+            _snapZombieDeaggroEnabled = ZombieDeaggroEnabled;
+            _snapZombieDeaggroMultiplier = ZombieDeaggroMultiplier;
+            _snapBeetleDeaggroMultiplier = BeetleDeaggroMultiplier;
             _snapWindForceMultiplier = WindForceMultiplier;
             _snapWindGustDurationMultiplier = WindGustDurationMultiplier;
             _snapWindItemForceMultiplier = WindItemForceMultiplier;
@@ -1627,6 +2197,148 @@ namespace Fairoots
         /// </summary>
         public bool EffectiveDisableSporeAreas =>
             HostAuthority.Resolve("DisableSporeAreas", DisableSporeAreas.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="ZombieSpeedMultiplier"/>. Host-authoritative (how fast a
+        /// creature chases is shared balance) and level-load-snapshotted like the
+        /// other numeric dials, so it respects <see cref="ApplyChangesLive"/>.
+        /// </summary>
+        public double EffectiveZombieSpeedMultiplier =>
+            HostAuthority.Resolve("ZombieSpeedMultiplier", UseLiveValue ? ZombieSpeedMultiplier : _snapZombieSpeedMultiplier);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="BeetleSpeedMultiplier"/>. Host-authoritative and
+        /// level-load-snapshotted, same shape as
+        /// <see cref="EffectiveZombieSpeedMultiplier"/>.
+        /// </summary>
+        public double EffectiveBeetleSpeedMultiplier =>
+            HostAuthority.Resolve("BeetleSpeedMultiplier", UseLiveValue ? BeetleSpeedMultiplier : _snapBeetleSpeedMultiplier);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="BeetleKnockbackMultiplier"/>. Host-authoritative and
+        /// level-load-snapshotted, same shape as
+        /// <see cref="EffectiveBeetleSpeedMultiplier"/>.
+        /// </summary>
+        public double EffectiveBeetleKnockbackMultiplier =>
+            HostAuthority.Resolve("BeetleKnockbackMultiplier", UseLiveValue ? BeetleKnockbackMultiplier : _snapBeetleKnockbackMultiplier);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="CreatureRagdollMultiplier"/>. Host-authoritative and
+        /// level-load-snapshotted, same shape as
+        /// <see cref="EffectiveBeetleKnockbackMultiplier"/>.
+        /// </summary>
+        public double EffectiveCreatureRagdollMultiplier =>
+            HostAuthority.Resolve("CreatureRagdollMultiplier", UseLiveValue ? CreatureRagdollMultiplier : _snapCreatureRagdollMultiplier);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="ZombieDeaggroEnabled"/>. Host-authoritative - whether a chase can
+        /// be escaped at all is shared balance, not local feel.
+        /// </summary>
+        public double EffectiveZombieKnockoutSeconds =>
+            HostAuthority.Resolve("ZombieKnockoutSeconds", ZombieKnockoutSeconds.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="BeetleKnockoutSeconds"/>. Host-authoritative, flat - same shape as
+        /// <see cref="EffectiveCoverMouthStaminaPerSecond"/>.
+        /// </summary>
+        public double EffectiveBeetleKnockoutSeconds =>
+            HostAuthority.Resolve("BeetleKnockoutSeconds", BeetleKnockoutSeconds.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="CreatureKnockoutMinThrowSpeed"/>. Host-authoritative, flat.
+        /// </summary>
+        public double EffectiveCreatureKnockoutMinThrowSpeed =>
+            HostAuthority.Resolve("CreatureKnockoutMinThrowSpeed", CreatureKnockoutMinThrowSpeed.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="CreatureKnockoutMaxThrowDistance"/>. Host-authoritative, flat.
+        /// </summary>
+        public double EffectiveCreatureKnockoutMaxThrowDistance =>
+            HostAuthority.Resolve("CreatureKnockoutMaxThrowDistance", CreatureKnockoutMaxThrowDistance.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="BlowgunAffectsCreatures"/>. Host-authoritative, flat.
+        /// </summary>
+        public bool EffectiveBlowgunAffectsCreatures =>
+            HostAuthority.Resolve("BlowgunAffectsCreatures", BlowgunAffectsCreatures.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="BlowgunCreatureStunSeconds"/>. Host-authoritative, flat.
+        /// </summary>
+        public double EffectiveBlowgunCreatureStunSeconds =>
+            HostAuthority.Resolve("BlowgunCreatureStunSeconds", BlowgunCreatureStunSeconds.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="ZombieWindMultiplier"/>. Host-authoritative, flat.
+        /// </summary>
+        public double EffectiveZombieWindMultiplier =>
+            HostAuthority.Resolve("ZombieWindMultiplier", ZombieWindMultiplier.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="BeetleWindSusceptibility"/>. Host-authoritative, flat.
+        /// </summary>
+        public double EffectiveBeetleWindSusceptibility =>
+            HostAuthority.Resolve("BeetleWindSusceptibility", BeetleWindSusceptibility.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="ZombieDeaggroEnabled"/>. Host-authoritative - whether a chase can
+        /// be escaped at all is shared balance, not local feel.
+        /// </summary>
+        public bool EffectiveZombieDeaggroEnabled =>
+            HostAuthority.Resolve("ZombieDeaggroEnabled", UseLiveValue ? ZombieDeaggroEnabled : _snapZombieDeaggroEnabled);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="ZombieDeaggroMultiplier"/>. Host-authoritative and
+        /// level-load-snapshotted.
+        /// </summary>
+        public double EffectiveZombieDeaggroMultiplier =>
+            HostAuthority.Resolve("ZombieDeaggroMultiplier", UseLiveValue ? ZombieDeaggroMultiplier : _snapZombieDeaggroMultiplier);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="BeetleDeaggroMultiplier"/>. Host-authoritative and
+        /// level-load-snapshotted.
+        /// </summary>
+        public double EffectiveBeetleDeaggroMultiplier =>
+            HostAuthority.Resolve("BeetleDeaggroMultiplier", UseLiveValue ? BeetleDeaggroMultiplier : _snapBeetleDeaggroMultiplier);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="DisableZombies"/>.Value. Host-authoritative - flat, same shape
+        /// as <see cref="EffectiveDisableSporeAreas"/>.
+        /// </summary>
+        public bool EffectiveDisableZombies =>
+            HostAuthority.Resolve("DisableZombies", DisableZombies.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="DisableBeetles"/>.Value. Host-authoritative - flat, same shape
+        /// as <see cref="EffectiveDisableSporeAreas"/>.
+        /// </summary>
+        public bool EffectiveDisableBeetles =>
+            HostAuthority.Resolve("DisableBeetles", DisableBeetles.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="DisableSpiders"/>.Value. Host-authoritative - flat, same shape
+        /// as <see cref="EffectiveDisableSporeAreas"/>.
+        /// </summary>
+        public bool EffectiveDisableSpiders =>
+            HostAuthority.Resolve("DisableSpiders", DisableSpiders.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of

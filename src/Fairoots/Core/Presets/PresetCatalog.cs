@@ -243,6 +243,158 @@ namespace Fairoots.Core.Presets
         }
 
         /// <summary>
+        /// Multiplier applied to a mushroom zombie's movement speed, per ROADMAP.md's
+        /// "Zombie/beetle move speed" row (-10%/-20%/-35%). 1.0 = vanilla (Subtle).
+        ///
+        /// Vanilla is <c>CharacterMovement.movementForce = 10</c>, inherited by
+        /// <c>CharacterMovementZombie</c> (which overrides only its ground checks) -
+        /// this resolves RESEARCH.md's Q8 open question about which field actually
+        /// governs zombie speed. Kept as its own row rather than shared with
+        /// <see cref="BeetleSpeedMultiplier"/> even though ROADMAP.md lists them
+        /// together: they're different fields with different units on unrelated
+        /// classes, and a chase you can't outrun and a beetle you can't sidestep are
+        /// separate complaints worth tuning apart. Starting estimates pending playtest.
+        /// </summary>
+        public static double ZombieSpeedMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.90;
+                case PresetId.Generous: return 0.80;
+                case PresetId.Tame: return 0.65;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
+        /// Multiplier applied to a beetle's movement speed (<c>Mob.movementSpeed</c>,
+        /// vanilla 5), per ROADMAP.md's "Zombie/beetle move speed" row
+        /// (-10%/-20%/-35%). 1.0 = vanilla (Subtle). See
+        /// <see cref="ZombieSpeedMultiplier"/> for why the two are separate rows.
+        /// Starting estimates pending playtest.
+        /// </summary>
+        public static double BeetleSpeedMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.90;
+                case PresetId.Generous: return 0.80;
+                case PresetId.Tame: return 0.65;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
+        /// Multiplier applied to a beetle's knockback shove
+        /// (<c>Beetle.bonkForce</c>/<c>bonkForceUp</c>, both vanilla 100), per
+        /// ROADMAP.md's "Beetle knockback force" row (-20%/-35%/-50%). 1.0 = vanilla
+        /// (Subtle).
+        ///
+        /// There is deliberately no zombie counterpart in this catalog: a zombie
+        /// applies no scripted knockback at all (decompile-confirmed - see
+        /// <c>Creatures/CreatureKnockbackPatch</c>), so there is no vanilla number for
+        /// a zombie row to scale.
+        /// </summary>
+        public static double BeetleKnockbackMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.80;
+                case PresetId.Generous: return 0.65;
+                case PresetId.Tame: return 0.50;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
+        /// Multiplier applied to how long a beetle's or a zombie's hit keeps the
+        /// player ragdolled (<c>Beetle.ragdollTime</c> 2s /
+        /// <c>MushroomZombie.biteStunTime</c> 3s - see
+        /// <see cref="CreatureTuning.ScaleRagdollTime"/>). 1.0 = vanilla (Subtle),
+        /// 0 = never lose control.
+        ///
+        /// One row for both creatures on purpose: this is the player's own
+        /// "how long am I not in control of my character" budget, which is the same
+        /// complaint regardless of what hit them - unlike speed, where a chase you
+        /// can't outrun and a beetle you can't sidestep are separate problems.
+        ///
+        /// New mechanic, so it has no ROADMAP.md row; values are starting estimates
+        /// pending playtest, in line with the neighbouring rows.
+        /// </summary>
+        public static double CreatureRagdollMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.85;
+                case PresetId.Generous: return 0.65;
+                case PresetId.Tame: return 0.40;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
+        /// Whether zombies can lose a target at all, per ROADMAP.md's "Zombie deaggro
+        /// (currently: never)" row, whose Subtle column is explicitly "none (still
+        /// never, matches vanilla)".
+        ///
+        /// This is why the mechanic needs an on/off row and not just a multiplier:
+        /// vanilla zombies never deaggro, so <em>any</em> multiplier is a behavior
+        /// change, and Subtle's whole identity is "vanilla except the always-on bug
+        /// fixes". Off on Subtle, on everywhere else.
+        /// </summary>
+        public static bool ZombieDeaggroEnabled(PresetId preset)
+        {
+            return CatalogKey(preset) != PresetId.Subtle;
+        }
+
+        /// <summary>
+        /// How hard it is for a player to shake a zombie, per ROADMAP.md's
+        /// "Zombie deaggro" row (large / moderate / short distance).
+        /// <b>1.0 is the toughest setting here, not vanilla</b> - see
+        /// <see cref="ZombieDeaggro"/> for why this one dial has to invert the mod's
+        /// usual convention. Subtle's value is unused (the mechanic is off there per
+        /// <see cref="ZombieDeaggroEnabled"/>) but is kept at the maximum so that
+        /// turning it on by hand under Subtle gives the toughest behavior rather than
+        /// the most forgiving.
+        /// </summary>
+        public static double ZombieDeaggroMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.85;
+                case PresetId.Generous: return 0.60;
+                case PresetId.Tame: return 0.35;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
+        /// How hard it is for a player to shake a beetle - a multiplier on the
+        /// distance at which it keeps an existing target
+        /// (<see cref="CreatureTuning.ScaleDeaggroDistance"/>). 1.0 = vanilla
+        /// (Subtle), lower = easier to escape, matching the direction of
+        /// <see cref="ZombieDeaggroMultiplier"/> even though only this one is
+        /// vanilla-anchored. Beetles already deaggro in vanilla, so unlike the zombie
+        /// row this needs no on/off companion. Starting estimates pending playtest.
+        /// </summary>
+        public static double BeetleDeaggroMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.90;
+                case PresetId.Generous: return 0.75;
+                case PresetId.Tame: return 0.55;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
         /// The unconditional bush/grass placement-removal pass is on for every
         /// preset, including Subtle (ROADMAP.md - the game never prevents a spore
         /// bomb landing in foliage, so this gap is always fixed). Kept as a method

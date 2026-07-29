@@ -66,6 +66,9 @@ namespace Fairoots
                     SporeBombCullPatch.ReapplyTriggerRadiusToAll();
                     WindChillZoneTuningPatch.ReapplyAll();
                     SporeAreaTuningPatch.ReapplyToAll();
+                    Creatures.CreatureSpeedPatch.ReapplyToAll();
+                    Creatures.CreatureKnockbackPatch.ReapplyToAll();
+                    Creatures.CreatureRagdollPatch.ReapplyToAll();
                 }
             };
 
@@ -90,6 +93,43 @@ namespace Fairoots
             // doesn't, so waiting for a level reload would just read as broken.
             // Applies in both directions (hides, and restores what it hid).
             Cfg.DisableSporeAreas.SettingChanged += (s, e) => SporeAreaDisablePatch.ReapplyToAll();
+
+            // Same treatment again, for the same reason: a creature either exists in
+            // this run or it doesn't. The zombie switch is included even though its
+            // own effect is a Harmony prefix that reads the setting live - flipping it
+            // off has to bring beetles/spiders back in the same pass, and the reapply
+            // is what logs the resulting state for all three.
+            EventHandler reapplyCreatureDisable = (s, e) => Creatures.CreatureDisablePatch.ReapplyToAll();
+            Cfg.DisableZombies.SettingChanged += reapplyCreatureDisable;
+            Cfg.DisableBeetles.SettingChanged += reapplyCreatureDisable;
+            Cfg.DisableSpiders.SettingChanged += reapplyCreatureDisable;
+
+            // Speed is a dial, not a removal - it can be undone, so it gets the same
+            // gated immediate-reapply treatment as the wind/spore-area multipliers
+            // (with live updates off, the Effective* accessors keep returning the
+            // level-load snapshot anyway).
+            EventHandler reapplyCreatureSpeed = (s, e) =>
+            {
+                if (Cfg.ApplyChangesLive.Value) Creatures.CreatureSpeedPatch.ReapplyToAll();
+            };
+            Cfg.ZombieSpeedMultiplierOverride.SettingChanged += reapplyCreatureSpeed;
+            Cfg.BeetleSpeedMultiplierOverride.SettingChanged += reapplyCreatureSpeed;
+            Cfg.BeetleKnockbackMultiplierOverride.SettingChanged += (s, e) =>
+            {
+                if (Cfg.ApplyChangesLive.Value) Creatures.CreatureKnockbackPatch.ReapplyToAll();
+            };
+            Cfg.CreatureRagdollMultiplierOverride.SettingChanged += (s, e) =>
+            {
+                if (Cfg.ApplyChangesLive.Value) Creatures.CreatureRagdollPatch.ReapplyToAll();
+            };
+
+            // The two deaggro dials need no reapply hook at all: both patches read
+            // their Effective* value fresh at the moment the game asks a targeting
+            // question (ZombieDeaggroPatch on every TargetIsValid call,
+            // BeetleDeaggroPatch around every Targeting scan), rather than writing a
+            // scaled value onto a field that would then need refreshing. Live updates
+            // still work - and apply-changes-live is still honoured, via the snapshot
+            // inside those same Effective* accessors.
 
             // A resize or a rate change can be undone, unlike a removal, so both
             // spore-area tuning dials get the same immediate-reapply treatment as
@@ -170,6 +210,12 @@ namespace Fairoots
             // SporeBombCloudWarning.
             SporeBombCloudWarning.Tick();
             Ui.SporeWarningLabel.Tick();
+
+            // Presence-driven like the spore label, but off a registry rather than a
+            // query: only spiders actually mid-drop on the local player are examined
+            // (see SpiderStrikeWarning - Roots has ~90 spiders, so a per-frame sweep
+            // is exactly the unconditional scan this mod has learned not to do).
+            Ui.SpiderWarningLabel.Tick();
 
             // Capture the cover-mouth hand pose while the player is still standing in
             // the airport, not the first time they need it - see CoverMouthPose.Prewarm.
