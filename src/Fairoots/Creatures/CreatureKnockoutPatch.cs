@@ -301,7 +301,38 @@ namespace Fairoots.Creatures
 
         private static bool _loggedFailure;
 
+        private static readonly MethodInfo Getter = AccessTools.PropertyGetter(typeof(Mob), "mobState");
+
+        /// <summary><c>MobState.Walking</c>, boxed once - the second enum member, hence 1.</summary>
+        private static readonly object Walking =
+            StateType != null ? Enum.ToObject(StateType, 1) : null;
+
         internal static bool Available => Setter != null && RigidbodyControlled != null;
+
+        /// <summary>
+        /// Whether this mob is in its normal walking state - i.e. the game is driving its
+        /// position directly rather than letting the rigidbody do it. Anything that writes
+        /// to a mob's transform has to check this, or it fights the physics engine.
+        ///
+        /// Fails <b>closed</b> if the reflection is unavailable: better to skip an added
+        /// effect than to apply it in a state where it does damage.
+        /// </summary>
+        internal static bool IsWalking(Mob mob)
+        {
+            if (Getter == null || Walking == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                return Equals(Getter.Invoke(mob, null), Walking);
+            }
+            catch
+            {
+                return false;
+            }
+        }
 
         internal static void SetRigidbodyControlled(Mob mob)
         {

@@ -10,7 +10,8 @@ namespace Fairoots.Creatures
     /// <summary>
     /// Phase 7 (ROADMAP.md), the beetle half of the deaggro tuning. Beetles already
     /// give up in vanilla - <c>Mob.Targeting()</c> re-picks the nearest conscious
-    /// player within <c>aggroDistance</c> (5 world units, ~8m) that it has clear line
+    /// player within <c>aggroDistance</c> (14 world units, ~22.4m on the Roots prefab -
+    /// <c>Mob</c>'s class default of 5 is not what ships) that it has clear line
     /// of sight to, and assigns the result <b>including <c>null</c></b> - so this is
     /// tuning, not invention, and 1.0 means exactly vanilla.
     ///
@@ -24,7 +25,7 @@ namespace Fairoots.Creatures
     /// instantly re-acquired the same player. Fixed by <see cref="SuppressedUntil"/>, a
     /// short window in which the beetle acquires nobody.</item>
     /// <item>Widening it did almost nothing, because vanilla retention also demands an
-    /// unbroken <c>LineCheck</c>, and in Roots sight breaks well before 8m does. Fixed
+    /// unbroken <c>LineCheck</c>, and in Roots sight breaks well before 22m does. Fixed
     /// by holding an in-range target directly (skipping the scan) rather than hoping a
     /// bigger radius survives the sight test.</item>
     /// </list>

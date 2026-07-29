@@ -528,6 +528,24 @@ namespace Fairoots
         public ConfigEntry<double> BlowgunCreatureStunSeconds { get; }
 
         /// <summary>
+        /// Multiplier on the wind force a zombie receives. 1.0 = vanilla, which is already
+        /// nonzero: a zombie is a bot <c>Character</c>, so the game pushes it at 0.6x what
+        /// it pushes a player (see <see cref="Core.CreatureWind"/>). Host-authoritative and
+        /// flat.
+        /// </summary>
+        public ConfigEntry<double> ZombieWindMultiplier { get; }
+
+        /// <summary>
+        /// How susceptible beetles are to wind, as a fraction of their own walking speed -
+        /// so 1.0 means wind slides a beetle about as fast as it walks. <b>0 is vanilla</b>,
+        /// not 1.0, because vanilla beetles are completely wind-immune and cannot be made
+        /// otherwise by scaling: <c>Mob.FixedUpdate</c> zeroes their velocity every tick.
+        /// Any positive value grants an effect the game never had. Host-authoritative and
+        /// flat.
+        /// </summary>
+        public ConfigEntry<double> BeetleWindSusceptibility { get; }
+
+        /// <summary>
         /// Master kill switch for the whole cover-your-mouth mechanic. When on, the
         /// key does nothing at all: no immunity, no stamina drain, no hand
         /// restrictions, no pose. <b>Host-authoritative</b> (read via
@@ -1250,7 +1268,8 @@ namespace Fairoots
                 0.9,
                 new ConfigDescription(
                     "How hard it is to shake a beetle once it's after you, as a multiplier on the " +
-                    "distance it will keep chasing you from. 1.0 means vanilla (about 8m), 0.5 is " +
+                    "distance it will keep chasing you from. 1.0 means vanilla (about 22m in " +
+                    "Roots), 0.5 is " +
                     "twice as easy to escape, 2.0 twice as hard. Unlike zombies, beetles DO give " +
                     "up on their own in the unmodded game - both by distance and by losing sight " +
                     "of you - so this only tunes how sticky that already is. It doesn't change how " +
@@ -1351,6 +1370,35 @@ namespace Fairoots
                     "works if you actually hit. HOST-AUTHORITATIVE: only the host's value counts " +
                     "for the whole lobby.",
                     new AcceptableValueRange<double>(0.0, 600.0)));
+
+            ZombieWindMultiplier = config.Bind(
+                "Creatures",
+                "zombie-wind-multiplier",
+                1.5,
+                new ConfigDescription(
+                    "Multiplier on how hard the wind pushes zombies around, e.g. 2.0 pushes them " +
+                    "twice as hard as normal, 0 makes them immune. 1.0 means vanilla - note that " +
+                    "vanilla is NOT zero: the game already pushes zombies at 60% of the force it " +
+                    "uses on you, because a zombie counts as a bot character. Useful for making a " +
+                    "storm a real hazard for the things chasing you and not just for you. " +
+                    "HOST-AUTHORITATIVE: only the host's value counts for the whole lobby.",
+                    new AcceptableValueRange<double>(0.0, 5.0)));
+
+            BeetleWindSusceptibility = config.Bind(
+                "Creatures",
+                "beetle-wind-susceptibility",
+                0.5,
+                new ConfigDescription(
+                    "How much the wind slides beetles around, as a fraction of their own walking " +
+                    "speed - 1.0 means wind moves a beetle about as fast as it walks, 0.5 half " +
+                    "that. NOTE: 0 is the vanilla value here, not 1.0, because beetles are " +
+                    "completely immune to wind in the unmodded game and can't be made otherwise " +
+                    "by scaling anything - the game resets a walking beetle's velocity every " +
+                    "physics tick, so any wind force on it is erased before it moves. Set 0 to " +
+                    "restore that. Only applies while a beetle is walking normally, never while " +
+                    "it's tumbling, flipped or knocked out. HOST-AUTHORITATIVE: only the host's " +
+                    "value counts for the whole lobby.",
+                    new AcceptableValueRange<double>(0.0, 5.0)));
 
             DisableCoverMouth = config.Bind(
                 "Spore-Areas",
@@ -2229,6 +2277,20 @@ namespace Fairoots
         /// </summary>
         public double EffectiveBlowgunCreatureStunSeconds =>
             HostAuthority.Resolve("BlowgunCreatureStunSeconds", BlowgunCreatureStunSeconds.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="ZombieWindMultiplier"/>. Host-authoritative, flat.
+        /// </summary>
+        public double EffectiveZombieWindMultiplier =>
+            HostAuthority.Resolve("ZombieWindMultiplier", ZombieWindMultiplier.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="BeetleWindSusceptibility"/>. Host-authoritative, flat.
+        /// </summary>
+        public double EffectiveBeetleWindSusceptibility =>
+            HostAuthority.Resolve("BeetleWindSusceptibility", BeetleWindSusceptibility.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of

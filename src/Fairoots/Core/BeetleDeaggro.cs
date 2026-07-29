@@ -25,11 +25,13 @@ namespace Fairoots.Core
     /// makes a mob wait before it's allowed to change its mind about a target.
     ///
     /// <b>And why the high end did nothing either</b>: vanilla retention also requires
-    /// an unbroken <c>LineCheck</c> to the target. In Roots' terrain, line of sight
-    /// breaks long before 8m does, so widening the radius alone changed almost nothing
-    /// - the sight test was the real limit. Above 1.0 the patch therefore holds the
-    /// existing target directly instead of re-running the scan, which is what "harder
-    /// to shake off" has to mean once sight is the binding constraint.
+    /// an unbroken <c>LineCheck</c> to the target. The Roots beetle's own aggro radius is
+    /// already ~22.4m (14 world units - the prefab overrides <c>Mob</c>'s class default of
+    /// 5), and in that terrain line of sight breaks long before that distance does, so
+    /// widening the radius alone changed almost nothing - the sight test was the real
+    /// limit all along. Above 1.0 the patch therefore holds the existing target directly
+    /// instead of re-running the scan, which is what "harder to shake off" has to mean
+    /// once sight is the binding constraint.
     /// </summary>
     public static class BeetleDeaggro
     {
@@ -70,7 +72,8 @@ namespace Fairoots.Core
 
         /// <summary>
         /// How far a beetle will keep chasing a target it already has, given its own
-        /// vanilla <c>aggroDistance</c> (5 world units on the stock prefab).
+        /// vanilla <c>aggroDistance</c> - passed in per instance, because the Roots prefab
+        /// ships 14 world units rather than <c>Mob</c>'s class default of 5.
         /// </summary>
         public static float ResolveRetentionDistance(float vanillaAggroDistance, double multiplier)
         {

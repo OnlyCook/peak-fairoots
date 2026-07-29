@@ -191,6 +191,8 @@ namespace Fairoots.Networking
                 { KeyPrefix + "CreatureKnockoutMaxThrowDistance", cfg.EffectiveCreatureKnockoutMaxThrowDistance },
                 { KeyPrefix + "BlowgunAffectsCreatures", cfg.EffectiveBlowgunAffectsCreatures },
                 { KeyPrefix + "BlowgunCreatureStunSeconds", cfg.EffectiveBlowgunCreatureStunSeconds },
+                { KeyPrefix + "ZombieWindMultiplier", cfg.EffectiveZombieWindMultiplier },
+                { KeyPrefix + "BeetleWindSusceptibility", cfg.EffectiveBeetleWindSusceptibility },
                 { KeyPrefix + "DisableBeetles", cfg.EffectiveDisableBeetles },
                 { KeyPrefix + "DisableSpiders", cfg.EffectiveDisableSpiders },
                 { KeyPrefix + "SporeAreaRemovalFraction", cfg.EffectiveSporeAreaRemovalFraction },

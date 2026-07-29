@@ -133,7 +133,10 @@ namespace Fairoots.Tests
         // The first version of this dial showed no difference between its extremes.
         // These pin down both causes so neither can quietly come back.
 
-        private const float VanillaAggroDistance = 5f; // Mob.aggroDistance
+        // Mob's class default. The Roots prefab actually ships 14 (~22.4m), which is why
+        // the game-facing code reads the live field per instance rather than assuming; this
+        // constant only needs to be *a* baseline for the arithmetic below.
+        private const float VanillaAggroDistance = 5f;
 
         [Fact]
         public void Beetle_ZeroIsNotReachable_MinimumIsATenth()

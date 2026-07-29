@@ -86,9 +86,14 @@ namespace Fairoots.Core
 
         /// <summary>
         /// Scales the distance at which a beetle will <em>keep</em> a target it has
-        /// already picked, from its vanilla <c>Mob.aggroDistance</c> (5 world units,
-        /// i.e. ~8m). 1.0 = vanilla, 0.5 = twice as easy to shake off, 2.0 = twice as
-        /// hard.
+        /// already picked, from its vanilla <c>Mob.aggroDistance</c>. 1.0 = vanilla,
+        /// 0.5 = twice as easy to shake off, 2.0 = twice as hard.
+        ///
+        /// <b>Read the live field, never the class default.</b> <c>Mob</c> declares
+        /// <c>aggroDistance = 5f</c>, but the Roots beetle prefab overrides it to 14 world
+        /// units (~22.4m) - runtime-confirmed from the aggro log. That is why every caller
+        /// passes the instance's own value in rather than assuming 5; an earlier round of
+        /// these comments quoted the class default as if it were the real one.
         ///
         /// <b>Unlike the zombie, a beetle already deaggros in vanilla</b>, which is why
         /// this dial keeps the mod's usual "1.0 means vanilla" convention while
