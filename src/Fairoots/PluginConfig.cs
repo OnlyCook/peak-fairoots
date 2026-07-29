@@ -351,6 +351,31 @@ namespace Fairoots
         public ConfigEntry<bool> DisableSpiders { get; }
 
         /// <summary>
+        /// Custom-preset value for the multiplier applied to a mushroom zombie's
+        /// movement speed. 1.0 = vanilla, 0 = a zombie that can still turn, aggro and
+        /// bite but never closes any distance. Only takes effect under
+        /// <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
+        ///
+        /// Scales <c>CharacterMovement.movementForce</c> (vanilla 10) on the zombie's
+        /// own movement component - deliberately <em>not</em> the sibling
+        /// <c>movementModifier</c> field, which the game's own energy-drink affliction
+        /// adjusts additively; writing a computed value there would clobber it (the
+        /// same trap already documented for <c>climbSpeedMod</c> in
+        /// <c>ClimbWindShelterPatch</c>).
+        /// </summary>
+        public ConfigEntry<double> ZombieSpeedMultiplierOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for the multiplier applied to a beetle's movement
+        /// speed (<c>Mob.movementSpeed</c>, vanilla 5). 1.0 = vanilla, 0 = a beetle
+        /// that still turns to face you and still attacks if you walk into it, but
+        /// never chases. Only takes effect under <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
+        /// </summary>
+        public ConfigEntry<double> BeetleSpeedMultiplierOverride { get; }
+
+        /// <summary>
         /// Master kill switch for the whole cover-your-mouth mechanic. When on, the
         /// key does nothing at all: no immunity, no stamina drain, no hand
         /// restrictions, no pose. <b>Host-authoritative</b> (read via
@@ -970,6 +995,31 @@ namespace Fairoots
                 "host's value counts for the whole lobby. Off by default; no preset ever turns this " +
                 "on automatically. Applies immediately, regardless of apply-changes-live.");
 
+            ZombieSpeedMultiplierOverride = config.Bind(
+                "Creatures",
+                "zombie-speed-multiplier",
+                0.9,
+                new ConfigDescription(
+                    "Multiplier applied to how fast mushroom zombies move, e.g. 0.5 makes them " +
+                    "half as fast, 1.5 half again as fast. 1.0 always means vanilla. Affects both " +
+                    "their walk and their sprint, since the sprint is a multiple of the same " +
+                    "speed. 0 means a zombie can still notice you, turn towards you and bite you " +
+                    "if you stand next to it, but never closes any distance. Only takes effect " +
+                    "when preset is set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 3.0)));
+
+            BeetleSpeedMultiplierOverride = config.Bind(
+                "Creatures",
+                "beetle-speed-multiplier",
+                0.9,
+                new ConfigDescription(
+                    "Multiplier applied to how fast beetles move, e.g. 0.5 makes them half as " +
+                    "fast, 1.5 half again as fast. 1.0 always means vanilla. 0 means a beetle " +
+                    "still turns to face you and still hits you if you walk into it, but never " +
+                    "chases. Only takes effect when preset is set to Custom (5) - ignored under " +
+                    "presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 3.0)));
+
             DisableCoverMouth = config.Bind(
                 "Spore-Areas",
                 "disable-cover-mouth",
@@ -1468,6 +1518,20 @@ namespace Fairoots
                 SporeAreaStatusRateMultiplierOverride.Value,
                 UseCustomOverrides);
 
+        /// <summary>The effective movement-speed multiplier for every mushroom zombie.</summary>
+        public double ZombieSpeedMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.ZombieSpeedMultiplier(Preset.Value),
+                ZombieSpeedMultiplierOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>The effective movement-speed multiplier for every beetle.</summary>
+        public double BeetleSpeedMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.BeetleSpeedMultiplier(Preset.Value),
+                BeetleSpeedMultiplierOverride.Value,
+                UseCustomOverrides);
+
         /// <summary>The effective wind-force (and gust-timing) multiplier.</summary>
         public double WindForceMultiplier =>
             OverrideResolution.Resolve(
@@ -1549,6 +1613,8 @@ namespace Fairoots
         private double _snapSporeAreaRemovalFraction;
         private double _snapSporeAreaRadiusMultiplierValue;
         private double _snapSporeAreaStatusRateMultiplier;
+        private double _snapZombieSpeedMultiplier;
+        private double _snapBeetleSpeedMultiplier;
         private double _snapWindForceMultiplier;
         private double _snapWindGustDurationMultiplier;
         private double _snapWindItemForceMultiplier;
@@ -1577,6 +1643,8 @@ namespace Fairoots
             _snapSporeAreaRemovalFraction = SporeAreaRemovalFraction;
             _snapSporeAreaRadiusMultiplierValue = SporeAreaRadiusMultiplier;
             _snapSporeAreaStatusRateMultiplier = SporeAreaStatusRateMultiplier;
+            _snapZombieSpeedMultiplier = ZombieSpeedMultiplier;
+            _snapBeetleSpeedMultiplier = BeetleSpeedMultiplier;
             _snapWindForceMultiplier = WindForceMultiplier;
             _snapWindGustDurationMultiplier = WindGustDurationMultiplier;
             _snapWindItemForceMultiplier = WindItemForceMultiplier;
@@ -1703,6 +1771,24 @@ namespace Fairoots
         /// </summary>
         public bool EffectiveDisableSporeAreas =>
             HostAuthority.Resolve("DisableSporeAreas", DisableSporeAreas.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="ZombieSpeedMultiplier"/>. Host-authoritative (how fast a
+        /// creature chases is shared balance) and level-load-snapshotted like the
+        /// other numeric dials, so it respects <see cref="ApplyChangesLive"/>.
+        /// </summary>
+        public double EffectiveZombieSpeedMultiplier =>
+            HostAuthority.Resolve("ZombieSpeedMultiplier", UseLiveValue ? ZombieSpeedMultiplier : _snapZombieSpeedMultiplier);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="BeetleSpeedMultiplier"/>. Host-authoritative and
+        /// level-load-snapshotted, same shape as
+        /// <see cref="EffectiveZombieSpeedMultiplier"/>.
+        /// </summary>
+        public double EffectiveBeetleSpeedMultiplier =>
+            HostAuthority.Resolve("BeetleSpeedMultiplier", UseLiveValue ? BeetleSpeedMultiplier : _snapBeetleSpeedMultiplier);
 
         /// <summary>
         /// Game-facing code should read this instead of

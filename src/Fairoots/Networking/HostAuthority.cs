@@ -178,6 +178,8 @@ namespace Fairoots.Networking
                 { KeyPrefix + "DisableWindEntirely", cfg.EffectiveDisableWindEntirely },
                 { KeyPrefix + "DisableSporeAreas", cfg.EffectiveDisableSporeAreas },
                 { KeyPrefix + "DisableZombies", cfg.EffectiveDisableZombies },
+                { KeyPrefix + "ZombieSpeedMultiplier", cfg.EffectiveZombieSpeedMultiplier },
+                { KeyPrefix + "BeetleSpeedMultiplier", cfg.EffectiveBeetleSpeedMultiplier },
                 { KeyPrefix + "DisableBeetles", cfg.EffectiveDisableBeetles },
                 { KeyPrefix + "DisableSpiders", cfg.EffectiveDisableSpiders },
                 { KeyPrefix + "SporeAreaRemovalFraction", cfg.EffectiveSporeAreaRemovalFraction },

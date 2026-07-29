@@ -243,6 +243,50 @@ namespace Fairoots.Core.Presets
         }
 
         /// <summary>
+        /// Multiplier applied to a mushroom zombie's movement speed, per ROADMAP.md's
+        /// "Zombie/beetle move speed" row (-10%/-20%/-35%). 1.0 = vanilla (Subtle).
+        ///
+        /// Vanilla is <c>CharacterMovement.movementForce = 10</c>, inherited by
+        /// <c>CharacterMovementZombie</c> (which overrides only its ground checks) -
+        /// this resolves RESEARCH.md's Q8 open question about which field actually
+        /// governs zombie speed. Kept as its own row rather than shared with
+        /// <see cref="BeetleSpeedMultiplier"/> even though ROADMAP.md lists them
+        /// together: they're different fields with different units on unrelated
+        /// classes, and a chase you can't outrun and a beetle you can't sidestep are
+        /// separate complaints worth tuning apart. Starting estimates pending playtest.
+        /// </summary>
+        public static double ZombieSpeedMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.90;
+                case PresetId.Generous: return 0.80;
+                case PresetId.Tame: return 0.65;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
+        /// Multiplier applied to a beetle's movement speed (<c>Mob.movementSpeed</c>,
+        /// vanilla 5), per ROADMAP.md's "Zombie/beetle move speed" row
+        /// (-10%/-20%/-35%). 1.0 = vanilla (Subtle). See
+        /// <see cref="ZombieSpeedMultiplier"/> for why the two are separate rows.
+        /// Starting estimates pending playtest.
+        /// </summary>
+        public static double BeetleSpeedMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 0.90;
+                case PresetId.Generous: return 0.80;
+                case PresetId.Tame: return 0.65;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
         /// The unconditional bush/grass placement-removal pass is on for every
         /// preset, including Subtle (ROADMAP.md - the game never prevents a spore
         /// bomb landing in foliage, so this gap is always fixed). Kept as a method

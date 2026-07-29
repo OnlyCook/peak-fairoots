@@ -66,6 +66,7 @@ namespace Fairoots
                     SporeBombCullPatch.ReapplyTriggerRadiusToAll();
                     WindChillZoneTuningPatch.ReapplyAll();
                     SporeAreaTuningPatch.ReapplyToAll();
+                    Creatures.CreatureSpeedPatch.ReapplyToAll();
                 }
             };
 
@@ -100,6 +101,17 @@ namespace Fairoots
             Cfg.DisableZombies.SettingChanged += reapplyCreatureDisable;
             Cfg.DisableBeetles.SettingChanged += reapplyCreatureDisable;
             Cfg.DisableSpiders.SettingChanged += reapplyCreatureDisable;
+
+            // Speed is a dial, not a removal - it can be undone, so it gets the same
+            // gated immediate-reapply treatment as the wind/spore-area multipliers
+            // (with live updates off, the Effective* accessors keep returning the
+            // level-load snapshot anyway).
+            EventHandler reapplyCreatureSpeed = (s, e) =>
+            {
+                if (Cfg.ApplyChangesLive.Value) Creatures.CreatureSpeedPatch.ReapplyToAll();
+            };
+            Cfg.ZombieSpeedMultiplierOverride.SettingChanged += reapplyCreatureSpeed;
+            Cfg.BeetleSpeedMultiplierOverride.SettingChanged += reapplyCreatureSpeed;
 
             // A resize or a rate change can be undone, unlike a removal, so both
             // spore-area tuning dials get the same immediate-reapply treatment as
