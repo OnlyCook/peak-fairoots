@@ -93,6 +93,7 @@ namespace Fairoots
                 Creatures.BeetleDeaggroPatch.ClearLevelState();
                 Creatures.ZombieAggroLogPatch.ClearLevelState();
                 Creatures.CreatureAggroLog.ClearLevelState();
+                Creatures.SpiderStrikeWarning.ClearLevelState();
                 SporeBombCloudWarning.ClearLevelState();
                 SporePresence.ClearLevelState();
             }

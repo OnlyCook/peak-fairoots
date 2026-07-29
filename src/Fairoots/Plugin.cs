@@ -211,6 +211,12 @@ namespace Fairoots
             SporeBombCloudWarning.Tick();
             Ui.SporeWarningLabel.Tick();
 
+            // Presence-driven like the spore label, but off a registry rather than a
+            // query: only spiders actually mid-drop on the local player are examined
+            // (see SpiderStrikeWarning - Roots has ~90 spiders, so a per-frame sweep
+            // is exactly the unconditional scan this mod has learned not to do).
+            Ui.SpiderWarningLabel.Tick();
+
             // Capture the cover-mouth hand pose while the player is still standing in
             // the airport, not the first time they need it - see CoverMouthPose.Prewarm.
             CoverMouthPose.Prewarm();

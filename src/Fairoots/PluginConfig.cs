@@ -144,6 +144,24 @@ namespace Fairoots
         /// </summary>
         public ConfigEntry<bool> ShowSporeCloudLabel { get; }
 
+        /// <summary>
+        /// The spider strike indicator: an on-screen warning while a spider is
+        /// descending on you (<c>Ui/SpiderWarningLabel</c>).
+        ///
+        /// Off by default, matching <see cref="ShowSporeCloudLabel"/> and the rest of
+        /// the label group: every setting that puts a HUD element on screen that PEAK
+        /// doesn't have is opted into, not out of, regardless of how well it fills a
+        /// gap. And the gap is real - vanilla gives a dropping spider no advance
+        /// warning at all, since its only cue is a sound that plays in the same frame
+        /// the drop starts and the grab that follows is instant on contact - which is
+        /// what makes it worth offering, just not worth imposing. See
+        /// <c>Creatures/SpiderStrikeWarning</c>.
+        ///
+        /// Purely cosmetic and per-client, like the spore label and the spore-bomb
+        /// recolor: it changes what one player sees, not what happens.
+        /// </summary>
+        public ConfigEntry<bool> ShowSpiderWarningLabel { get; }
+
         // --- Spore-Bombs ---------------------------------------------------
         /// <summary>
         /// Custom-preset value for the spore-bomb total removal target. Only takes
@@ -836,6 +854,21 @@ namespace Fairoots
                 "readability settings just make the game's own feedback legible, while this " +
                 "adds a HUD element PEAK doesn't have, which is more a matter of taste. " +
                 "Purely cosmetic and PER-PLAYER: not host-authoritative. Applies immediately, " +
+                "regardless of apply-changes-live.");
+
+            ShowSpiderWarningLabel = config.Bind(
+                "General",
+                "show-spider-warning-label",
+                false,
+                "Shows a text warning on screen, in the game's own font and in the Poison status " +
+                "colour, while a spider is dropping down on you, and hides it again about a " +
+                "second after the spider lands without catching anyone. Worth turning on if " +
+                "spiders keep getting you from above: the game gives you no warning at all for " +
+                "this - the only spider sound plays at the same moment the drop starts, and " +
+                "being grabbed is instant on contact - so this turns the time the spider spends " +
+                "descending into time you can actually react in. Off by default like the other " +
+                "on-screen labels, since it adds a HUD element PEAK doesn't have. Purely " +
+                "cosmetic and PER-PLAYER: not host-authoritative. Applies immediately, " +
                 "regardless of apply-changes-live.");
 
             SporeBombCullFractionOverride = config.Bind(
