@@ -455,6 +455,57 @@ namespace Fairoots
         public ConfigEntry<double> BeetleDeaggroMultiplierOverride { get; }
 
         /// <summary>
+        /// How long a zombie is knocked out by a thrown item, in seconds. Vanilla
+        /// already ragdolls a zombie for about a second when an item hits it (a zombie
+        /// is a <c>Character</c>, so <c>Bonkable</c> finds it), so this extends an
+        /// existing interaction rather than inventing one - see
+        /// <see cref="Core.CreatureKnockout"/>. 0 leaves vanilla alone.
+        ///
+        /// Flat rather than preset-gated, and <b>host-authoritative</b>: this is
+        /// counterplay the player can use, so it follows
+        /// <see cref="CoverMouthStaminaPerSecond"/>'s shape - how strong a counterplay
+        /// move is, is shared balance.
+        /// </summary>
+        public ConfigEntry<double> ZombieKnockoutSeconds { get; }
+
+        /// <summary>
+        /// How long a beetle is knocked onto its back by a thrown item, in seconds.
+        /// Unlike the zombie's, this is an entirely new interaction: a beetle is a
+        /// <c>Mob</c> with no <c>Character</c> and no <c>EventOnItemCollision</c>, so
+        /// vanilla thrown items pass straight by it. 0 restores that.
+        ///
+        /// Shorter than <see cref="ZombieKnockoutSeconds"/> by default, at the
+        /// maintainer's direction - a beetle's shell should visibly shrug off a thrown
+        /// rock better than a zombie or a spider does. Same flat, host-authoritative
+        /// shape as the zombie dial.
+        /// </summary>
+        public ConfigEntry<double> BeetleKnockoutSeconds { get; }
+
+        /// <summary>
+        /// How fast a thrown item must be going, in <b>meters per second</b>, to knock out
+        /// a beetle or a zombie. Shared by both so "a hard throw" means one thing.
+        ///
+        /// Exists because matching the game's own <c>Bonkable</c> threshold (5 world
+        /// units/s) turned out to accept any contact at all - see
+        /// <see cref="Core.CreatureKnockout.VanillaBonkableThresholdUnits"/>. 0 restores
+        /// that anything-goes behaviour for anyone who wants it. Host-authoritative and
+        /// flat, like the two duration dials it gates.
+        /// </summary>
+        public ConfigEntry<double> CreatureKnockoutMinThrowSpeed { get; }
+
+        /// <summary>
+        /// How close to the creature the thrower must have been, in <b>meters</b>, for a
+        /// thrown item to knock it out. The second half of the mechanic's cost, alongside
+        /// <see cref="CreatureKnockoutMinThrowSpeed"/>: a hard throw is still travelling
+        /// fast a long way out, so speed alone would license picking creatures off from
+        /// safety. 0 removes the distance requirement.
+        ///
+        /// Measured from <c>Item.lastHolderCharacter</c> at the moment of impact.
+        /// Host-authoritative and flat, like the rest of the knockout group.
+        /// </summary>
+        public ConfigEntry<double> CreatureKnockoutMaxThrowDistance { get; }
+
+        /// <summary>
         /// Master kill switch for the whole cover-your-mouth mechanic. When on, the
         /// key does nothing at all: no immunity, no stamina drain, no hand
         /// restrictions, no pose. <b>Host-authoritative</b> (read via
@@ -1187,6 +1238,71 @@ namespace Fairoots
                     "beetle, which is what disable-beetles is for. Only takes effect when preset " +
                     "is set to Custom (5) - ignored under presets 1-4.",
                     new AcceptableValueRange<double>(0.1, 3.0)));
+
+            ZombieKnockoutSeconds = config.Bind(
+                "Creatures",
+                "zombie-knockout-seconds",
+                4.0,
+                new ConfigDescription(
+                    "How many seconds a zombie is knocked out for when you hit it with a thrown " +
+                    "item, the way you can already stun a spider by throwing something at it. " +
+                    "The unmodded game already knocks a zombie down for about a second, so this " +
+                    "mostly decides how long that lasts; 0 leaves the vanilla behaviour alone. " +
+                    "Deliberately less than the 5 seconds a spider gets. Note the zombie also " +
+                    "needs a moment to get up and re-orient afterwards, so the total time it's " +
+                    "out of the fight is a few seconds longer than this. HOST-AUTHORITATIVE: " +
+                    "only the host's value counts for the whole lobby.",
+                    new AcceptableValueRange<double>(0.0, 60.0)));
+
+            BeetleKnockoutSeconds = config.Bind(
+                "Creatures",
+                "beetle-knockout-seconds",
+                2.0,
+                new ConfigDescription(
+                    "How many seconds a beetle is knocked onto its back for when you hit it with " +
+                    "a thrown item. Unlike zombies and spiders, beetles are completely immune to " +
+                    "thrown items in the unmodded game - nothing happens at all - so this adds " +
+                    "the interaction outright; 0 turns it back off. Shortest of the three on " +
+                    "purpose: a beetle has a shell, so it should shrug off a thrown rock better " +
+                    "than a zombie or a spider does. A knocked-out beetle can't chase or attack, " +
+                    "and rights itself with its own flip animation afterwards. Only counts if " +
+                    "the item is actually thrown hard - dropping something on it does nothing. " +
+                    "HOST-AUTHORITATIVE: only the host's value counts for the whole lobby.",
+                    new AcceptableValueRange<double>(0.0, 60.0)));
+
+            CreatureKnockoutMinThrowSpeed = config.Bind(
+                "Creatures",
+                "creature-knockout-min-throw-speed",
+                36.0,
+                new ConfigDescription(
+                    "How fast a thrown item has to be travelling, in meters per second, to knock " +
+                    "out a beetle or a zombie - so a genuine throw does it and gently lobbing or " +
+                    "dropping something doesn't. Applies to both creatures, so \"a hard throw\" " +
+                    "means the same thing for each. Lower it if throws that feel hard aren't " +
+                    "landing, raise it if soft ones are. 0 means any contact counts at all, " +
+                    "however gentle. Turn on Debug/enable-debug-logging to see the measured speed " +
+                    "of each throw next to this threshold in the log, which is the easy way to " +
+                    "pick a value. The default is set from measured throws: medium throws land " +
+                    "around 23-31 m/s and near-full-strength ones around 37-43, and the default " +
+                    "of 36 was picked by play-testing as the point where a knockout needs a " +
+                    "genuinely committed throw. This is a flat setting, so it is the same under " +
+                    "every preset including Balanced. HOST-AUTHORITATIVE: only the host's value " +
+                    "counts for the whole lobby.",
+                    new AcceptableValueRange<double>(0.0, 100.0)));
+
+            CreatureKnockoutMaxThrowDistance = config.Bind(
+                "Creatures",
+                "creature-knockout-max-throw-distance",
+                12.0,
+                new ConfigDescription(
+                    "How close you have to be to a beetle or zombie, in meters, for a thrown item " +
+                    "to knock it out. Together with creature-knockout-min-throw-speed above this " +
+                    "is what the knockout costs you: a charged throw from close range, which " +
+                    "takes time to wind up and usually loses you the item. Without a distance " +
+                    "limit a hard throw is still fast a long way out, so you could pick creatures " +
+                    "off from somewhere safe. 0 removes the distance requirement. " +
+                    "HOST-AUTHORITATIVE: only the host's value counts for the whole lobby.",
+                    new AcceptableValueRange<double>(0.0, 200.0)));
 
             DisableCoverMouth = config.Bind(
                 "Spore-Areas",
@@ -2021,6 +2137,36 @@ namespace Fairoots
         /// </summary>
         public double EffectiveCreatureRagdollMultiplier =>
             HostAuthority.Resolve("CreatureRagdollMultiplier", UseLiveValue ? CreatureRagdollMultiplier : _snapCreatureRagdollMultiplier);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="ZombieDeaggroEnabled"/>. Host-authoritative - whether a chase can
+        /// be escaped at all is shared balance, not local feel.
+        /// </summary>
+        public double EffectiveZombieKnockoutSeconds =>
+            HostAuthority.Resolve("ZombieKnockoutSeconds", ZombieKnockoutSeconds.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="BeetleKnockoutSeconds"/>. Host-authoritative, flat - same shape as
+        /// <see cref="EffectiveCoverMouthStaminaPerSecond"/>.
+        /// </summary>
+        public double EffectiveBeetleKnockoutSeconds =>
+            HostAuthority.Resolve("BeetleKnockoutSeconds", BeetleKnockoutSeconds.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="CreatureKnockoutMinThrowSpeed"/>. Host-authoritative, flat.
+        /// </summary>
+        public double EffectiveCreatureKnockoutMinThrowSpeed =>
+            HostAuthority.Resolve("CreatureKnockoutMinThrowSpeed", CreatureKnockoutMinThrowSpeed.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="CreatureKnockoutMaxThrowDistance"/>. Host-authoritative, flat.
+        /// </summary>
+        public double EffectiveCreatureKnockoutMaxThrowDistance =>
+            HostAuthority.Resolve("CreatureKnockoutMaxThrowDistance", CreatureKnockoutMaxThrowDistance.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of

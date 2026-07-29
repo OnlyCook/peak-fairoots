@@ -94,6 +94,7 @@ namespace Fairoots
                 Creatures.ZombieAggroLogPatch.ClearLevelState();
                 Creatures.CreatureAggroLog.ClearLevelState();
                 Creatures.SpiderStrikeWarning.ClearLevelState();
+                Creatures.CreatureKnockoutPatch.ClearLevelState();
                 SporeBombCloudWarning.ClearLevelState();
                 SporePresence.ClearLevelState();
             }
