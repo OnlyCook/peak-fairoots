@@ -51,22 +51,13 @@ The rows marked `*` on the default are the one documented exception: **gated par
 
 ## Spores
 
-Dials on the Spores *status* itself rather than on any one hazard that applies
-it. These compound with the per-hazard rows above, on purpose.
+Dials on the *Spores* status effect itself rather than on any one hazard that applies it. These combine with the per-hazard rows above.
 
 | Setting | Type | Default | Subtle | Balanced | Generous | Tame |
 |---|---|---|---|---|---|---|
-| `clear-time-multiplier` | double | 1.0 | 1.00 | 0.70 | 0.65 | 0.45 | <!--SporeClearTimeMultiplier-->
+| `clear-time-multiplier` | double | 1.0 | 1.00 | 0.80 | 0.75 | 0.65 | <!--SporeClearTimeMultiplier-->
 | `build-up-multiplier` | double | 1.0 | 1.00 | 1.00 | 1.00 | 1.00 | <!--SporeBuildUpMultiplier-->
-- `clear-time-multiplier` Balanced `0.70` is live-tuned (2026-07-30): 0.85 was
-  not noticeable enough at the default preset. That leaves Balanced and Generous
-  only 0.05 apart, which is known and deliberate for now.
-- `build-up-multiplier` is `1.00` on all four presets **and that is not an
-  unfilled row.** It multiplies every incoming dose from every source, on top of
-  the per-hazard rows that already express the same intent — giving it preset
-  values would compound with them (Tame's 0.45 area rate would land at 0.20).
-  It stays a Custom-only global lever. Do not "finish" this row without
-  rebalancing the per-hazard ones.
+- `build-up-multiplier` is `1.00` on all four presets intentionally, as it stacks too strongly with the other setting. 
 
 ## Creatures
 
@@ -76,44 +67,24 @@ it. These compound with the per-hazard rows above, on purpose.
 | `disable-beetles` | bool | off | — | — | — | — | <!--DisableBeetles-->
 | `disable-spiders` | bool | off | — | — | — | — | <!--DisableSpiders-->
 | `zombie-speed-multiplier` | double | 1.0 | 1.00 | 0.90 | 0.80 | 0.65 | <!--ZombieSpeedMultiplier-->
-| `beetle-speed-multiplier` | double | 1.0 | 1.00 | 0.90 | 0.80 | 0.65 | <!--BeetleSpeedMultiplier-->
+| `beetle-speed-multiplier` | double | 1.0 | 1.00 | 1.00 | 0.90 | 0.80 | <!--BeetleSpeedMultiplier-->
 | `beetle-knockback-multiplier` | double | 1.0 | 1.00 | 0.80 | 0.65 | 0.50 | <!--BeetleKnockbackMultiplier-->
 | `creature-ragdoll-multiplier` | double | 1.0 | 1.00 | 0.85 | 0.65 | 0.40 | <!--CreatureRagdollMultiplier-->
 | `zombie-deaggro-enabled` | bool | off | off | on | on | on | <!--ZombieDeaggroEnabled-->
-| `zombie-deaggro-multiplier` | double | 1.0 | 1.00 | 0.85 | 0.60 | 0.35 | <!--ZombieDeaggroMultiplier-->
-| `beetle-deaggro-multiplier` | double | 1.0 | 1.00 | 0.90 | 0.75 | 0.55 | <!--BeetleDeaggroMultiplier-->
-| `zombie-knockout-seconds` | double | 0.0 | 2.0 | 4.0 | 6.0 | 8.0 | <!--ZombieKnockoutSeconds-->
-| `beetle-knockout-seconds` | double | 0.0 | 1.0 | 2.0 | 3.0 | 4.0 | <!--BeetleKnockoutSeconds-->
-| `creature-knockout-min-throw-speed` | double | 36.0* | 44 | 36 | 28 | 20 | <!--CreatureKnockoutMinThrowSpeed-->
-| `creature-knockout-max-throw-distance` | double | 12.0* | 8 | 12 | 18 | 25 | <!--CreatureKnockoutMaxThrowDistance-->
+| └ `zombie-deaggro-multiplier` | double | 1.0 | 1.00 | 1.00 | 0.85 | 0.75 | <!--ZombieDeaggroMultiplier-->
+| `beetle-deaggro-multiplier` | double | 1.0 | 1.00 | 1.00 | 0.90 | 0.80 | <!--BeetleDeaggroMultiplier-->
+| `zombie-knockout-seconds` | double | 0.0 | 1.0 | 2.0 | 3.0 | 4.0 | <!--ZombieKnockoutSeconds-->
+| `beetle-knockout-seconds` | double | 0.0 | 2.0 | 3.0 | 4.0 | 4.0 | <!--BeetleKnockoutSeconds-->
+| `creature-knockout-min-throw-speed` | double | 36.0* | 38 | 36 | 34 | 32 | <!--CreatureKnockoutMinThrowSpeed-->
+| `creature-knockout-max-throw-distance` | double | 12.0* | 10 | 12 | 13 | 15 | <!--CreatureKnockoutMaxThrowDistance-->
 | `blowgun-affects-creatures` | bool | off | on | on | on | on | <!--BlowgunAffectsCreatures-->
-| `blowgun-creature-stun-seconds` | double | 60.0* | 30 | 60 | 90 | 120 | <!--BlowgunCreatureStunSeconds-->
-| `zombie-wind-multiplier` | double | 1.0 | 1.2 | 1.5 | 1.8 | 2.2 | <!--ZombieWindMultiplier-->
-| `beetle-wind-susceptibility` | double | 0.0 | 0.25 | 0.50 | 0.75 | 1.00 | <!--BeetleWindSusceptibility-->
-- `zombie-deaggro-multiplier` is the one dial in the file where **1.0 is not
-  vanilla** — it is the *toughest* setting, because vanilla zombies never
-  deaggro at all and no finite multiplier expresses "never". Vanilla is
-  `zombie-deaggro-enabled = off`, which is the default and the Subtle column.
-- `zombie-knockout-seconds`/`beetle-knockout-seconds`: `0` = vanilla. Vanilla
-  already ragdolls a *zombie* for about a second when a thrown item hits it, so
-  the zombie row extends an existing interaction; a beetle is a `Mob` that
-  vanilla thrown items pass straight through, so the beetle row is a genuinely
-  new one. The beetle numbers stay shorter than the zombie's on every preset —
-  a shell should visibly shrug off a rock better.
-- `creature-knockout-min-throw-speed` (m/s) and
-  `creature-knockout-max-throw-distance` (m) are gated parameters (`*`): they
-  only mean anything once a knockout duration is non-zero. Lower speed / higher
-  distance = easier, hence the direction they run in.
-- `zombie-wind-multiplier`: `1.0` is vanilla and already non-zero — the game
-  pushes a bot `Character` at 0.6× what it pushes a player. Above 1.0 the wind
-  shoves zombies harder than the game does, which helps the player.
-- `beetle-wind-susceptibility`: **`0` is vanilla**, not 1.0. Vanilla beetles are
-  completely wind-immune (`Mob.FixedUpdate` zeroes their velocity every tick), so
-  any positive value grants an effect the game never had. It is a fraction of the
-  beetle's own walking speed, so 1.0 means wind slides one about as fast as it
-  walks.
-- The three `disable-*` switches are flat manual overrides — no preset ever turns
-  them on, they exist for a host who wants a creature gone outright.
+| └ `blowgun-creature-stun-seconds` | double | 45.0* | 30 | 45 | 60 | 60 | <!--BlowgunCreatureStunSeconds-->
+| `zombie-wind-multiplier` | double | 1.0 | 1.2 | 1.4 | 1.5 | 1.6 | <!--ZombieWindMultiplier-->
+| `beetle-wind-susceptibility` | double | 0.0 | 0.25 | 0.40 | 0.60 | 0.80 | <!--BeetleWindSusceptibility-->
+- `zombie-deaggro-multiplier` is the one dial in the file where **1.0 is not vanilla**, because vanilla zombies never deaggro at all. But because vanilla is `zombie-deaggro-enabled = off` we don't have to worry about the value.
+- `creature-knockout-min-throw-speed` (m/s) and `creature-knockout-max-throw-distance` (m) are gated parameters (`*`): they only mean anything once a knockout duration is non-zero (for each creature). Lower speed / higher distance = easier.
+- `zombie-wind-multiplier`: `1.0` is vanilla and already non-zero, the game pushes a zombie `Character` at 0.6× what it pushes a player.
+- `beetle-wind-susceptibility`: **`0` is vanilla**, not 1.0. Vanilla beetles are completely wind-immune, so any positive value grants an effect the game never had. It is a fraction of the beetle's own walking speed, so 1.0 means wind slides one about as fast as it walks.
 
 ## Wind
 
