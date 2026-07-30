@@ -36,19 +36,19 @@ namespace Fairoots.Core.Presets
 
         // --- Spore-Bombs ---
         public static double SporeBombCullFraction(PresetId preset) =>
-            Pick(preset, 0.00, 0.25, 0.50, 0.75);
+            Pick(preset, 0.00, 0.05, 0.15, 0.25);
         public static bool EnableFoliageRemoval(PresetId preset) =>
             Pick(preset, true, true, true, true);
         public static double SporeBombTriggerRadiusMultiplier(PresetId preset) =>
-            Pick(preset, 1.00, 0.75, 0.70, 0.55);
+            Pick(preset, 0.90, 0.75, 0.70, 0.60);
         public static double SporeBombKnockbackMultiplier(PresetId preset) =>
-            Pick(preset, 1.00, 0.80, 0.60, 0.40);
+            Pick(preset, 1.00, 0.90, 0.70, 0.50);
         public static double SporeBombScreenshakeRangeCapMeters(PresetId preset) =>
-            Pick(preset, 0.0, 30.0, 20.0, 10.0);
+            Pick(preset, 75.0, 75.0, 50.0, 50.0);
         public static double SporeBombVfxCountMultiplier(PresetId preset) =>
             Pick(preset, 1.00, 0.75, 0.50, 0.35);
         public static double SporeBombTriggerHeightMultiplier(PresetId preset) =>
-            Pick(preset, 1.00, 0.804, 0.75, 0.589);
+            Pick(preset, 0.9, 0.804, 0.804, 0.804);
         public static double SporeBombSporeAreaRadiusMultiplier(PresetId preset) =>
             Pick(preset, 1.00, 1.00, 1.00, 1.00);
         public static bool CoverMouthBlocksSporeBombs(PresetId preset) =>
@@ -58,9 +58,9 @@ namespace Fairoots.Core.Presets
         public static double SporeAreaRemovalFraction(PresetId preset) =>
             Pick(preset, 0.00, 0.00, 0.20, 0.35);
         public static double SporeAreaRadiusMultiplier(PresetId preset) =>
-            Pick(preset, 1.00, 0.85, 0.70, 0.55);
+            Pick(preset, 1.00, 1.00, 0.85, 0.70);
         public static double SporeAreaStatusRateMultiplier(PresetId preset) =>
-            Pick(preset, 1.00, 0.85, 0.65, 0.45);
+            Pick(preset, 1.00, 1.00, 0.90, 0.80);
         public static bool EnableCoverMouth(PresetId preset) =>
             Pick(preset, true, true, true, true);
         public static float CoverMouthStaminaPerSecond(PresetId preset) =>
@@ -68,7 +68,7 @@ namespace Fairoots.Core.Presets
 
         // --- Spores ---
         public static double SporeClearTimeMultiplier(PresetId preset) =>
-            Pick(preset, 1.00, 0.70, 0.65, 0.45);
+            Pick(preset, 1.00, 0.80, 0.75, 0.65);
         public static double SporeBuildUpMultiplier(PresetId preset) =>
             Pick(preset, 1.00, 1.00, 1.00, 1.00);
 
@@ -76,7 +76,7 @@ namespace Fairoots.Core.Presets
         public static double ZombieSpeedMultiplier(PresetId preset) =>
             Pick(preset, 1.00, 0.90, 0.80, 0.65);
         public static double BeetleSpeedMultiplier(PresetId preset) =>
-            Pick(preset, 1.00, 0.90, 0.80, 0.65);
+            Pick(preset, 1.00, 1.00, 0.90, 0.80);
         public static double BeetleKnockbackMultiplier(PresetId preset) =>
             Pick(preset, 1.00, 0.80, 0.65, 0.50);
         public static double CreatureRagdollMultiplier(PresetId preset) =>
@@ -84,39 +84,39 @@ namespace Fairoots.Core.Presets
         public static bool ZombieDeaggroEnabled(PresetId preset) =>
             Pick(preset, false, true, true, true);
         public static double ZombieDeaggroMultiplier(PresetId preset) =>
-            Pick(preset, 1.00, 0.85, 0.60, 0.35);
+            Pick(preset, 1.00, 1.00, 0.85, 0.75);
         public static double BeetleDeaggroMultiplier(PresetId preset) =>
-            Pick(preset, 1.00, 0.90, 0.75, 0.55);
+            Pick(preset, 1.00, 1.00, 0.90, 0.80);
         public static double ZombieKnockoutSeconds(PresetId preset) =>
-            Pick(preset, 2.0, 4.0, 6.0, 8.0);
-        public static double BeetleKnockoutSeconds(PresetId preset) =>
             Pick(preset, 1.0, 2.0, 3.0, 4.0);
+        public static double BeetleKnockoutSeconds(PresetId preset) =>
+            Pick(preset, 2.0, 3.0, 4.0, 4.0);
         public static double CreatureKnockoutMinThrowSpeed(PresetId preset) =>
-            Pick(preset, 44.0, 36.0, 28.0, 20.0);
+            Pick(preset, 38.0, 36.0, 34.0, 32.0);
         public static double CreatureKnockoutMaxThrowDistance(PresetId preset) =>
-            Pick(preset, 8.0, 12.0, 18.0, 25.0);
+            Pick(preset, 10.0, 12.0, 13.0, 15.0);
         public static bool BlowgunAffectsCreatures(PresetId preset) =>
             Pick(preset, true, true, true, true);
         public static double BlowgunCreatureStunSeconds(PresetId preset) =>
-            Pick(preset, 30.0, 60.0, 90.0, 120.0);
+            Pick(preset, 30.0, 45.0, 60.0, 60.0);
         public static double ZombieWindMultiplier(PresetId preset) =>
-            Pick(preset, 1.2, 1.5, 1.8, 2.2);
+            Pick(preset, 1.2, 1.4, 1.5, 1.6);
         public static double BeetleWindSusceptibility(PresetId preset) =>
-            Pick(preset, 0.25, 0.50, 0.75, 1.00);
+            Pick(preset, 0.25, 0.40, 0.60, 0.80);
 
         // --- Wind ---
         public static bool WindBackpackAlwaysImmune(PresetId preset) =>
             Pick(preset, true, true, true, true);
         public static double WindForceMultiplier(PresetId preset) =>
-            Pick(preset, 0.90, 0.80, 0.60, 0.35);
+            Pick(preset, 0.95, 0.95, 0.90, 0.85);
         public static double WindGustDurationMultiplier(PresetId preset) =>
-            Pick(preset, 0.90, 0.80, 0.60, 0.35);
+            Pick(preset, 1.00, 1.00, 0.90, 0.90);
         public static double WindItemForceMultiplier(PresetId preset) =>
-            Pick(preset, 1.00, 0.70, 0.40, 0.00);
+            Pick(preset, 0.70, 0.60, 0.40, 0.20);
         public static double WindObstacleOcclusionRangeMultiplier(PresetId preset) =>
-            Pick(preset, 1.00, 1.30, 1.60, 2.00);
+            Pick(preset, 1.00, 1.20, 1.30, 1.50);
         public static double WindFallCameraDampenClamp(PresetId preset) =>
-            Pick(preset, 0.00, 0.35, 0.55, 0.75);
+            Pick(preset, 0.20, 0.35, 0.55, 0.75);
         public static float WindRecentForceWindowSeconds(PresetId preset) =>
             Pick(preset, 1.0f, 1.5f, 2.0f, 2.5f);
         public static bool PreventWindRagdoll(PresetId preset) =>
@@ -124,14 +124,14 @@ namespace Fairoots.Core.Presets
         public static bool ClimbSheltersFromWind(PresetId preset) =>
             Pick(preset, false, true, true, true);
         public static double ClimbWindSpeedMultiplier(PresetId preset) =>
-            Pick(preset, 1.00, 0.90, 0.93, 0.96);
+            Pick(preset, 0.85, 0.90, 0.93, 0.96);
         public static double ClimbWindUpwardSpeedMultiplier(PresetId preset) =>
-            Pick(preset, 1.00, 0.85, 0.89, 0.94);
+            Pick(preset, 0.80, 0.85, 0.89, 0.94);
         public static double ClimbWindIntoWindSpeedMultiplier(PresetId preset) =>
-            Pick(preset, 1.00, 0.85, 0.89, 0.94);
+            Pick(preset, 0.80, 0.85, 0.89, 0.94);
         public static float ClimbShelterGraceSeconds(PresetId preset) =>
-            Pick(preset, 0.3f, 0.5f, 0.7f, 1.0f);
+            Pick(preset, 0.4f, 0.5f, 0.5f, 0.6f);
         public static double ClimbWindGraceForceMultiplier(PresetId preset) =>
-            Pick(preset, 1.00, 0.15, 0.12, 0.08);
+            Pick(preset, 0.25, 0.15, 0.12, 0.10);
     }
 }

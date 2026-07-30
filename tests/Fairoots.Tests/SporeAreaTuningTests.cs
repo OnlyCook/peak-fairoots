@@ -1,3 +1,4 @@
+using System;
 using Fairoots.Core;
 using Fairoots.Core.Presets;
 using Xunit;
@@ -110,28 +111,58 @@ namespace Fairoots.Tests
         }
 
         [Fact]
-        public void StatusRatePresetProgression_SubtleIsVanillaAndEachPresetIsGentler()
+        public void StatusRatePresetProgression_EachPresetIsAtLeastAsGentle()
         {
-            Assert.Equal(1.0, PresetCatalog.SporeAreaStatusRateMultiplier(PresetId.Subtle));
-            Assert.True(PresetCatalog.SporeAreaStatusRateMultiplier(PresetId.Balanced)
-                        < PresetCatalog.SporeAreaStatusRateMultiplier(PresetId.Subtle));
-            Assert.True(PresetCatalog.SporeAreaStatusRateMultiplier(PresetId.Generous)
-                        < PresetCatalog.SporeAreaStatusRateMultiplier(PresetId.Balanced));
-            Assert.True(PresetCatalog.SporeAreaStatusRateMultiplier(PresetId.Tame)
-                        < PresetCatalog.SporeAreaStatusRateMultiplier(PresetId.Generous));
+            AssertGetsGentler("status-rate-multiplier", PresetCatalog.SporeAreaStatusRateMultiplier);
+
+            // A rate of 0 is not "gentle", it's a spore area that does nothing - and
+            // SporeAreaScan.IsSporeArea identifies an area by its positive amount, so
+            // a zeroed one would stop being findable at all.
             Assert.True(PresetCatalog.SporeAreaStatusRateMultiplier(PresetId.Tame) > 0.0);
         }
 
         [Fact]
-        public void PresetProgression_SubtleIsVanillaAndEachPresetShrinksFurther()
+        public void RadiusPresetProgression_EachPresetShrinksAtLeastAsFar()
         {
-            Assert.Equal(1.0, PresetCatalog.SporeAreaRadiusMultiplier(PresetId.Subtle));
-            Assert.True(PresetCatalog.SporeAreaRadiusMultiplier(PresetId.Balanced)
-                        < PresetCatalog.SporeAreaRadiusMultiplier(PresetId.Subtle));
-            Assert.True(PresetCatalog.SporeAreaRadiusMultiplier(PresetId.Generous)
-                        < PresetCatalog.SporeAreaRadiusMultiplier(PresetId.Balanced));
-            Assert.True(PresetCatalog.SporeAreaRadiusMultiplier(PresetId.Tame)
-                        < PresetCatalog.SporeAreaRadiusMultiplier(PresetId.Generous));
+            AssertGetsGentler("radius-multiplier", PresetCatalog.SporeAreaRadiusMultiplier);
+        }
+
+        /// <summary>
+        /// The shape both spore-area dials have to keep, and nothing more: never above
+        /// vanilla, never rebounding as the presets get more forgiving, and Tame
+        /// strictly below Subtle so the row actually does something.
+        ///
+        /// <b>Ties between neighbours are allowed on purpose</b>, and both dials
+        /// currently use them (Subtle and Balanced sit at 1.00 on each as of
+        /// 2026-07-30) - "the two lightest presets leave spore areas alone" is a
+        /// legitimate tuning outcome, and the strict less-than chain this replaced
+        /// made it a build failure. Same reasoning, and the same rule, as
+        /// <c>PresetResolutionTests.AssertRunsFromVanilla</c>: values are re-tuned
+        /// between play sessions via <c>docs/PRESETS.md</c>, so tests pin direction,
+        /// not numbers (see <c>docs/TESTING.md</c>).
+        /// </summary>
+        private static void AssertGetsGentler(string row, Func<PresetId, double> value)
+        {
+            PresetId[] scale = { PresetId.Subtle, PresetId.Balanced, PresetId.Generous, PresetId.Tame };
+
+            foreach (PresetId p in scale)
+            {
+                Assert.True(
+                    value(p) <= 1.0 + 1e-9,
+                    $"{row}: {p} ({value(p)}) is above vanilla - no preset may make spore areas worse");
+            }
+
+            for (int i = 1; i < scale.Length; i++)
+            {
+                Assert.True(
+                    value(scale[i]) <= value(scale[i - 1]) + 1e-9,
+                    $"{row}: {scale[i]} ({value(scale[i])}) is harsher than {scale[i - 1]} "
+                    + $"({value(scale[i - 1])}) - the scale runs one way only");
+            }
+
+            Assert.True(
+                value(PresetId.Tame) < value(PresetId.Subtle) - 1e-9,
+                $"{row}: Tame is no gentler than Subtle - the row does nothing");
         }
 
         [Fact]

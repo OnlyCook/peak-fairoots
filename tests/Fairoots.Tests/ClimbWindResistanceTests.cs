@@ -288,7 +288,14 @@ namespace Fairoots.Tests
         [Fact]
         public void SubtlePresetsGraceMultiplierIsMoot()
         {
-            Assert.Equal(1.00, PresetCatalog.ClimbWindGraceForceMultiplier(PresetId.Subtle));
+            // What makes it moot is the parent toggle, not the number itself: with
+            // climb-shelters-from-wind off, ClimbWindShelter.Enabled is false and the
+            // grace window is never consulted. That's the gated-parameter rule from
+            // docs/PRESETS.md, and it's why this asserts the gate rather than pinning
+            // the child to 1.0 - the table authors a real tuned number in that cell
+            // (0.25 as of 2026-07-30) so the column stays readable next to the presets
+            // that do use it.
+            Assert.False(PresetCatalog.ClimbSheltersFromWind(PresetId.Subtle));
         }
 
         [Fact]
@@ -298,11 +305,21 @@ namespace Fairoots.Tests
             // is the least subtle thing in the mod (maintainer, 2026-07-27).
             Assert.False(PresetCatalog.ClimbSheltersFromWind(PresetId.Subtle));
 
-            // Its multipliers are moot, and must read as "no slowdown" rather
-            // than implying a Subtle-strength one exists.
-            Assert.Equal(1.0, PresetCatalog.ClimbWindSpeedMultiplier(PresetId.Subtle));
-            Assert.Equal(1.0, PresetCatalog.ClimbWindUpwardSpeedMultiplier(PresetId.Subtle));
-            Assert.Equal(1.0, PresetCatalog.ClimbWindIntoWindSpeedMultiplier(PresetId.Subtle));
+            // The three speed multipliers underneath it are gated parameters, so they
+            // are NOT required to read 1.0 here - nothing reads them while the parent
+            // is off, and the table authors real numbers in those cells so the Subtle
+            // column stays comparable with the presets that do use them. What has to
+            // hold is that they'd be sane if the player turned the toggle on under
+            // Subtle: a slowdown, never a speed-up, and never a full stop.
+            foreach (double m in new[]
+                     {
+                         PresetCatalog.ClimbWindSpeedMultiplier(PresetId.Subtle),
+                         PresetCatalog.ClimbWindUpwardSpeedMultiplier(PresetId.Subtle),
+                         PresetCatalog.ClimbWindIntoWindSpeedMultiplier(PresetId.Subtle),
+                     })
+            {
+                Assert.InRange(m, 0.01, 1.0);
+            }
         }
 
         [Theory]

@@ -57,7 +57,7 @@ namespace Fairoots.Core
         public const double CreatureKnockoutMinThrowSpeed = 36.0;
         public const double CreatureKnockoutMaxThrowDistance = 12.0;
         public const bool BlowgunAffectsCreatures = false;
-        public const double BlowgunCreatureStunSeconds = 60.0;
+        public const double BlowgunCreatureStunSeconds = 45.0;
         public const double ZombieWindMultiplier = 1.0;
         public const double BeetleWindSusceptibility = 0.0;
 
