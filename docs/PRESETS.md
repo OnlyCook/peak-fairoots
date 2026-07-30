@@ -42,17 +42,12 @@ The rows marked `*` on the default are the one documented exception: **gated par
 |---|---|---|---|---|---|---|
 | `disable-spore-areas` | bool | off | — | — | — | — | <!--DisableSporeAreas-->
 | `removal-fraction` | double | 0.0 | 0.00 | 0.00 | 0.20 | 0.35 | <!--SporeAreaRemovalFraction-->
-| `radius-multiplier` | double | 1.0 | 1.00 | 0.85 | 0.70 | 0.55 | <!--SporeAreaRadiusMultiplier-->
-| `status-rate-multiplier` | double | 1.0 | 1.00 | 0.85 | 0.65 | 0.45 | <!--SporeAreaStatusRateMultiplier-->
+| `radius-multiplier` | double | 1.0 | 1.00 | 1.00 | 0.85 | 0.70 | <!--SporeAreaRadiusMultiplier-->
+| `status-rate-multiplier` | double | 1.0 | 1.00 | 1.00 | 0.90 | 0.80 | <!--SporeAreaStatusRateMultiplier-->
 | `enable-cover-mouth` | bool | off | on | on | on | on | <!--EnableCoverMouth-->
-| `cover-mouth-stamina-per-second` | float | 0.03* | 0.04 | 0.03 | 0.02 | 0.01 | <!--CoverMouthStaminaPerSecond-->
-- `removal-fraction` is 0 on Subtle **and** Balanced on purpose: a level has only
-  ~12–23 spore areas against 400+ spore bombs, so they are landmarks rather than
-  clutter and removing any at the default preset would reshape the biome instead
-  of just making it fairer.
-- `cover-mouth-stamina-per-second` is a gated parameter (`*`): it costs nothing
-  until `enable-cover-mouth` is on. For scale, vanilla wall climbing costs up to
-  0.2/s.
+| └ `cover-mouth-stamina-per-second` | float | 0.03* | 0.04 | 0.03 | 0.02 | 0.01 | <!--CoverMouthStaminaPerSecond-->
+- `removal-fraction` decides how much percent of spore areas should be removed.
+- `cover-mouth-stamina-per-second` is a gated parameter (`*`): it costs nothing until `enable-cover-mouth` is on. For scale, vanilla static wall climbing costs 0.2/s.
 
 ## Spores
 
