@@ -1,80 +1,21 @@
-# PRESETS — every balance setting, its default, and what each preset sets it to
+**This file is the source of truth for every balance number in the mod,** the tables and its values below are used directly by the mod.
 
-**This file is the source of truth for every balance number in the mod.** The
-tables below are not documentation written after the fact — they are parsed by
-`scripts/apply-presets.sh`, which generates the two C# files the mod actually
-reads:
+## The two rules the tables follow
 
-- `src/Fairoots/Core/ConfigDefaults.g.cs` — the **Default** column, i.e. the
-  value each BepInEx config entry is bound with.
-- `src/Fairoots/Core/Presets/PresetValues.g.cs` — the four preset columns, i.e.
-  what `PresetCatalog` returns per preset.
+**1. Every default is the vanilla value.** Freshly install Fairoots (or delete its config file), set `General/preset` to `Custom`, change nothing else, and the game plays exactly like unmodded PEAK: every multiplier is `1.0`, every removal fraction is `0`, and every new mechanic is `off`. Custom is a blank slate you build up from, not Balanced with the numbers exposed.
 
-So the tuning loop is: edit a cell here → run `bash scripts/apply-presets.sh` →
-build and deploy. Never hand-edit either `.g.cs` file; the script overwrites
-them. `bash scripts/apply-presets.sh --check` re-runs the generator and fails if
-the checked-in `.g.cs` files are stale or if a setting has drifted out of the
-table (it runs in CI-style verification, changing nothing).
+The rows marked `*` on the default are the one documented exception: **gated parameters**, a dial that only means anything while some other setting is on. There is no vanilla value for the cost of a mechanic vanilla doesn't have, so the default is the sensible tuned number and the parent toggle is what defaults to off. So when the parent row isn't enabled these values aren't read anyway and therefore still play like vanilla.
 
-**Scope: the five gameplay sections only** — `Spore-Bombs`, `Spore-Areas`,
-`Spores`, `Creatures`, `Wind`. `General` (seed, preset selector, keybinds, the
-client-side cosmetic settings) and `Debug` are deliberately not here: nothing in
-either is preset-driven or a balance value, so their defaults stay ordinary
-literals in `PluginConfig.cs`. If a setting isn't in this file, no preset touches
-it.
-
-## The two rules the tables encode
-
-**1. Every default is the vanilla value.** Install Fairoots, set
-`General/preset` to `Custom`, change nothing else, and the game plays exactly
-like unmodded PEAK: every multiplier is `1.0`, every removal fraction is `0`,
-every new mechanic is `off`. Custom is a blank slate you build up from, not
-Balanced with the numbers exposed.
-
-The rows marked `*` on the default are the one documented exception: **gated
-parameters** — a dial that only means anything while some other setting is on
-(what covering your mouth *costs*, how long a blowgun dart stuns). There is no
-vanilla value for the cost of a mechanic vanilla doesn't have, so the default is
-the sensible tuned number and the parent toggle is what defaults to off.
-Custom-plus-defaults is still exactly vanilla, because nothing switches these on.
-
-(The client-side cosmetic settings in `General` — the recolor, the cloud
-opacities, the spore overlay — are deliberately left at their tuned values rather
-than vanilla ones, maintainer's call: they change only what the player looking at
-their own screen sees, never game state. They live outside this file entirely,
-along with the rest of `General`.)
-
-**2. Presets 1–4 ignore the config entries entirely.** Under Subtle, Balanced,
-Generous or Tame, the four preset columns are what applies, whatever the player
-has typed into the per-mechanic settings. The config entries are read only under
-`Custom`. See `src/Fairoots/Core/Presets/OverrideResolution.cs`.
-
-A `—` in the preset columns means the row is not preset-driven at all: it is a
-flat setting that applies the same under every preset, including Custom. The only
-ones left in this file are the `disable-*` kill switches, which are already
-vanilla when off and which no preset ever reaches for.
+**2. Presets 1-4 ignore the config entries entirely.** The config entries are read only under `Custom`.
 
 ## How to read the columns
 
 | Column | Meaning |
 |---|---|
-| Setting | The BepInEx config key, inside the section the table is headed by. |
-| Type | `bool`, `double` or `float` — decides how the value is written into C#. |
-| Default | What the config entry ships with (rule 1 above). `on`/`off` for bools. |
-| Subtle … Tame | What presets 1–4 set it to. `—` = not preset-driven. |
-
-Each row also ends with an HTML comment naming its C# identifier
-(`<!--WindForceMultiplier-->`), which is what the generator keys off:
-`ConfigDefaults.<Id>`, `PresetValues.<Id>`, `PresetCatalog.<Id>` and the
-`HostAuthority` sync key. It doesn't render, so the tables stay readable; leave it
-on the row when editing values, and give any **new** row one (the script fails on
-a row without it).
-
-**Every preset number here is a placeholder pending the Phase 9 tuning pass**
-(see `ROADMAP.md`'s "Presets" section) — with the exception of the handful noted
-as playtest-tuned below their table. Balanced is deliberately set to whatever
-the setting shipped as before the table existed, so the default preset's feel
-did not change when the values moved in here.
+| **Setting** | The BepInEx config key, inside the section the table is headed by. |
+| **Type** | `bool`, `double` or `float`, decides how the value is written into C#. |
+| **Default** | What the config entry ships with (rule 1 above). `on`/`off` for bools. |
+| **Subtle … Tame** | What presets 1-4 set it to. `—` = not preset-driven. |
 
 ---
 
@@ -82,28 +23,18 @@ did not change when the values moved in here.
 
 | Setting | Type | Default | Subtle | Balanced | Generous | Tame |
 |---|---|---|---|---|---|---|
-| `cull-fraction` | double | 0.0 | 0.00 | 0.25 | 0.50 | 0.75 | <!--SporeBombCullFraction-->
+| `cull-fraction` | double | 0.0 | 0.00 | 0.05 | 0.15 | 0.25 | <!--SporeBombCullFraction-->
 | `enable-foliage-removal` | bool | off | on | on | on | on | <!--EnableFoliageRemoval-->
-| `trigger-radius-multiplier` | double | 1.0 | 1.00 | 0.75 | 0.70 | 0.55 | <!--SporeBombTriggerRadiusMultiplier-->
-| `knockback-multiplier` | double | 1.0 | 1.00 | 0.80 | 0.60 | 0.40 | <!--SporeBombKnockbackMultiplier-->
-| `screenshake-range-cap-meters` | double | 0.0 | 0 | 30 | 20 | 10 | <!--SporeBombScreenshakeRangeCapMeters-->
+| `trigger-radius-multiplier` | double | 1.0 | 0.90 | 0.75 | 0.70 | 0.60 | <!--SporeBombTriggerRadiusMultiplier-->
+| `knockback-multiplier` | double | 1.0 | 1.00 | 0.90 | 0.70 | 0.50 | <!--SporeBombKnockbackMultiplier-->
+| `screenshake-range-cap-meters` | double | 0.0 | 75 | 75 | 50 | 50 | <!--SporeBombScreenshakeRangeCapMeters-->
 | `vfx-count-multiplier` | double | 1.0 | 1.00 | 0.75 | 0.50 | 0.35 | <!--SporeBombVfxCountMultiplier-->
-| `trigger-height-multiplier` | double | 1.0 | 1.00 | 0.804 | 0.75 | 0.589 | <!--SporeBombTriggerHeightMultiplier-->
+| `trigger-height-multiplier` | double | 1.0 | 0.9 | 0.804 | 0.804 | 0.804 | <!--SporeBombTriggerHeightMultiplier-->
 | `spore-area-radius-multiplier` | double | 1.0 | 1.00 | 1.00 | 1.00 | 1.00 | <!--SporeBombSporeAreaRadiusMultiplier-->
 | `cover-mouth-blocks-spore-bombs` | bool | off | off | off | off | off | <!--CoverMouthBlocksSporeBombs-->
-- `cull-fraction` is the **total** removal target (the foliage pass plus the
-  seeded cull combined), not an extra cull on top. `0` means the seeded pass
-  removes nothing; the foliage pass still runs if `enable-foliage-removal` is on.
-- `screenshake-range-cap-meters`: `0` means uncapped (vanilla). Any positive
-  value is a cap in metres.
-- `trigger-radius-multiplier` Balanced `0.75` and `trigger-height-multiplier`
-  Balanced `0.804` are **playtest-tuned, not placeholders** — 0.804 reproduces
-  the 2.25 m absolute cutoff that was tuned against the actual mushroom mesh.
-- `enable-foliage-removal` was `disable-foliage-removal` before 2026-07-30. The
-  polarity was flipped so that "off = vanilla" holds for every row in the file.
-- `cover-mouth-blocks-spore-bombs` is off on every preset today. It is a real
-  preset row rather than a flat setting so the tuning pass can turn it on for
-  the more forgiving presets without a code change.
+- `cull-fraction` is the **total** removal target (the foliage pass plus the seeded cull combined), not an extra cull on top. `0` means the seeded pass removes nothing; the foliage pass still runs if `enable-foliage-removal` is on.
+- `screenshake-range-cap-meters`: `0` means uncapped (vanilla). Any positive value is a cap in meters. Vanilla does not have a cap which means that a player triggering a spore bomb will make the screen of another player shake even those that are very far away.
+- `cover-mouth-blocks-spore-bombs` is off on every preset today. It is a real preset row rather than a flat setting so the tuning pass can turn it on for the more forgiving presets without a code change.
 
 ## Spore-Areas
 
