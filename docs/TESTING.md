@@ -234,9 +234,21 @@ Two layers, per ROADMAP.md's testing strategy:
    on every tuning pass and the loop would stop being worth using. What is pinned
    is the direction of the scale — Subtle closest to vanilla, each later preset at
    least as forgiving, Tame strictly further than Subtle — plus anchors on values
-   that are design invariants rather than tuning choices (Subtle being exactly
-   vanilla for a given row, a fraction staying inside 0-1). Ties between
-   neighbouring presets are allowed: that's a legitimate tuning outcome.
+   that are genuine design invariants rather than tuning choices (a fraction
+   staying inside 0-1, a spore-area rate never reaching 0, a gated parameter's
+   parent toggle being off under Subtle). Ties between neighbouring presets are
+   allowed: that's a legitimate tuning outcome.
+
+   **"Subtle is exactly vanilla" is not one of those invariants**, and asserting it
+   per row was the single biggest source of false build failures — the 2026-07-30
+   tuning pass broke five tests at once by giving Subtle a light trigger-radius
+   shrink and a wide screen-shake cap, both perfectly legitimate. Subtle is the
+   *lightest* preset, not a vanilla one. It is still anchored where the row's own
+   design says so (spore clear time), but a new test should assume tuning may move
+   it and assert the shape instead. Four `*_MatchesRoadmapTable` tests that pinned
+   exact per-preset numbers outright were removed in that same pass for the same
+   reason — they were the rule this section states, being broken in the one file
+   that should have followed it hardest.
 
 2. **Manual in-game loop** (this doc) — for anything only observable at
    runtime (feel, visual clutter, screen shake, actual spawn positions in a
@@ -266,8 +278,10 @@ pass.
 
 For tuning a *single* mechanic mid-session you don't need the loop at all: set
 `General/preset = Custom` and edit that mechanic's own config entry in-game (via
-PEAKLib.ModConfig or the config file — `Debug/apply-changes-live` is on by
-default, so most settings apply immediately). Under Custom every setting starts
+PEAKLib.ModConfig or the config file — turn `Debug/apply-changes-live` on
+*before* loading into Roots so most settings apply immediately; it is off by
+default and is read once per Roots load, so flipping it while already standing in
+the biome does nothing until the next one). Under Custom every setting starts
 at its vanilla value, so whatever you change is the *only* thing differing from
 unmodded PEAK, which is what makes a single dial judgeable in isolation. Once a
 value feels right, write it into the preset column it belongs to in
@@ -556,18 +570,22 @@ run.
 **Pre-req:** debug logging on, in a Roots run, preset set to `Custom` (5) so
 the `Spore-Bombs` entries are actually in effect.
 
-1. With `apply-changes-live` at its default (`true`), change
-   `knockback-multiplier` while standing in Roots (e.g. via PEAKLib.ModConfig)
+0. **The flag is read once, as a Roots biome loads.** That is the whole design:
+   what you had set when the biome loaded is how that biome behaves, so switching
+   it *on* mid-run must do nothing at all. Test that first - stand in Roots with
+   it off, turn it on, change `knockback-multiplier`, trigger a spore bomb: the
+   old value must still apply. Then leave and come back for the steps below.
+1. Turn `apply-changes-live` on, then load into Roots. Change
+   `knockback-multiplier` while standing there (e.g. via PEAKLib.ModConfig)
    and trigger a spore bomb - the new value should apply to that very
    detonation. Change `trigger-radius-multiplier` too - already-placed spore
    bombs should visibly resize immediately, no reload needed.
-2. Set `apply-changes-live` to `false`. Change `knockback-multiplier` again
-   and trigger a spore bomb - it should still use whatever was in effect
-   *before* you flipped the flag off (the level's frozen snapshot), not the
-   new value. Same for `trigger-radius-multiplier` - existing hitboxes should
-   stay exactly the size they already were, not resize.
-3. Leave Roots and reload into a fresh Roots level (or `Custom` → any preset →
-   `Custom` isn't required here, an actual level load is): the new
+2. Leave Roots, set `apply-changes-live` back to `false` (its default), and load
+   into Roots again. Change `knockback-multiplier` and trigger a spore bomb - it
+   should use whatever was in effect when the biome loaded, not the new value.
+   Same for `trigger-radius-multiplier` - existing hitboxes should stay exactly
+   the size they already were, not resize.
+3. Leave Roots and reload into a fresh Roots level: the new
    `knockback-multiplier`/`trigger-radius-multiplier` values should now be in
    effect, confirming the freeze only lasts until the next Roots load.
 4. Confirm the rest of the `Debug` section (e.g. `keep-vanilla-trigger-radius`)
@@ -575,9 +593,10 @@ the `Spore-Bombs` entries are actually in effect.
    (`disable-wind-entirely`, `backpack-always-immune`, `recolor-spore-bombs`)
    still apply instantly regardless of `apply-changes-live`'s value.
 
-**Report back:** whether step 1's changes applied instantly, whether step 2's
-changes were correctly ignored until step 3's reload, and whether step 4's
-debug toggle stayed live throughout.
+**Report back:** whether step 0's mid-run switch-on was correctly ignored,
+whether step 1's changes applied instantly, whether step 2's changes were
+correctly ignored until step 3's reload, and whether step 4's debug toggle stayed
+live throughout.
 
 ### Foliage removal (`Spore-Bombs/enable-foliage-removal`)
 
@@ -807,7 +826,8 @@ true` and `fall-camera-dampen-window-seconds = 1.5`.
    also vanilla, confirming the recency window is what gates it.
 4. Turn the setting **off** and repeat step 1: wind should ragdoll you again,
    softened only partway if the preset sets a `fall-camera-dampen-clamp`
-   (Balanced 0.35 / Generous 0.55 / Tame 0.75; Subtle 0, i.e. full vanilla spin).
+   (every preset sets one; `0` would mean full vanilla spin). Read the current
+   numbers off `docs/PRESETS.md` rather than trusting a number quoted here.
 5. Being ragdolled by something that *isn't* wind (a beetle hit, a zombie bite,
    fall damage on landing) must be completely unaffected in every case above.
 

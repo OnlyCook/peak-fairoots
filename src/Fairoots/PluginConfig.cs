@@ -1839,17 +1839,21 @@ namespace Fairoots
             ApplyChangesLive = config.Bind(
                 "Debug",
                 "apply-changes-live",
-                true,
-                "When on (default), every gameplay setting takes effect the instant you change " +
-                "it in-game (e.g. via PEAKLib.ModConfig): kept spore bombs resize live, the next " +
-                "detonation uses the new knockback/VFX/shake numbers, and the jump-over-height " +
-                "cutoff updates immediately. Turn this off to freeze all of that at whatever it " +
-                "was the moment you loaded into Roots - further changes only take effect the " +
-                "next time you load into a Roots biome, which is useful for A/B-testing a " +
-                "mechanic without values shifting under you mid-run. The spore-bomb removal " +
-                "fraction and the seed are always level-load-only either way, since which spore " +
-                "bombs were already removed can't be undone mid-level; the wind kill switch, " +
-                "backpack immunity and the spore-bomb recolor are always immediate either way. " +
+                false,
+                "OFF by default, and off is the fast path: Fairoots resolves every gameplay " +
+                "value once as the Roots biome loads and then leaves it alone for the rest of " +
+                "the run, which is why this lives in Debug - it is a testing convenience, not " +
+                "something normal play needs. Turn it on to have settings take effect the " +
+                "instant you change them in-game (e.g. via PEAKLib.ModConfig): kept spore bombs " +
+                "resize live, the next detonation uses the new knockback/VFX/shake numbers, and " +
+                "the jump-over-height cutoff updates immediately - useful while tuning, at the " +
+                "cost of re-resolving those values as the game asks for them instead of reading " +
+                "one frozen set. IMPORTANT: this is read once, when a Roots biome loads. " +
+                "Switching it on while already standing in Roots does nothing until the next " +
+                "Roots load - so turn it on first, then load in. The spore-bomb removal fraction " +
+                "and the seed are always level-load-only either way, since which spore bombs " +
+                "were already removed can't be undone mid-level; the spore-bomb recolor and the " +
+                "cloud-opacity sliders are per-player cosmetics and always immediate either way. " +
                 "This is a behavior override, not a diagnostic, so it works regardless of the " +
                 "debug-logging switch below.");
 
@@ -1865,10 +1869,12 @@ namespace Fairoots
             LogSceneScanOnLoad = config.Bind(
                 "Debug",
                 "log-scene-scan-on-load",
-                true,
+                false,
                 "When debug logging is on, automatically dump a scene diagnostics report " +
-                "each time a level finishes generating. Turn this off if you only want to " +
-                "trigger the report manually with the hotkey below.");
+                "each time a Roots biome finishes loading. Off by default, like everything " +
+                "else in this section - the dump walks the whole level, so it belongs behind " +
+                "a deliberate choice rather than riding along with the logging switch. Leave " +
+                "it off and trigger the report manually with the hotkey below instead.");
 
             LogScreenshakeSources = config.Bind(
                 "Debug",
@@ -2320,6 +2326,11 @@ namespace Fairoots
             _snapClimbWindUpwardSpeedMultiplier = ClimbWindUpwardSpeedMultiplier;
             _snapClimbWindIntoWindSpeedMultiplier = ClimbWindIntoWindSpeedMultiplier;
             _snapClimbWindGraceForceMultiplier = ClimbWindGraceForceMultiplier;
+
+            // Captured last and read from everywhere else via LiveUpdatesActive: the
+            // whole point is that the rest of this level answers to what the player had
+            // set when it loaded, not to what they flip mid-run.
+            _snapLiveUpdates = ApplyChangesLive.Value;
             _snapshotTaken = true;
         }
 
@@ -2328,7 +2339,32 @@ namespace Fairoots
         /// live updates, or no level has loaded yet to snapshot from (falling back
         /// to live rather than a meaningless zeroed snapshot).
         /// </summary>
-        private bool UseLiveValue => ApplyChangesLive.Value || !_snapshotTaken;
+        /// <summary>
+        /// <see cref="ApplyChangesLive"/> as it stood when this level's snapshot was
+        /// taken - see <see cref="LiveUpdatesActive"/> for why the live entry isn't
+        /// read directly.
+        /// </summary>
+        private bool _snapLiveUpdates;
+
+        /// <summary>
+        /// Whether live config updates are in force for the current Roots biome.
+        ///
+        /// <b>Deliberately the value captured at level load, not the live one.</b>
+        /// Reading <see cref="ApplyChangesLive"/> directly meant flipping it on
+        /// mid-run retroactively switched every accessor in this file over to
+        /// resolving fresh, and every <c>SettingChanged</c> hook in <c>Plugin.Awake</c>
+        /// over to firing scene-wide reapply passes - a mode change in the middle of a
+        /// run, from a setting the player may well have flipped just to see what it
+        /// did. Freezing it per level makes the rule simple and the cost predictable:
+        /// what you had set when the biome loaded is how that biome behaves.
+        /// Turn it on, then load in.
+        ///
+        /// Before the first Roots load of the session there is no snapshot to read, so
+        /// the live entry stands in - there is nothing frozen to contradict yet.
+        /// </summary>
+        internal bool LiveUpdatesActive => !_snapshotTaken || _snapLiveUpdates;
+
+        private bool UseLiveValue => LiveUpdatesActive;
 
         /// <summary>
         /// Game-facing code should read this instead of <see cref="Seed"/>.Value -

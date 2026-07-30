@@ -94,8 +94,9 @@ namespace Fairoots.Spores
                 }
 
                 Diag.Info(
-                    $"[Spores] clear-time x{Plugin.Cfg.EffectiveSporeClearTimeMultiplier:0.###} " +
-                    $"applied to {applied} character(s)");
+                    RootsState.Active
+                        ? $"[Spores] clear-time x{Plugin.Cfg.EffectiveSporeClearTimeMultiplier:0.###} applied to {applied} character(s)"
+                        : $"[Spores] not in Roots - vanilla clear-time restored on {applied} character(s)");
             }
             catch (Exception e)
             {
@@ -122,7 +123,13 @@ namespace Fairoots.Spores
                 Baselines[id] = vanilla;
             }
 
-            double multiplier = Plugin.Cfg.EffectiveSporeClearTimeMultiplier;
+            // Vanilla outside the Roots biome (RootsState). This is the single most
+            // important place that gate applies: CharacterAfflictions is the player's
+            // own component and follows them into every other biome, so a scaled
+            // recovery rate left on it would keep changing the game long after Roots
+            // is gone. The restore branch below is what hands it back, and
+            // RootsLevelWatcher drives one final pass through here on the way out.
+            double multiplier = RootsState.Active ? Plugin.Cfg.EffectiveSporeClearTimeMultiplier : 1.0;
             if (SporeStatusTuning.IsVanilla(multiplier))
             {
                 afflictions.sporesReductionPerSecond = vanilla.PerSecond;

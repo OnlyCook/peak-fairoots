@@ -116,7 +116,7 @@ namespace Fairoots.Creatures
         /// </summary>
         internal static void ApplyToBeetle(Beetle beetle)
         {
-            if (Plugin.Cfg == null || !Plugin.Cfg.EffectiveDisableBeetles)
+            if (!RootsState.Active || Plugin.Cfg == null || !Plugin.Cfg.EffectiveDisableBeetles)
             {
                 return;
             }
@@ -132,8 +132,11 @@ namespace Fairoots.Creatures
 
         private static void Apply(IReadOnlyList<Beetle> beetles, IReadOnlyList<Spider> spiders, string reason)
         {
-            bool disableBeetles = Plugin.Cfg.EffectiveDisableBeetles;
-            bool disableSpiders = Plugin.Cfg.EffectiveDisableSpiders;
+            // Both switches read as "off" outside Roots, which is deliberately not the
+            // same as skipping the pass: taking the restore branch is what brings back
+            // anything this mod hid when the biome unloads (see RootsState).
+            bool disableBeetles = RootsState.Active && Plugin.Cfg.EffectiveDisableBeetles;
+            bool disableSpiders = RootsState.Active && Plugin.Cfg.EffectiveDisableSpiders;
 
             int beetlesHidden = 0, beetlesRestored = 0;
             foreach (var beetle in beetles)
@@ -187,9 +190,10 @@ namespace Fairoots.Creatures
             }
 
             Diag.Info(
-                $"[Creatures] {reason}: disable-zombies={OnOff(Plugin.Cfg.EffectiveDisableZombies)}, " +
+                $"[Creatures] {reason}: disable-zombies={OnOff(RootsState.Active && Plugin.Cfg.EffectiveDisableZombies)}, " +
                 $"disable-beetles={OnOff(disableBeetles)} ({beetles.Count} found, {beetlesHidden} newly hidden, {beetlesRestored} restored), " +
-                $"disable-spiders={OnOff(disableSpiders)} ({spiders.Count} found, {spidersHidden} newly hidden, {spidersRestored} restored)");
+                $"disable-spiders={OnOff(disableSpiders)} ({spiders.Count} found, {spidersHidden} newly hidden, {spidersRestored} restored)" +
+                (RootsState.Active ? string.Empty : " [not in Roots - everything restored]"));
         }
 
         /// <summary>
@@ -258,7 +262,7 @@ namespace Fairoots.Creatures
     {
         private static bool Prefix(ZombieManager __instance)
         {
-            if (Plugin.Cfg == null || !Plugin.Cfg.EffectiveDisableZombies)
+            if (!RootsState.Active || Plugin.Cfg == null || !Plugin.Cfg.EffectiveDisableZombies)
             {
                 return true;
             }
@@ -306,7 +310,7 @@ namespace Fairoots.Creatures
     internal static class SpiderScanSuppressionPatch
     {
         private static bool Prefix() =>
-            Plugin.Cfg == null || !Plugin.Cfg.EffectiveDisableSpiders;
+            !RootsState.Active || Plugin.Cfg == null || !Plugin.Cfg.EffectiveDisableSpiders;
     }
 
     /// <summary>
@@ -322,7 +326,7 @@ namespace Fairoots.Creatures
     internal static class SpiderGrabSuppressionPatch
     {
         private static bool Prefix() =>
-            Plugin.Cfg == null || !Plugin.Cfg.EffectiveDisableSpiders;
+            !RootsState.Active || Plugin.Cfg == null || !Plugin.Cfg.EffectiveDisableSpiders;
     }
 
     /// <summary>
@@ -351,7 +355,7 @@ namespace Fairoots.Creatures
     internal static class SpiderRopeSuppressionPatch
     {
         private static bool Prefix() =>
-            Plugin.Cfg == null || !Plugin.Cfg.EffectiveDisableSpiders;
+            !RootsState.Active || Plugin.Cfg == null || !Plugin.Cfg.EffectiveDisableSpiders;
     }
 
     /// <summary>

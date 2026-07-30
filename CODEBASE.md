@@ -173,6 +173,14 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       decompile references them. Same technique and same key as
       `peak-sense-of-direction`'s `Labels/NativeAssets`. Retried until it succeeds,
       since no native label necessarily exists yet at plugin load.
+    - `RootsLoadingOverlay.cs` — the dimmed "preparing the Roots..." screen shown
+      while `RootsLevelWatcher` runs its per-level passes. Deliberately minimal (a
+      full-screen dim plus one centred line, no procedural sprites), copied in
+      shape and dim colour from `peak-checkpoint-save`'s save-picker first-open
+      loading indicator so the two mods' loading beats read as one thing. Its
+      sorting order sits **below** that mod's own loading screen: during a Quick
+      Resume into a Roots campfire both are up at once, and the right thing to
+      show is that mod's "LOADING SAVE...", not two stacked overlays.
     - `SporeWarningLabel.cs` — the opt-in `General/show-spore-cloud-label` text
       warning, centred between the top of the screen and the crosshair. Says in
       words what the green overlay says in colour, because a colored tint is
@@ -238,10 +246,45 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
     an exact restore. Also owns the one-time verbose per-material inventory
     (shader, render mode, every declared property, which one is the lever) — the
     line that answers "why didn't this cloud thin?" instead of the next guess.
-  - `RootsLevelWatcher.cs` — detects a freshly-loaded Roots level (Roots prop
-    placement is baked into the scene at author time, not regenerated at
-    runtime — see `SporeBombCullPatch`'s remarks) and triggers the spore-bomb
-    cull pass once per level.
+  - `RootsState.cs` — **the mod's on/off switch, and the first thing to read
+    before adding any game-facing code.** `RootsState.Active` is true only while a
+    Roots Segment is loaded, and every patch in the mod checks it. This is not
+    decoration: most of what Fairoots patches is *not* Roots-specific code —
+    `WindChillZone` drives wind on the whole mountain, `CharacterAfflictions` is
+    the player's own component and follows them into every biome,
+    `CharacterClimbing`/`CharacterRopeHandling`/`CharacterVineClimbing` run
+    wherever the player climbs, and `Mob`/`MushroomZombie` are shared creature
+    base classes. Two shapes of gate, and which one a patch needs depends on
+    whether it writes to a native field: a patch that *decides* something reads
+    `if (!RootsState.Active) return <passthrough>`, while a patch that *writes* a
+    field takes its cached-vanilla-baseline restore branch instead — that's what
+    makes leaving Roots hand the game back rather than just stop re-applying.
+    Same file also holds `FairootsInterop`, the mod's only public API: a
+    reflection-friendly `ShouldHoldLoadingScreen()` that `peak-checkpoint-save`
+    polls so its Quick Resume loading screen stays up until the setup below is
+    done (see that repo's `FairootsCompat`). It answers true while the work is
+    *pending* as well as running, so a caller can't lose the race by asking
+    before the watcher's poll has noticed the biome.
+  - `RootsLevelWatcher.cs` — decides when the mod is awake: asks `MapHandler` once
+    a frame whether the player is in a live Roots biome, opens the `RootsState` gate,
+    and runs the per-level passes; on the way out it closes the gate, drives one
+    restore pass over everything that can outlive the biome, and drops the
+    per-level registries. **It asks the game rather than searching the scene** —
+    earlier versions polled `GameObject.Find("Roots Segment")` twice a second, a
+    linear search over every active object in every loaded scene, paid forever in
+    every biome to answer something `MapHandler` already tracks. Two consequences
+    beyond the cost: the check is now an array index and a couple of field reads, so
+    it runs every frame and is *more* responsive than the poll was; and it can no
+    longer be fooled by PEAK's main menu, which runs a Roots biome as its animated
+    background (live-reported 2026-07-30 — the old search found that perfectly real
+    Roots Segment behind the menu and culled it). The passes run **behind `Ui/RootsLoadingOverlay`, one
+    per frame**: they used to all fire inside the single `Update()` tick that
+    detected the segment, which is a long main-thread stall (live-reported as a
+    huge stutter as the biome loads in after lighting the campfire). The work
+    can't be deferred into gameplay — the player must not reach a spore bomb the
+    cull is about to remove — so what changed is the presentation: the overlay is
+    given a frame to actually render before the first heavy pass starts. Pass
+    order is load-bearing in three places; see the `SetupSteps` remarks.
   - **`Diagnostics/`** — the debug/runtime-logging harness (game-facing, off
     unless `Debug/enable-debug-logging` is on). See `docs/TESTING.md`.
     - `Diag.cs` — gated logger wrapper; `Diag.V(...)` only logs when debug is on.

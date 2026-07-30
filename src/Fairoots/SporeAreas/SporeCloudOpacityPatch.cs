@@ -72,7 +72,9 @@ namespace Fairoots.SporeAreas
                 return;
             }
 
-            double opacity = Plugin.Cfg.SporeAreaCloudOpacity.Value;
+            // 1.0 outside Roots - ParticleOpacity restores the authored values at
+            // vanilla, so this hands the clouds back rather than skipping them.
+            double opacity = RootsState.Active ? Plugin.Cfg.SporeAreaCloudOpacity.Value : 1.0;
 
             int systems = 0, areasWithoutVfx = 0;
             for (int i = 0; i < areas.Count; i++)

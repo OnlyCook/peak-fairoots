@@ -51,7 +51,7 @@ namespace Fairoots.SporeBombs
 
         private void Update()
         {
-            if (Plugin.Cfg == null || Time.unscaledTime < _nextApplyTime)
+            if (!RootsState.Active || Plugin.Cfg == null || Time.unscaledTime < _nextApplyTime)
             {
                 return;
             }

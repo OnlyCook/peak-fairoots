@@ -66,7 +66,8 @@ namespace Fairoots.Wind
                 Apply(__instance, baseline);
 
                 Diag.Info(
-                    $"[WindTuning] captured baseline + applied tuning (vanilla windForce={baseline.WindForce}, " +
+                    $"[WindTuning] captured baseline, then {(RootsState.Active ? "applied tuning" : "left it at vanilla (not in Roots)")} " +
+                    $"(vanilla windForce={baseline.WindForce}, " +
                     $"on={baseline.WindTimeRangeOn}, off={baseline.WindTimeRangeOff}, " +
                     $"itemFactor={baseline.WindItemFactor}, raycast=[{baseline.MinRaycastDistance}," +
                     $"{baseline.MaxRaycastDistance}])");
@@ -79,14 +80,21 @@ namespace Fairoots.Wind
 
         private static void Apply(WindChillZone zone, Baseline baseline)
         {
+            // Outside the Roots biome this mod does nothing at all (RootsState), and
+            // wind is the clearest case for why that rule exists: WindChillZone drives
+            // the gusts on the whole mountain, so a scaled windForce left on it would
+            // silently rebalance every other biome. Restoring rather than just
+            // skipping is what makes leaving Roots put the wind back.
+            if (!RootsState.Active)
+            {
+                Restore(zone, baseline);
+                Diag.V($"[WindTuning] not in Roots - WindChillZone#{zone.GetInstanceID()} restored to vanilla");
+                return;
+            }
+
             if (Plugin.Cfg.EffectiveDisableWindEntirely)
             {
-                zone.windForce = baseline.WindForce;
-                zone.windTimeRangeOn = baseline.WindTimeRangeOn;
-                zone.windTimeRangeOff = baseline.WindTimeRangeOff;
-                zone.windItemFactor = baseline.WindItemFactor;
-                zone.minRaycastDistance = baseline.MinRaycastDistance;
-                zone.maxRaycastDistance = baseline.MaxRaycastDistance;
+                Restore(zone, baseline);
 
                 // "Disabled" means no wind ever occurs, not just vanilla-strength
                 // wind (2026-07-22 clarification) - force this zone off right now
@@ -123,6 +131,17 @@ namespace Fairoots.Wind
                 $"itemFactor {baseline.WindItemFactor}->{zone.windItemFactor}, " +
                 $"raycast [{baseline.MinRaycastDistance},{baseline.MaxRaycastDistance}]->" +
                 $"[{zone.minRaycastDistance},{zone.maxRaycastDistance}]");
+        }
+
+        /// <summary>Writes every cached vanilla field back onto the zone, untouched.</summary>
+        private static void Restore(WindChillZone zone, Baseline baseline)
+        {
+            zone.windForce = baseline.WindForce;
+            zone.windTimeRangeOn = baseline.WindTimeRangeOn;
+            zone.windTimeRangeOff = baseline.WindTimeRangeOff;
+            zone.windItemFactor = baseline.WindItemFactor;
+            zone.minRaycastDistance = baseline.MinRaycastDistance;
+            zone.maxRaycastDistance = baseline.MaxRaycastDistance;
         }
 
         /// <summary>
@@ -167,7 +186,10 @@ namespace Fairoots.Wind
                     count++;
                 }
 
-                Diag.Info($"[WindTuning] reapplied tuning to {count} WindChillZone instance(s)");
+                Diag.Info(
+                    RootsState.Active
+                        ? $"[WindTuning] reapplied tuning to {count} WindChillZone instance(s)"
+                        : $"[WindTuning] not in Roots - vanilla wind restored on {count} WindChillZone instance(s)");
             }
             catch (Exception e)
             {
@@ -196,7 +218,7 @@ namespace Fairoots.Wind
     {
         private static void Prefix(ref bool set)
         {
-            if (Plugin.Cfg.EffectiveDisableWindEntirely)
+            if (RootsState.Active && Plugin.Cfg.EffectiveDisableWindEntirely)
             {
                 set = false;
             }
@@ -218,7 +240,9 @@ namespace Fairoots.Wind
     {
         private static bool Prefix(Item item)
         {
-            if (Plugin.Cfg.EffectiveDisableWindEntirely || !Plugin.Cfg.EffectiveWindBackpackAlwaysImmune)
+            if (!RootsState.Active
+                || Plugin.Cfg.EffectiveDisableWindEntirely
+                || !Plugin.Cfg.EffectiveWindBackpackAlwaysImmune)
             {
                 return true; // let the original run untouched - no immunity override.
             }

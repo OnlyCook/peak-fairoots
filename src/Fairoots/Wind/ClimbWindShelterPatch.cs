@@ -30,12 +30,16 @@ namespace Fairoots.Wind
         private static bool _loggedGrace;
 
         /// <summary>
-        /// Whether the mechanic is active at all: off entirely when the host has
-        /// killed wind (nothing to shelter from - and the slowdown would be a pure
-        /// penalty) or turned the feature off.
+        /// Whether the mechanic is active at all: off entirely outside the Roots
+        /// biome (<see cref="RootsState"/> - climbing is a whole-game activity, so
+        /// this is the single check that keeps all four of this file's patches from
+        /// slowing a climb anywhere else), when the host has killed wind (nothing to
+        /// shelter from - and the slowdown would be a pure penalty), or when the
+        /// feature is turned off.
         /// </summary>
         internal static bool Enabled =>
-            Plugin.Cfg != null
+            RootsState.Active
+            && Plugin.Cfg != null
             && !Plugin.Cfg.EffectiveDisableWindEntirely
             && Plugin.Cfg.EffectiveClimbSheltersFromWind;
 

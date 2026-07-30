@@ -42,7 +42,7 @@ namespace Fairoots.SporeBombs
     {
         private static bool Prefix(TriggerEvent __instance, Collider other)
         {
-            if (Plugin.Cfg.KeepVanillaTriggerRadius.Value)
+            if (!RootsState.Active || Plugin.Cfg.KeepVanillaTriggerRadius.Value)
             {
                 return true; // before/after comparison mode - full vanilla behavior, height cutoff included.
             }

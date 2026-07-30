@@ -46,7 +46,7 @@ namespace Fairoots.Wind
 
         private static void Postfix(Character character)
         {
-            if (Plugin.Cfg.EffectiveDisableWindEntirely)
+            if (!RootsState.Active || Plugin.Cfg.EffectiveDisableWindEntirely)
             {
                 return;
             }
@@ -85,7 +85,9 @@ namespace Fairoots.Wind
         {
             try
             {
-                if (Plugin.Cfg.EffectiveDisableWindEntirely)
+                // GetTargetRagdollControll governs every fall in the game, so this
+                // gate is what keeps a Roots-only assist out of every other biome.
+                if (!RootsState.Active || Plugin.Cfg.EffectiveDisableWindEntirely)
                 {
                     return;
                 }

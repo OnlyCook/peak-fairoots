@@ -200,6 +200,11 @@ namespace Fairoots.Creatures
 
         private static void Postfix(Spider __instance)
         {
+            if (!RootsState.Active)
+            {
+                return;
+            }
+
             if (StunnedTime == null)
             {
                 if (!_loggedMissingField)

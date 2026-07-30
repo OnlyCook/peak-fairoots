@@ -33,7 +33,7 @@ namespace Fairoots.SporeBombs
         {
             try
             {
-                if (__instance == null)
+                if (!RootsState.Active || __instance == null)
                 {
                     return;
                 }

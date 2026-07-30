@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using ExitGames.Client.Photon;
 using Fairoots.Diagnostics;
 using Photon.Pun;
@@ -137,12 +139,55 @@ namespace Fairoots.Networking
             Diag.V($"[HostAuthority] Resolve(\"{key}\") fell back to local value {localValue} - {reason}");
         }
 
-        private static bool TryGetRoomProperty(string key, out object value)
+        /// <summary>
+        /// The host's published values, keyed by the bare setting name, refreshed only
+        /// when Photon actually tells us the room properties changed
+        /// (<see cref="RefreshCache"/>, driven by <see cref="HostAuthoritySync"/>).
+        ///
+        /// <b>Why a cache rather than reading the room every time.</b> Some of these
+        /// are resolved on genuinely hot paths - <c>Creatures/disable-spiders</c> is
+        /// read from a prefix on <c>Spider.LateUpdate</c>, and a Roots level holds
+        /// ~76-90 spiders, so that one setting alone was doing ~80 room-property
+        /// lookups per frame on every non-host client, each one building a
+        /// <c>"Fairoots." + key</c> string first. That is per-frame garbage for a value
+        /// that changes when somebody edits a config entry. A dictionary this side of
+        /// Photon costs a hash lookup and allocates nothing.
+        ///
+        /// Empty (not null) until the first refresh, so solo play and the window
+        /// before the host's first publish both fall through to the local value
+        /// exactly as before.
+        /// </summary>
+        private static readonly Dictionary<string, object> Published = new Dictionary<string, object>();
+
+        /// <summary>
+        /// Re-reads the room's Fairoots properties into <see cref="Published"/>. Called
+        /// on every event that can change what the host has published or who the host
+        /// is - see <see cref="HostAuthoritySync"/>. Cheap and rare: a handful of
+        /// entries, only on an actual property update.
+        /// </summary>
+        internal static void RefreshCache()
         {
-            value = null;
+            Published.Clear();
+
             var room = PhotonNetwork.CurrentRoom;
-            return room != null && room.CustomProperties.TryGetValue(KeyPrefix + key, out value);
+            if (room == null)
+            {
+                return;
+            }
+
+            foreach (var entry in room.CustomProperties)
+            {
+                if (entry.Key is string key && key.StartsWith(KeyPrefix, StringComparison.Ordinal))
+                {
+                    Published[key.Substring(KeyPrefix.Length)] = entry.Value;
+                }
+            }
+
+            Diag.V($"[HostAuthority] cached {Published.Count} published value(s) from the room.");
         }
+
+        private static bool TryGetRoomProperty(string key, out object value) =>
+            Published.TryGetValue(key, out value);
 
         /// <summary>
         /// Publishes every host-authoritative resolved value to the room's
@@ -224,6 +269,12 @@ namespace Fairoots.Networking
                 { KeyPrefix + "ClimbShelterGraceSeconds", cfg.EffectiveClimbShelterGraceSeconds },
             };
             room.SetCustomProperties(props);
+
+            // Keep our own cache in step with what we just wrote, rather than waiting
+            // for Photon to echo it back - matters the moment this client stops being
+            // the host, since Resolve starts reading the cache instead of the local
+            // config on that exact frame.
+            RefreshCache();
             Diag.V(
                 $"[HostAuthority] PublishAll wrote {props.Count} propert(y/ies) to room " +
                 $"\"{room.Name}\": windForce={cfg.EffectiveWindForceMultiplier:0.###}, " +

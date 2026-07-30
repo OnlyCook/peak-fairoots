@@ -99,8 +99,10 @@ namespace Fairoots.Creatures
                 }
 
                 Diag.Info(
-                    $"[Creatures] speed reapply: zombie x{Plugin.Cfg.EffectiveZombieSpeedMultiplier:0.###} " +
-                    $"({zombies} live), beetle x{Plugin.Cfg.EffectiveBeetleSpeedMultiplier:0.###} ({beetles} live)");
+                    RootsState.Active
+                        ? $"[Creatures] speed reapply: zombie x{Plugin.Cfg.EffectiveZombieSpeedMultiplier:0.###} "
+                          + $"({zombies} live), beetle x{Plugin.Cfg.EffectiveBeetleSpeedMultiplier:0.###} ({beetles} live)"
+                        : $"[Creatures] not in Roots - vanilla speed restored on {zombies} zombie(s), {beetles} beetle(s)");
             }
             catch (Exception e)
             {
@@ -134,8 +136,12 @@ namespace Fairoots.Creatures
                 BeetleBaselines[id] = baseline;
             }
 
+            // Outside Roots the baseline is written back rather than the pass simply
+            // skipped: Mob is a shared creature base class, so this hook also fires
+            // for beetles in other biomes, and "restore on the way out" is what makes
+            // leaving Roots hand them back untouched (see RootsState).
             double multiplier = Plugin.Cfg.EffectiveBeetleSpeedMultiplier;
-            beetle.movementSpeed = CreatureTuning.IsVanilla(multiplier)
+            beetle.movementSpeed = !RootsState.Active || CreatureTuning.IsVanilla(multiplier)
                 ? baseline
                 : CreatureTuning.ScaleMovementSpeed(baseline, multiplier);
 
@@ -174,7 +180,7 @@ namespace Fairoots.Creatures
             }
 
             double multiplier = Plugin.Cfg.EffectiveZombieSpeedMultiplier;
-            movement.movementForce = CreatureTuning.IsVanilla(multiplier)
+            movement.movementForce = !RootsState.Active || CreatureTuning.IsVanilla(multiplier)
                 ? baseline
                 : CreatureTuning.ScaleMovementSpeed(baseline, multiplier);
 

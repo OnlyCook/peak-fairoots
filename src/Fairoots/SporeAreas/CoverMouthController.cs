@@ -73,11 +73,20 @@ namespace Fairoots.SporeAreas
                 // (vanilla, or a preset/Custom value that leaves it off), the other opts
                 // this player out. Either way an active cover is dropped immediately
                 // rather than left latched.
-                if (key == KeyCode.None || character == null || !cfg.EffectiveEnableCoverMouth)
+                // Three ways out, all of which drop an active cover rather than leave
+                // it latched: the biome is gone (RootsState - this mechanic exists to
+                // counter Roots spore areas, so it has no business being available on
+                // the rest of the mountain, and dropping it here is also what makes
+                // every cover-mouth patch downstream go inert, since they all key off
+                // LocalCovering), the host-authoritative master switch is off, or this
+                // player has unbound the key.
+                if (!RootsState.Active || key == KeyCode.None || character == null || !cfg.EffectiveEnableCoverMouth)
                 {
-                    SetCovering(false, character, !cfg.EffectiveEnableCoverMouth
-                        ? "not enabled by host"
-                        : "no keybind set, or no local character");
+                    SetCovering(false, character, !RootsState.Active
+                        ? "not in the Roots biome"
+                        : !cfg.EffectiveEnableCoverMouth
+                            ? "not enabled by host"
+                            : "no keybind set, or no local character");
                     return;
                 }
 

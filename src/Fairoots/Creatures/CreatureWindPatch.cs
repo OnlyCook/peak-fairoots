@@ -94,7 +94,7 @@ namespace Fairoots.Creatures
         {
             __state = null;
 
-            if (Plugin.Cfg == null || character == null || !character.isZombie)
+            if (!RootsState.Active || Plugin.Cfg == null || character == null || !character.isZombie)
             {
                 return;
             }
@@ -153,7 +153,7 @@ namespace Fairoots.Creatures
         {
             try
             {
-                if (Plugin.Cfg == null || !(__instance is Beetle beetle) || beetle.sleeping)
+                if (!RootsState.Active || Plugin.Cfg == null || !(__instance is Beetle beetle) || beetle.sleeping)
                 {
                     return;
                 }

@@ -29,6 +29,7 @@ namespace Fairoots.Networking
     {
         public override void OnJoinedRoom()
         {
+            HostAuthority.RefreshCache();
             HostAuthority.PublishAll();
 
             // Re-assert our own cover-mouth state as a player property: a write made
@@ -39,6 +40,7 @@ namespace Fairoots.Networking
 
         public override void OnMasterClientSwitched(Photon.Realtime.Player newMasterClient)
         {
+            HostAuthority.RefreshCache();
             HostAuthority.PublishAll();
         }
 
@@ -62,6 +64,11 @@ namespace Fairoots.Networking
         /// </summary>
         public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
         {
+            // Always refreshed, host included: the cache is what every Resolve call
+            // reads, and a host that later stops being one must not be left answering
+            // from a stale snapshot (see HostAuthority.Published).
+            HostAuthority.RefreshCache();
+
             if (HostAuthority.IsHost)
             {
                 return; // our own local values are already authoritative - nothing to refresh.

@@ -76,7 +76,7 @@ namespace Fairoots.SporeBombs
             try
             {
                 PruneDestroyed();
-                Resolve(Plugin.Cfg.ShowOverlayInSporeBombClouds.Value && InBombCloud());
+                Resolve(RootsState.Active && Plugin.Cfg.ShowOverlayInSporeBombClouds.Value && InBombCloud());
             }
             catch (Exception e)
             {

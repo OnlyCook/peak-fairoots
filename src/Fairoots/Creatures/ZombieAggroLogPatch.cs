@@ -33,7 +33,7 @@ namespace Fairoots.Creatures
 
         private static void Postfix(MushroomZombie __instance)
         {
-            if (!Diag.Enabled || Plugin.Cfg == null)
+            if (!RootsState.Active || !Diag.Enabled || Plugin.Cfg == null)
             {
                 return;
             }

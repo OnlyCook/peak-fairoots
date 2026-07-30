@@ -250,7 +250,7 @@ namespace Fairoots.SporeBombs
 
             try
             {
-                bool enabled = Plugin.Cfg.RecolorSporeBombs.Value;
+                bool enabled = RootsState.Active && Plugin.Cfg.RecolorSporeBombs.Value;
                 Rgb sporeColor = ResolveSporeColor();
 
                 int found = 0;

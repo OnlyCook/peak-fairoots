@@ -98,7 +98,10 @@ namespace Fairoots.SporeAreas
 
         private static void Apply(IReadOnlyList<StatusEmitter> emitters, string reason)
         {
-            bool disable = Plugin.Cfg.EffectiveDisableSporeAreas;
+            // "off" outside Roots, which takes the restore branch below rather than
+            // skipping the pass - that is what un-hides anything the switch hid when
+            // the biome unloads (see RootsState).
+            bool disable = RootsState.Active && Plugin.Cfg.EffectiveDisableSporeAreas;
 
             var areas = SporeAreaScan.FilterSporeAreas(emitters);
             int hidden = 0, restored = 0;

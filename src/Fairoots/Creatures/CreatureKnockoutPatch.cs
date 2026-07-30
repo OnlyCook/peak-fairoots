@@ -404,7 +404,7 @@ namespace Fairoots.Creatures
 
         private void OnCollisionEnter(Collision collision)
         {
-            if (Zombie == null || Plugin.Cfg == null || collision == null)
+            if (!RootsState.Active || Zombie == null || Plugin.Cfg == null || collision == null)
             {
                 return;
             }
@@ -501,7 +501,7 @@ namespace Fairoots.Creatures
 
         private void OnCollisionEnter(Collision collision)
         {
-            if (_beetle == null || Plugin.Cfg == null || collision == null)
+            if (!RootsState.Active || _beetle == null || Plugin.Cfg == null || collision == null)
             {
                 return;
             }

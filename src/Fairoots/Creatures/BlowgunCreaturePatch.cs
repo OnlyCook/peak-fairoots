@@ -44,7 +44,7 @@ namespace Fairoots.Creatures
         {
             try
             {
-                if (Plugin.Cfg == null || !Plugin.Cfg.EffectiveBlowgunAffectsCreatures)
+                if (!RootsState.Active || Plugin.Cfg == null || !Plugin.Cfg.EffectiveBlowgunAffectsCreatures)
                 {
                     return;
                 }

@@ -153,6 +153,11 @@ namespace Fairoots.SporeAreas
         /// </summary>
         private static bool ShouldPose(Character character)
         {
+            if (!RootsState.Active)
+            {
+                return false;
+            }
+
             if (CoverMouthController.IsCovering(character))
             {
                 return true;

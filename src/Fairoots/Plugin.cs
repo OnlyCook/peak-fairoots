@@ -37,7 +37,13 @@ namespace Fairoots
             _harmony = new Harmony(PluginInfo.Guid);
             _harmony.PatchAll(typeof(Plugin).Assembly);
 
-            TriggerRadiusOverlay.Init();
+            // Both debug overlays attach themselves only while switched on - see
+            // DebugOverlayHost and TriggerRadiusOverlay.Sync for why "gated inside the
+            // callback" wasn't good enough.
+            TriggerRadiusOverlay.Sync();
+            Cfg.EnableDebugLogging.SettingChanged += (s, e) => SyncDebugOverlays();
+            Cfg.ShowSporeBombTriggerRadius.SettingChanged += (s, e) => TriggerRadiusOverlay.Sync();
+            Cfg.ShowRemovedSporeBombMarkers.SettingChanged += (s, e) => DebugOverlayHost.Sync();
 
             // Any live change to a setting that feeds trigger-radius resolution
             // forces an immediate, full scene-wide re-scan (SporeBombCullPatch.
@@ -57,11 +63,11 @@ namespace Fairoots
             Cfg.KeepVanillaTriggerRadius.SettingChanged += (s, e) => SporeBombCullPatch.ReapplyTriggerRadiusToAll();
             Cfg.SporeBombTriggerRadiusMultiplierOverride.SettingChanged += (s, e) =>
             {
-                if (Cfg.ApplyChangesLive.Value) SporeBombCullPatch.ReapplyTriggerRadiusToAll();
+                if (Cfg.LiveUpdatesActive) SporeBombCullPatch.ReapplyTriggerRadiusToAll();
             };
             Cfg.Preset.SettingChanged += (s, e) =>
             {
-                if (Cfg.ApplyChangesLive.Value)
+                if (Cfg.LiveUpdatesActive)
                 {
                     SporeBombCullPatch.ReapplyTriggerRadiusToAll();
                     WindChillZoneTuningPatch.ReapplyAll();
@@ -78,7 +84,7 @@ namespace Fairoots
             // would leave wind mid-storm at whatever the previous config said.
             EventHandler reapplyWindTuning = (s, e) =>
             {
-                if (Cfg.ApplyChangesLive.Value) WindChillZoneTuningPatch.ReapplyAll();
+                if (Cfg.LiveUpdatesActive) WindChillZoneTuningPatch.ReapplyAll();
             };
             Cfg.WindForceMultiplierOverride.SettingChanged += reapplyWindTuning;
             Cfg.WindGustDurationMultiplierOverride.SettingChanged += reapplyWindTuning;
@@ -111,17 +117,17 @@ namespace Fairoots
             // level-load snapshot anyway).
             EventHandler reapplyCreatureSpeed = (s, e) =>
             {
-                if (Cfg.ApplyChangesLive.Value) Creatures.CreatureSpeedPatch.ReapplyToAll();
+                if (Cfg.LiveUpdatesActive) Creatures.CreatureSpeedPatch.ReapplyToAll();
             };
             Cfg.ZombieSpeedMultiplierOverride.SettingChanged += reapplyCreatureSpeed;
             Cfg.BeetleSpeedMultiplierOverride.SettingChanged += reapplyCreatureSpeed;
             Cfg.BeetleKnockbackMultiplierOverride.SettingChanged += (s, e) =>
             {
-                if (Cfg.ApplyChangesLive.Value) Creatures.CreatureKnockbackPatch.ReapplyToAll();
+                if (Cfg.LiveUpdatesActive) Creatures.CreatureKnockbackPatch.ReapplyToAll();
             };
             Cfg.CreatureRagdollMultiplierOverride.SettingChanged += (s, e) =>
             {
-                if (Cfg.ApplyChangesLive.Value) Creatures.CreatureRagdollPatch.ReapplyToAll();
+                if (Cfg.LiveUpdatesActive) Creatures.CreatureRagdollPatch.ReapplyToAll();
             };
 
             // The two deaggro dials need no reapply hook at all: both patches read
@@ -139,7 +145,7 @@ namespace Fairoots
             // level-load snapshot anyway).
             EventHandler reapplySporeAreaTuning = (s, e) =>
             {
-                if (Cfg.ApplyChangesLive.Value) SporeAreaTuningPatch.ReapplyToAll();
+                if (Cfg.LiveUpdatesActive) SporeAreaTuningPatch.ReapplyToAll();
             };
             Cfg.SporeAreaRadiusMultiplierOverride.SettingChanged += reapplySporeAreaTuning;
             Cfg.SporeAreaStatusRateMultiplierOverride.SettingChanged += reapplySporeAreaTuning;
@@ -151,7 +157,7 @@ namespace Fairoots
             // arrangement as the two deaggro dials noted above.
             Cfg.SporeClearTimeMultiplierOverride.SettingChanged += (s, e) =>
             {
-                if (Cfg.ApplyChangesLive.Value) Spores.SporeDecayPatch.ReapplyToAll();
+                if (Cfg.LiveUpdatesActive) Spores.SporeDecayPatch.ReapplyToAll();
             };
 
             // The pose's clip choice is cached after its first lookup (it logs the
@@ -194,6 +200,10 @@ namespace Fairoots
             // newly-detected gap) if anyone in the lobby is missing the mod.
             networkingObject.AddComponent<ModPresenceCheck>();
 
+            // Same DontDestroyOnLoad holder for the debug overlay, so it survives level
+            // transitions the same way everything else here does.
+            DebugOverlayHost.Bind(networkingObject);
+
             Logger.LogInfo(
                 $"{PluginInfo.Name} {PluginInfo.Version} loaded. " +
                 $"seed={Cfg.Seed.Value}, preset={Cfg.Preset.Value}, " +
@@ -213,7 +223,15 @@ namespace Fairoots
                 return;
             }
 
+            // Always: this is what opens and closes the RootsState gate every tick
+            // below depends on.
             RootsLevelWatcher.CheckAndRun();
+
+            // One frame past the biome unloading, so an active cover is dropped and
+            // both labels get the frame they need to fade out and disable themselves,
+            // rather than being frozen mid-fade the instant Roots goes away. Each of
+            // these no-ops immediately once that's done (they all check RootsState
+            // themselves too - see their remarks).
             CoverMouthController.Tick();
 
             // Presence-driven, so it has to be polled: a spore bomb's cloud raises no
@@ -256,14 +274,10 @@ namespace Fairoots
             }
         }
 
-        private void OnGUI()
+        private static void SyncDebugOverlays()
         {
-            if (Cfg == null)
-            {
-                return;
-            }
-
-            RemovedMarkerOverlay.Draw();
+            TriggerRadiusOverlay.Sync();
+            DebugOverlayHost.Sync();
         }
     }
 }

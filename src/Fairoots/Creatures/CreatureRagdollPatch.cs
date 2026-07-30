@@ -81,8 +81,10 @@ namespace Fairoots.Creatures
                 }
 
                 Diag.Info(
-                    $"[Creatures] ragdoll reapply: x{Plugin.Cfg.EffectiveCreatureRagdollMultiplier:0.###} " +
-                    $"({beetles} beetle(s), {zombies} zombie(s) live)");
+                    RootsState.Active
+                        ? $"[Creatures] ragdoll reapply: x{Plugin.Cfg.EffectiveCreatureRagdollMultiplier:0.###} "
+                          + $"({beetles} beetle(s), {zombies} zombie(s) live)"
+                        : $"[Creatures] not in Roots - vanilla ragdoll restored on {beetles} beetle(s), {zombies} zombie(s)");
             }
             catch (Exception e)
             {
@@ -111,8 +113,9 @@ namespace Fairoots.Creatures
                 BeetleBaselines[id] = baseline;
             }
 
+            // See CreatureSpeedPatch on why !RootsState.Active restores rather than skips.
             double multiplier = Plugin.Cfg.EffectiveCreatureRagdollMultiplier;
-            beetle.ragdollTime = CreatureTuning.IsVanilla(multiplier)
+            beetle.ragdollTime = !RootsState.Active || CreatureTuning.IsVanilla(multiplier)
                 ? baseline
                 : CreatureTuning.ScaleRagdollTime(baseline, multiplier);
 
@@ -135,7 +138,7 @@ namespace Fairoots.Creatures
             }
 
             double multiplier = Plugin.Cfg.EffectiveCreatureRagdollMultiplier;
-            zombie.biteStunTime = CreatureTuning.IsVanilla(multiplier)
+            zombie.biteStunTime = !RootsState.Active || CreatureTuning.IsVanilla(multiplier)
                 ? baseline
                 : CreatureTuning.ScaleRagdollTime(baseline, multiplier);
 

@@ -41,7 +41,7 @@ namespace Fairoots.SporeBombs
         {
             try
             {
-                if (__instance == null || __instance.toSpawn == null
+                if (!RootsState.Active || __instance == null || __instance.toSpawn == null
                     || !SporeBombCullPatch.ClassifySporeBomb(__instance.gameObject.name))
                 {
                     return true; // not a spore bomb - let the original run untouched.

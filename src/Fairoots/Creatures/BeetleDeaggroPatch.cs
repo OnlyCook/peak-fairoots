@@ -85,7 +85,7 @@ namespace Fairoots.Creatures
             __state = null;
 
             // Scorpion is the other Mob subclass in the build and isn't a Roots creature.
-            if (Plugin.Cfg == null || !(__instance is Beetle))
+            if (!RootsState.Active || Plugin.Cfg == null || !(__instance is Beetle))
             {
                 return true;
             }

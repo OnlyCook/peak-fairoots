@@ -379,7 +379,9 @@ namespace Fairoots.SporeBombs
         /// apply the exact same number.
         /// </summary>
         private static double ResolveTriggerRadiusMultiplier() =>
-            Plugin.Cfg.KeepVanillaTriggerRadius.Value ? 1.0 : Plugin.Cfg.EffectiveSporeBombTriggerRadiusMultiplier;
+            !RootsState.Active || Plugin.Cfg.KeepVanillaTriggerRadius.Value
+                ? 1.0
+                : Plugin.Cfg.EffectiveSporeBombTriggerRadiusMultiplier;
 
         /// <summary>
         /// Forces every currently-active spore bomb <em>anywhere in the loaded

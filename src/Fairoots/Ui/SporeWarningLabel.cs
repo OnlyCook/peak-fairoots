@@ -76,7 +76,9 @@ namespace Fairoots.Ui
         {
             try
             {
-                bool wanted = Plugin.Cfg.ShowSporeCloudLabel.Value && SporePresence.InAnySpores();
+                bool wanted = RootsState.Active
+                    && Plugin.Cfg.ShowSporeCloudLabel.Value
+                    && SporePresence.InAnySpores();
 
                 // Nothing built and nothing to show: the common case by far (the
                 // setting is off by default), so it costs one bool and returns.

@@ -82,7 +82,7 @@ namespace Fairoots.Creatures
 
         private static void Postfix(MushroomZombie __instance, Character target, ref bool __result)
         {
-            if (!__result || Plugin.Cfg == null || target == null)
+            if (!RootsState.Active || !__result || Plugin.Cfg == null || target == null)
             {
                 return; // Already invalid for the game's own reasons, or nothing to judge.
             }

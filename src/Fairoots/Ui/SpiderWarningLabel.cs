@@ -79,7 +79,9 @@ namespace Fairoots.Ui
         {
             try
             {
-                bool wanted = Plugin.Cfg.ShowSpiderWarningLabel.Value && SpiderStrikeWarning.StrikeIncoming();
+                bool wanted = RootsState.Active
+                    && Plugin.Cfg.ShowSpiderWarningLabel.Value
+                    && SpiderStrikeWarning.StrikeIncoming();
 
                 if (!wanted && _root == null)
                 {

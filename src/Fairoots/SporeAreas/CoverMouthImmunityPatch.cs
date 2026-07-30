@@ -240,7 +240,11 @@ namespace Fairoots.SporeAreas
         /// </summary>
         private static bool ShouldSuppress(StatusEmitter emitter)
         {
-            if (!CoverMouthController.LocalCovering || !SporeAreaScan.IsSporeArea(emitter))
+            // RootsState is belt and braces next to LocalCovering (which the
+            // controller already drops outside Roots): StatusEmitter.Update runs for
+            // every emitter in every biome, so this is the one place all three of
+            // this file's patches funnel through.
+            if (!RootsState.Active || !CoverMouthController.LocalCovering || !SporeAreaScan.IsSporeArea(emitter))
             {
                 return false;
             }

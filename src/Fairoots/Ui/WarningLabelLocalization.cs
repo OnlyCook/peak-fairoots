@@ -4,11 +4,12 @@ using Fairoots.Networking;
 namespace Fairoots.Ui
 {
     /// <summary>
-    /// Translations for the two on-screen warning labels
-    /// (<see cref="SporeWarningLabel"/>, <see cref="SpiderWarningLabel"/>). Both
-    /// used to be English-only by explicit scoping; live-reported 2026-07-30 as the
-    /// one player-visible text in the mod that didn't follow the game's language
-    /// setting, so they now land exactly the way
+    /// Translations for the mod's on-screen labels: the two warnings
+    /// (<see cref="SporeWarningLabel"/>, <see cref="SpiderWarningLabel"/>) and the
+    /// Roots setup screen (<see cref="RootsLoadingOverlay"/>). The warnings used to
+    /// be English-only by explicit scoping; live-reported 2026-07-30 as the one
+    /// player-visible text in the mod that didn't follow the game's language setting,
+    /// so they now land exactly the way
     /// <c>Networking/ModPresenceLocalization</c> does it.
     ///
     /// Array order matches <c>LocalizedText.Language</c>'s declaration order
@@ -34,6 +35,9 @@ namespace Fairoots.Ui
 
         /// <summary>The spider strike warning: a spider is descending on the local player.</summary>
         SpiderDropping,
+
+        /// <summary>The Roots setup screen: Fairoots is applying its per-level changes to a freshly-loaded biome.</summary>
+        PreparingRoots,
     }
 
     internal static class WarningLabelLocalization
@@ -75,6 +79,24 @@ namespace Fairoots.Ui
                 "거미가 당신을 향해 내려옵니다!",
                 "Pająk spada na ciebie!",
                 "Bir örümcek üstüne iniyor!",
+            },
+            [WarningLabelKey.PreparingRoots] = new[]
+            {
+                "Preparing the Roots...",
+                "Préparation des Racines...",
+                "Preparazione delle Radici...",
+                "Die Wurzeln werden vorbereitet...",
+                "Preparando las Raíces...",
+                "Preparando las Raíces...",
+                "Preparando as Raízes...",
+                "Подготовка Корней...",
+                "Підготовка Коренів...",
+                "正在准备根系...",
+                "",
+                "ルーツを準備しています...",
+                "뿌리를 준비하는 중...",
+                "Przygotowywanie Korzeni...",
+                "Kökler hazırlanıyor...",
             },
         };
 

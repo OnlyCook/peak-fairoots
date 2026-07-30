@@ -94,8 +94,10 @@ namespace Fairoots.SporeAreas
 
         private static void Apply(IReadOnlyList<StatusEmitter> emitters, string reason)
         {
-            double multiplier = Plugin.Cfg.EffectiveSporeAreaRadiusMultiplier;
-            double rateMultiplier = Plugin.Cfg.EffectiveSporeAreaStatusRateMultiplier;
+            // 1.0 outside Roots: every write below is computed from a cached vanilla
+            // baseline, so a vanilla multiplier restores rather than skips.
+            double multiplier = RootsState.Active ? Plugin.Cfg.EffectiveSporeAreaRadiusMultiplier : 1.0;
+            double rateMultiplier = RootsState.Active ? Plugin.Cfg.EffectiveSporeAreaStatusRateMultiplier : 1.0;
             var areas = SporeAreaScan.FilterSporeAreas(emitters);
             if (areas.Count == 0)
             {
@@ -137,7 +139,8 @@ namespace Fairoots.SporeAreas
             }
 
             Diag.Info(
-                $"[SporeAreaTuning] {reason}: {resized} spore area(s) tuned. " +
+                $"[SporeAreaTuning] {reason}: {resized} spore area(s) " +
+                $"{(RootsState.Active ? "tuned" : "restored to vanilla (not in Roots)")}. " +
                 $"radius x{multiplier:0.###} (e.g. {sampleFrom:0.##} -> {sampleTo:0.##} world units, " +
                 $"{GameUnits.ToMeters(sampleFrom):0.#}m -> {GameUnits.ToMeters(sampleTo):0.#}m), " +
                 $"{vfxScaled} cloud VFX transform(s) scaled" +

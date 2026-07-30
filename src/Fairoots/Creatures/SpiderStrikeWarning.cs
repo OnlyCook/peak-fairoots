@@ -205,7 +205,7 @@ namespace Fairoots.Creatures
     {
         private static void Postfix(Spider __instance, PhotonView characterView, float distance)
         {
-            if (Plugin.Cfg == null || characterView == null)
+            if (!RootsState.Active || Plugin.Cfg == null || characterView == null)
             {
                 return;
             }

@@ -62,7 +62,10 @@ namespace Fairoots.Spores
         {
             try
             {
-                if (statusType != CharacterAfflictions.STATUSTYPE.Spores || amount <= 0f || Plugin.Cfg == null)
+                if (!RootsState.Active
+                    || statusType != CharacterAfflictions.STATUSTYPE.Spores
+                    || amount <= 0f
+                    || Plugin.Cfg == null)
                 {
                     return;
                 }

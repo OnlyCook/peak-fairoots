@@ -65,7 +65,9 @@ namespace Fairoots.Creatures
                 }
 
                 Diag.Info(
-                    $"[Creatures] knockback reapply: beetle x{Plugin.Cfg.EffectiveBeetleKnockbackMultiplier:0.###} ({count} live)");
+                    RootsState.Active
+                        ? $"[Creatures] knockback reapply: beetle x{Plugin.Cfg.EffectiveBeetleKnockbackMultiplier:0.###} ({count} live)"
+                        : $"[Creatures] not in Roots - vanilla knockback restored on {count} beetle(s)");
             }
             catch (Exception e)
             {
@@ -94,8 +96,11 @@ namespace Fairoots.Creatures
                 Baselines[id] = baseline;
             }
 
+            // !RootsState.Active takes the restore branch rather than skipping, for
+            // the same reason as CreatureSpeedPatch: Mob.Start fires for beetles in
+            // every biome, and leaving Roots has to hand them back untouched.
             double multiplier = Plugin.Cfg.EffectiveBeetleKnockbackMultiplier;
-            if (CreatureTuning.IsVanilla(multiplier))
+            if (!RootsState.Active || CreatureTuning.IsVanilla(multiplier))
             {
                 beetle.bonkForce = baseline.Forward;
                 beetle.bonkForceUp = baseline.Up;

@@ -71,19 +71,47 @@ namespace Fairoots.Diagnostics
         private static readonly List<(Vector3 Center, float Radius)> PendingCapDiscs = new List<(Vector3, float)>();
 
         /// <summary>Hook the render callback once at plugin startup. Safe to call more than once.</summary>
-        internal static void Init()
+        /// <summary>
+        /// Subscribes to (or unsubscribes from) the per-camera render callback to match
+        /// the current toggles, rather than subscribing once and returning early inside
+        /// the callback.
+        ///
+        /// The early return was cheap but it was still a delegate the render pipeline
+        /// invoked for every camera, every frame, forever, on behalf of a debug
+        /// wireframe that is off by default - the same reasoning as
+        /// <see cref="DebugOverlayHost"/>. Wired to both settings' <c>SettingChanged</c>
+        /// in <c>Plugin.Awake</c>, so turning the wireframe on still works live.
+        /// </summary>
+        internal static void Sync()
         {
-            if (_initialized)
+            if (Plugin.Cfg == null)
             {
                 return;
             }
 
-            _initialized = true;
-            RenderPipelineManager.endCameraRendering += OnEndCameraRendering;
+            bool wanted = Plugin.Cfg.EnableDebugLogging.Value && Plugin.Cfg.ShowSporeBombTriggerRadius.Value;
+            if (wanted == _initialized)
+            {
+                return;
+            }
+
+            _initialized = wanted;
+            if (wanted)
+            {
+                RenderPipelineManager.endCameraRendering += OnEndCameraRendering;
+                Diag.Info("[Debug] spore-bomb trigger-radius wireframe is ON - its render callback is now running.");
+            }
+            else
+            {
+                RenderPipelineManager.endCameraRendering -= OnEndCameraRendering;
+                Diag.Info("[Debug] spore-bomb trigger-radius wireframe is off - its render callback is gone.");
+            }
         }
 
         private static void OnEndCameraRendering(ScriptableRenderContext context, Camera cam)
         {
+            // Sync() only subscribes while both toggles are on, so this is a guard
+            // against a config change racing an in-flight callback, not the real gate.
             if (Plugin.Cfg == null || !Plugin.Cfg.EnableDebugLogging.Value || !Plugin.Cfg.ShowSporeBombTriggerRadius.Value)
             {
                 return;

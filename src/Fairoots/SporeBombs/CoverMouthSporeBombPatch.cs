@@ -65,7 +65,11 @@ namespace Fairoots.SporeBombs
 
         private static bool ShouldSuppress(AOE aoe)
         {
-            if (!CoverMouthController.LocalCovering
+            // RootsState is belt and braces next to LocalCovering (which the controller
+            // already drops outside Roots): AOE.Explode is the game's generic explosion
+            // path, so this runs for every explosion in every biome.
+            if (!RootsState.Active
+                || !CoverMouthController.LocalCovering
                 || !Plugin.Cfg.EffectiveCoverMouthBlocksSporeBombs
                 || aoe.statusType != CharacterAfflictions.STATUSTYPE.Spores
                 || aoe.statusAmount <= 0f)
