@@ -37,8 +37,9 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
     `General` — the `seed` field, the `preset` 1-5 selector (1-4 are the fixed
     presets, 5 is Custom — see `Core/Presets/PresetId.cs`), and
     `recolor-spore-bombs` (the one client-side setting, see below); then the
-    per-mechanic Custom-only sections (sane numeric defaults, only read when
-    preset is set to Custom — ignored under presets 1-4 even if changed); then
+    per-mechanic Custom-only sections (**every default is the vanilla value** —
+    only read when preset is set to Custom, ignored under presets 1-4 even if
+    changed); then
     `Debug`, bound last, which also holds `apply-changes-live` (see below —
     it's in `Debug` because freezing values mid-run is a comparison-testing
     tool, and like `keep-vanilla-trigger-radius` it's a behavior override that
@@ -654,9 +655,9 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
     - `SporeBombCull.cs` — the two-pass spore-bomb removal decision: foliage
       removal, then a `ClusteredRemovalSelection` cull budgeted against it.
       Returns per-candidate outcomes; `SporeBombCullPatch` maps them back onto
-      real GameObjects. The foliage pass runs under every preset but can be
-      switched off outright (`Spore-Bombs/disable-foliage-removal`, added
-      2026-07-30 → `Decide`'s `foliageRemovalEnabled`), which makes the pass a
+      real GameObjects. The foliage pass runs under every preset but is off in
+      vanilla and under an untouched Custom (`Spore-Bombs/enable-foliage-removal`
+      → `Decide`'s `foliageRemovalEnabled`); switching it off makes the pass a
       no-op **without** changing the overall removal target: the seeded pass
       still removes up to the same count, it just selects from every candidate
       instead of only the non-camouflaged ones. So it's an opt-out of *which*
@@ -776,17 +777,28 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
     - `Presets/PresetId.cs` — the preset enum: 1-4 are the fixed presets
       (Balanced is default), 5 is Custom (ignores the catalog and uses the
       player's own config directly).
-    - `Presets/PresetCatalog.cs` — the per-preset numeric values (single source
-      of truth): spore-bomb cull fraction, trigger-radius/knockback/
-      screen-shake-cap/VFX-count multipliers, and always-on mechanic flags;
-      grows one entry per mechanic as its phase lands. Custom (`PresetId.Custom`)
-      isn't a real row in this catalog — every method maps it to Balanced's
-      numbers internally, purely so a catalog lookup never throws (it's still
-      called as an unused argument under Custom — see `OverrideResolution.cs`).
+    - `Presets/PresetCatalog.cs` — the documented front door onto the per-preset
+      values: one method per setting, each carrying the reasoning for its row and
+      **no numbers at all**. The numbers live in `Presets/PresetValues.g.cs`.
+      Custom (`PresetId.Custom`) isn't a real row — every method maps it to
+      Balanced's numbers internally, purely so a catalog lookup never throws (it's
+      still called as an unused argument under Custom — see
+      `OverrideResolution.cs`).
+    - `Presets/PresetValues.g.cs` and `ConfigDefaults.g.cs` — **generated, do not
+      hand-edit.** `scripts/apply-presets.sh` writes both from the table in
+      `docs/PRESETS.md`: the first is the four preset columns (what
+      `PresetCatalog` returns), the second is the Default column (what
+      `PluginConfig` binds for every setting in the five gameplay sections;
+      `General`/`Debug` defaults stay literals). Tune by editing that table and re-running the
+      script; `bash scripts/apply-presets.sh --check` fails if either file is
+      stale or a setting has drifted out of the table. `PresetValues` is indexed
+      by presets 1-4 only and throws on Custom, since mapping Custom is
+      `PresetCatalog`'s job.
     - `Presets/OverrideResolution.cs` — preset-vs-Custom resolution: presets 1-4
       always use their own catalog numbers, ignoring the player's config
       entirely; Custom (5) always uses the player's configured value (0
-      included). No sentinel/"unset" value to track.
+      included). No sentinel/"unset" value to track. Generic since 2026-07-30 —
+      presets drive on/off toggles and timing windows as well as multipliers.
     - `WindTuning.cs` — pure arithmetic for wind force/gust-duration scaling,
       non-backpack item-force scaling, and obstacle-occlusion raycast-distance
       scaling (not seed-gated, same reasoning as `SporeBombExplosionTuning`),
@@ -920,6 +932,16 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
 - `packaging/` — Thunderstore/Nexus packaging pipeline (`build-release.sh`,
   `gen-readme.sh`, `manifest.json`, `CHANGELOG.md`), same pattern as the
   other two PEAK mods in this GitHub account.
+- `scripts/apply-presets.sh` — the balance-tuning generator: parses
+  `docs/PRESETS.md` and writes `Core/ConfigDefaults.g.cs` +
+  `Core/Presets/PresetValues.g.cs`. Run it after every edit to that table, and
+  `--check` to verify without writing.
+- `docs/PRESETS.md` — **the source of truth for every balance number in the
+  mod**: one row per setting in the five gameplay sections, with its default and
+  its value under each of the four presets (`General`/`Debug` are excluded — no
+  balance values, no preset involvement, defaults stay literal in
+  `PluginConfig.cs`). Also documents the two rules the values encode: every
+  default is vanilla, and every gameplay setting is preset-driven.
 - `docs/TESTING.md` — automated-test coverage summary + manual in-game loop.
 
 ## Planned structure (fills in as phases land — see ROADMAP.md)
@@ -932,7 +954,8 @@ the one folder that doesn't map to an `OVERVIEW.md` section — it groups the di
 that act on the *status* instead of on a hazard (added 2026-07-30). What's left
 (`ROADMAP.md` Phases 8-9) needs no new folder: the achievement spawn-weight
 nudge intercepts the game's own weighted item selection, and the preset tuning
-pass only changes numbers in `Core/Presets/PresetCatalog.cs`.
+pass changes no code at all — it edits the table in `docs/PRESETS.md` and re-runs
+`scripts/apply-presets.sh`.
 
 **Note for Phase 7 readers:** the creature dials are the one group where
 "1.0 = vanilla" is not universal, because two of the mechanics have no vanilla

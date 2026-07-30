@@ -296,7 +296,7 @@ namespace Fairoots.Tests
         {
             // Subtle leaves vanilla mechanics alone, and outright wind immunity
             // is the least subtle thing in the mod (maintainer, 2026-07-27).
-            Assert.False(PresetCatalog.ClimbToCounterWind(PresetId.Subtle));
+            Assert.False(PresetCatalog.ClimbSheltersFromWind(PresetId.Subtle));
 
             // Its multipliers are moot, and must read as "no slowdown" rather
             // than implying a Subtle-strength one exists.
@@ -316,7 +316,7 @@ namespace Fairoots.Tests
             double upward = PresetCatalog.ClimbWindUpwardSpeedMultiplier(preset);
             double intoWind = PresetCatalog.ClimbWindIntoWindSpeedMultiplier(preset);
 
-            Assert.True(PresetCatalog.ClimbToCounterWind(preset), $"{preset} should have the mechanic on");
+            Assert.True(PresetCatalog.ClimbSheltersFromWind(preset), $"{preset} should have the mechanic on");
             foreach (double m in new[] { baseMult, upward, intoWind })
             {
                 Assert.InRange(m, 0.05, 1.0);
@@ -353,7 +353,7 @@ namespace Fairoots.Tests
         {
             // Custom has no catalog row of its own (it maps to Balanced), so
             // picking Custom must not silently inherit Subtle's "off".
-            Assert.True(PresetCatalog.ClimbToCounterWind(PresetId.Custom));
+            Assert.True(PresetCatalog.ClimbSheltersFromWind(PresetId.Custom));
             Assert.Equal(
                 PresetCatalog.ClimbWindSpeedMultiplier(PresetId.Balanced),
                 PresetCatalog.ClimbWindSpeedMultiplier(PresetId.Custom));

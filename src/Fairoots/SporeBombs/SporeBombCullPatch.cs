@@ -11,7 +11,7 @@ namespace Fairoots.SporeBombs
     /// Phase 4 (ROADMAP.md): the actual spore-bomb removal logic. Scans an
     /// already-placed Roots scene and applies the two-pass decision from
     /// <see cref="SporeBombCull"/>: foliage removal (on under every preset, but
-    /// switchable off via <c>Spore-Bombs/disable-foliage-removal</c>), then a seeded
+    /// switchable off via <c>Spore-Bombs/enable-foliage-removal</c>), then a seeded
     /// cull budgeted against it.
     ///
     /// Triggered by <see cref="RootsLevelWatcher"/> - NOT a Harmony postfix on
@@ -160,7 +160,7 @@ namespace Fairoots.SporeBombs
                 CollectFoliageVertices(rootsSegment);
                 Diag.V($"[SporeBombCull] {LastFoliageVertices.Count} foliage vertex sample(s) collected for proximity test");
 
-                bool foliageRemoval = !Plugin.Cfg.EffectiveDisableFoliageRemoval;
+                bool foliageRemoval = Plugin.Cfg.EffectiveEnableFoliageRemoval;
 
                 var positions = new List<GridPos>(candidates.Count);
                 var inFoliage = new List<bool>(candidates.Count);

@@ -28,7 +28,7 @@ namespace Fairoots.Core
     /// natively" to a real mechanic - see below).
     ///
     /// **Why this exists at all.** The earlier reading (RESEARCH.md, and the
-    /// original remarks on <see cref="Presets.PresetCatalog.ClimbToCounterWind"/>)
+    /// original remarks on <see cref="Presets.PresetCatalog.ClimbSheltersFromWind"/>)
     /// was that vanilla already suppresses wind while climbing. It doesn't:
     /// <c>WindChillZone.AddWindForceToCharacter</c>'s early return only covers
     /// <c>character.data.currentClimbHandle != null</c> - hanging off a climb

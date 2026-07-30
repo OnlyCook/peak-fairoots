@@ -12,6 +12,30 @@ namespace Fairoots
     /// entries (only read when <see cref="Preset"/> is <see cref="PresetId.Custom"/>
     /// - see <see cref="OverrideResolution"/>).
     ///
+    /// <b>No balance value is written in this file.</b> Every default in the five
+    /// gameplay sections comes from <see cref="ConfigDefaults"/>, generated from
+    /// <c>docs/PRESETS.md</c> by <c>scripts/apply-presets.sh</c> - which is also
+    /// where the rule those defaults encode is documented: <b>every default is the
+    /// vanilla value</b>, so a player who installs the mod, selects the Custom
+    /// preset and changes nothing plays exactly unmodded PEAK. The one documented
+    /// exception is the gated parameters (a dial that means nothing until the
+    /// mechanic it belongs to is switched on). Never hardcode a balance default
+    /// here; tune the table and re-run the script.
+    ///
+    /// <c>General</c> and <c>Debug</c> are the exception to that: nothing in either
+    /// is preset-driven or a balance number (the seed, the preset selector,
+    /// keybinds, the client-side cosmetic settings, the diagnostics), so they are
+    /// deliberately absent from the table and their defaults stay ordinary literals
+    /// below.
+    ///
+    /// It follows that every gameplay setting outside <c>General</c>/<c>Debug</c> is
+    /// preset-driven: if a mechanic is to be on under Balanced while its config entry
+    /// defaults to vanilla, the preset row is the only thing that can turn it on. The
+    /// pre-2026-07-30 category of "flat gameplay setting that applies the same under
+    /// every preset" is therefore gone; what stays flat is only the <c>disable-*</c>
+    /// kill switches (already vanilla when off, and no preset ever sets them), the
+    /// keybinds, and <c>Debug</c>.
+    ///
     /// Config keys are kebab-case per CLAUDE.md; the C# property names stay
     /// PascalCase. Section names follow the maintainer's other PEAK mods
     /// (Capitalized-Hyphenated, or a plain word where there's nothing to hyphenate).
@@ -179,17 +203,27 @@ namespace Fairoots
         public ConfigEntry<double> SporeBombCullFractionOverride { get; }
 
         /// <summary>
-        /// Turns off the unconditional bush/grass placement-removal pass
-        /// (<see cref="Core.SporeBombCull"/>'s pass 1). Flat and off by default
-        /// under every preset (<see cref="PresetCatalog.SporeBombFoliageRemoval"/>
-        /// stays <c>true</c> everywhere) - the pass is one of the mod's always-on
-        /// bug fixes, so this exists for the player who wants even that left alone,
-        /// not as something a preset ever reaches for. Doesn't change how much gets
-        /// removed overall: <see cref="SporeBombCullFractionOverride"/>'s target
-        /// still applies, the seeded pass just picks from every candidate instead of
-        /// only the non-camouflaged ones.
+        /// Custom-preset value for whether the bush/grass placement-removal pass
+        /// runs (<see cref="Core.SporeBombCull"/>'s pass 1). Off = vanilla, which
+        /// is the default; every preset 1-4 turns it on
+        /// (<see cref="PresetCatalog.EnableFoliageRemoval"/>), since the game never
+        /// prevents a spore bomb landing inside foliage and that gap is worth
+        /// closing at any balance level. Only takes effect under
+        /// <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
+        ///
+        /// Doesn't change how much gets removed overall:
+        /// <see cref="SporeBombCullFractionOverride"/>'s target still applies, the
+        /// seeded pass just picks from every candidate instead of only the
+        /// camouflaged ones first.
         /// </summary>
-        public ConfigEntry<bool> DisableFoliageRemoval { get; }
+        /// <remarks>
+        /// Was the negative <c>disable-foliage-removal</c> until 2026-07-30, when
+        /// the polarity was flipped so that "off = vanilla" holds for every
+        /// setting in the mod (see <c>docs/PRESETS.md</c>). Existing config files
+        /// carrying the old key are ignored and re-bound at the new one.
+        /// </remarks>
+        public ConfigEntry<bool> EnableFoliageRemovalOverride { get; }
 
         /// <summary>
         /// Custom-preset value for the trigger-hitbox radius multiplier applied to
@@ -519,136 +553,157 @@ namespace Fairoots
         public ConfigEntry<double> BeetleDeaggroMultiplierOverride { get; }
 
         /// <summary>
-        /// How long a zombie is knocked out by a thrown item, in seconds. Vanilla
-        /// already ragdolls a zombie for about a second when an item hits it (a zombie
-        /// is a <c>Character</c>, so <c>Bonkable</c> finds it), so this extends an
-        /// existing interaction rather than inventing one - see
-        /// <see cref="Core.CreatureKnockout"/>. 0 leaves vanilla alone.
-        ///
-        /// Flat rather than preset-gated, and <b>host-authoritative</b>: this is
-        /// counterplay the player can use, so it follows
-        /// <see cref="CoverMouthStaminaPerSecond"/>'s shape - how strong a counterplay
-        /// move is, is shared balance.
+        /// Custom-preset value for how long a zombie is knocked out by a thrown item,
+        /// in seconds. Vanilla already ragdolls a zombie for about a second when an
+        /// item hits it (a zombie is a <c>Character</c>, so <c>Bonkable</c> finds
+        /// it), so this extends an existing interaction rather than inventing one -
+        /// see <see cref="Core.CreatureKnockout"/>. 0 = vanilla, and the default.
+        /// Only takes effect under <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
         /// </summary>
-        public ConfigEntry<double> ZombieKnockoutSeconds { get; }
+        public ConfigEntry<double> ZombieKnockoutSecondsOverride { get; }
 
         /// <summary>
-        /// How long a beetle is knocked onto its back by a thrown item, in seconds.
-        /// Unlike the zombie's, this is an entirely new interaction: a beetle is a
-        /// <c>Mob</c> with no <c>Character</c> and no <c>EventOnItemCollision</c>, so
-        /// vanilla thrown items pass straight by it. 0 restores that.
+        /// Custom-preset value for how long a beetle is knocked onto its back by a
+        /// thrown item, in seconds. Unlike the zombie's, this is an entirely new
+        /// interaction: a beetle is a <c>Mob</c> with no <c>Character</c> and no
+        /// <c>EventOnItemCollision</c>, so vanilla thrown items pass straight by it.
+        /// 0 = vanilla, and the default.
         ///
-        /// Shorter than <see cref="ZombieKnockoutSeconds"/> by default, at the
-        /// maintainer's direction - a beetle's shell should visibly shrug off a thrown
-        /// rock better than a zombie or a spider does. Same flat, host-authoritative
-        /// shape as the zombie dial.
+        /// Shorter than <see cref="ZombieKnockoutSecondsOverride"/> on every preset,
+        /// at the maintainer's direction - a beetle's shell should visibly shrug off
+        /// a thrown rock better than a zombie or a spider does. Only takes effect
+        /// under <see cref="PresetId.Custom"/>.
         /// </summary>
-        public ConfigEntry<double> BeetleKnockoutSeconds { get; }
+        public ConfigEntry<double> BeetleKnockoutSecondsOverride { get; }
 
         /// <summary>
-        /// How fast a thrown item must be going, in <b>meters per second</b>, to knock out
-        /// a beetle or a zombie. Shared by both so "a hard throw" means one thing.
+        /// Custom-preset value for how fast a thrown item must be going, in
+        /// <b>meters per second</b>, to knock out a beetle or a zombie. Shared by
+        /// both so "a hard throw" means one thing. Only takes effect under
+        /// <see cref="PresetId.Custom"/>.
         ///
         /// Exists because matching the game's own <c>Bonkable</c> threshold (5 world
         /// units/s) turned out to accept any contact at all - see
-        /// <see cref="Core.CreatureKnockout.VanillaBonkableThresholdUnits"/>. 0 restores
-        /// that anything-goes behaviour for anyone who wants it. Host-authoritative and
-        /// flat, like the two duration dials it gates.
+        /// <see cref="Core.CreatureKnockout.VanillaBonkableThresholdUnits"/>. 0
+        /// restores that anything-goes behaviour for anyone who wants it. A gated
+        /// parameter, so its default is the tuned number rather than a vanilla one:
+        /// it means nothing until one of the two knockout durations is non-zero, and
+        /// both of those default to 0.
         /// </summary>
-        public ConfigEntry<double> CreatureKnockoutMinThrowSpeed { get; }
+        public ConfigEntry<double> CreatureKnockoutMinThrowSpeedOverride { get; }
 
         /// <summary>
-        /// How close to the creature the thrower must have been, in <b>meters</b>, for a
-        /// thrown item to knock it out. The second half of the mechanic's cost, alongside
-        /// <see cref="CreatureKnockoutMinThrowSpeed"/>: a hard throw is still travelling
-        /// fast a long way out, so speed alone would license picking creatures off from
-        /// safety. 0 removes the distance requirement.
+        /// Custom-preset value for how close to the creature the thrower must have
+        /// been, in <b>meters</b>, for a thrown item to knock it out. The second half
+        /// of the mechanic's cost, alongside
+        /// <see cref="CreatureKnockoutMinThrowSpeedOverride"/>: a hard throw is still
+        /// travelling fast a long way out, so speed alone would license picking
+        /// creatures off from safety. 0 removes the distance requirement.
         ///
         /// Measured from <c>Item.lastHolderCharacter</c> at the moment of impact.
-        /// Host-authoritative and flat, like the rest of the knockout group.
+        /// Gated on a non-zero knockout duration like the speed dial, and
+        /// Custom-only like the rest of the group.
         /// </summary>
-        public ConfigEntry<double> CreatureKnockoutMaxThrowDistance { get; }
+        public ConfigEntry<double> CreatureKnockoutMaxThrowDistanceOverride { get; }
 
         /// <summary>
-        /// Whether a blowgun dart takes a creature out of the fight: zombies die, spiders
-        /// and beetles are stunned for <see cref="BlowgunCreatureStunSeconds"/>. See
+        /// Custom-preset value for whether a blowgun dart takes a creature out of the
+        /// fight: zombies die, spiders and beetles are stunned for
+        /// <see cref="BlowgunCreatureStunSecondsOverride"/>. See
         /// <c>Creatures/BlowgunCreaturePatch</c> for why the outcomes differ (only the
-        /// zombie has a death state to reach) and why vanilla darts can't hit a spider or
-        /// beetle at all.
+        /// zombie has a death state to reach) and why vanilla darts can't hit a spider
+        /// or beetle at all.
         ///
-        /// On by default: the dart is a consumable fired from an uncommon item, so the
-        /// mechanic is self-limiting, and its whole purpose is to give the blowgun a use
-        /// against creatures it currently passes straight through. Host-authoritative and
-        /// flat.
+        /// Off = vanilla, and the default; on under every preset 1-4, because the dart
+        /// is a consumable fired from an uncommon item so the mechanic is
+        /// self-limiting, and its whole purpose is to give the blowgun a use against
+        /// creatures it currently passes straight through. Only takes effect under
+        /// <see cref="PresetId.Custom"/>.
         /// </summary>
-        public ConfigEntry<bool> BlowgunAffectsCreatures { get; }
+        public ConfigEntry<bool> BlowgunAffectsCreaturesOverride { get; }
 
         /// <summary>
-        /// How long a blowgun dart stuns a spider or a beetle, in seconds. Zombies aren't
-        /// covered by this - they die outright, which has no duration - so turning this to
-        /// 0 leaves darts lethal to zombies while harmless to the other two.
-        /// Host-authoritative and flat.
+        /// Custom-preset value for how long a blowgun dart stuns a spider or a beetle,
+        /// in seconds. Zombies aren't covered by this - they die outright, which has no
+        /// duration - so turning this to 0 leaves darts lethal to zombies while
+        /// harmless to the other two. Gated by
+        /// <see cref="BlowgunAffectsCreaturesOverride"/>, so its default is the tuned
+        /// number rather than a vanilla one. Only takes effect under
+        /// <see cref="PresetId.Custom"/>.
         /// </summary>
-        public ConfigEntry<double> BlowgunCreatureStunSeconds { get; }
+        public ConfigEntry<double> BlowgunCreatureStunSecondsOverride { get; }
 
         /// <summary>
-        /// Multiplier on the wind force a zombie receives. 1.0 = vanilla, which is already
-        /// nonzero: a zombie is a bot <c>Character</c>, so the game pushes it at 0.6x what
-        /// it pushes a player (see <see cref="Core.CreatureWind"/>). Host-authoritative and
-        /// flat.
+        /// Custom-preset value for the multiplier on the wind force a zombie receives.
+        /// 1.0 = vanilla, which is already nonzero: a zombie is a bot
+        /// <c>Character</c>, so the game pushes it at 0.6x what it pushes a player (see
+        /// <see cref="Core.CreatureWind"/>). Above 1.0 the wind shoves zombies harder
+        /// than the game does, which is the direction the presets run. Only takes
+        /// effect under <see cref="PresetId.Custom"/>.
         /// </summary>
-        public ConfigEntry<double> ZombieWindMultiplier { get; }
+        public ConfigEntry<double> ZombieWindMultiplierOverride { get; }
 
         /// <summary>
-        /// How susceptible beetles are to wind, as a fraction of their own walking speed -
-        /// so 1.0 means wind slides a beetle about as fast as it walks. <b>0 is vanilla</b>,
-        /// not 1.0, because vanilla beetles are completely wind-immune and cannot be made
-        /// otherwise by scaling: <c>Mob.FixedUpdate</c> zeroes their velocity every tick.
-        /// Any positive value grants an effect the game never had. Host-authoritative and
-        /// flat.
+        /// Custom-preset value for how susceptible beetles are to wind, as a fraction
+        /// of their own walking speed - so 1.0 means wind slides a beetle about as fast
+        /// as it walks. <b>0 is vanilla</b>, not 1.0, because vanilla beetles are
+        /// completely wind-immune and cannot be made otherwise by scaling:
+        /// <c>Mob.FixedUpdate</c> zeroes their velocity every tick. Any positive value
+        /// grants an effect the game never had. Only takes effect under
+        /// <see cref="PresetId.Custom"/>.
         /// </summary>
-        public ConfigEntry<double> BeetleWindSusceptibility { get; }
+        public ConfigEntry<double> BeetleWindSusceptibilityOverride { get; }
 
         /// <summary>
-        /// Master kill switch for the whole cover-your-mouth mechanic. When on, the
-        /// key does nothing at all: no immunity, no stamina drain, no hand
-        /// restrictions, no pose. <b>Host-authoritative</b> (read via
-        /// <see cref="EffectiveDisableCoverMouth"/>) - unlike the keybind and
-        /// hold/toggle mode, which are the player's own business, whether a
-        /// counterplay mechanic <em>exists in this run</em> is shared balance, so the
-        /// host decides for the lobby. Same shape as
-        /// <see cref="DisableWindEntirely"/>/<see cref="DisableSporeAreas"/>: flat (no
-        /// preset ever turns it on), off by default, always immediate.
+        /// Custom-preset value for whether the cover-your-mouth mechanic exists at
+        /// all. Off = vanilla (the key does nothing: no immunity, no stamina drain,
+        /// no hand restrictions, no pose), which is the default; every preset 1-4
+        /// turns it on (<see cref="PresetCatalog.EnableCoverMouth"/>). Only takes
+        /// effect under <see cref="PresetId.Custom"/>; read via
+        /// <see cref="EffectiveEnableCoverMouth"/>, which is host-authoritative -
+        /// unlike the keybind and hold/toggle mode, which are the player's own
+        /// business, whether a counterplay mechanic <em>exists in this run</em> is
+        /// shared balance.
         ///
         /// A player who simply doesn't want the mechanic for themselves can set
         /// <see cref="CoverMouthKey"/> to <see cref="KeyCode.None"/> instead; that
         /// needs no host cooperation, because opting out of a move you could make is
         /// not altering anyone else's game.
         /// </summary>
-        public ConfigEntry<bool> DisableCoverMouth { get; }
+        /// <remarks>
+        /// Was the negative <c>disable-cover-mouth</c> until 2026-07-30 - see
+        /// <see cref="EnableFoliageRemovalOverride"/>'s remarks for why the polarity
+        /// was flipped.
+        /// </remarks>
+        public ConfigEntry<bool> EnableCoverMouthOverride { get; }
 
         /// <summary>
-        /// Stamina drained per second while holding a mouth cover. Flat (not folded
-        /// through the preset/override system - it's the price of a player action,
-        /// not a per-preset balance curve) but <b>host-authoritative</b>
-        /// (<see cref="EffectiveCoverMouthStaminaPerSecond"/>): how expensive a
-        /// counterplay move is, is shared balance, unlike the keybind that triggers
-        /// it. Small by default - for scale, vanilla wall climbing costs up to 0.2/s.
-        /// 0 makes covering free.
+        /// Custom-preset value for the stamina drained per second while holding a
+        /// mouth cover: what the counterplay move costs, which is shared balance
+        /// unlike the keybind that triggers it. Only takes effect under
+        /// <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>. 0 makes covering free - for
+        /// scale, vanilla wall climbing costs up to 0.2/s.
+        ///
+        /// Its default is the tuned cost rather than a vanilla value, because
+        /// vanilla has no cover-mouth mechanic to have a cost: it is gated behind
+        /// <see cref="EnableCoverMouthOverride"/>, which is what defaults to off.
+        /// See <c>docs/PRESETS.md</c>'s note on gated parameters.
         /// </summary>
-        public ConfigEntry<float> CoverMouthStaminaPerSecond { get; }
+        public ConfigEntry<float> CoverMouthStaminaPerSecondOverride { get; }
 
 
         /// <summary>
-        /// Whether covering your mouth also blocks the spore status from a spore bomb's
-        /// temporary mini spore cloud, on top of the biome's persistent spore areas.
-        /// Off by default - see <c>SporeBombs/CoverMouthSporeBombPatch</c> for why the
-        /// mechanic is scoped to spore areas, and note that only the spore status is
-        /// suppressed either way: knockback and screen shake still land.
-        /// <b>Host-authoritative</b>: what a counterplay move protects against is shared
-        /// balance, like its stamina cost.
+        /// Custom-preset value for whether covering your mouth also blocks the spore
+        /// status from a spore bomb's temporary mini spore cloud, on top of the
+        /// biome's persistent spore areas. Off = vanilla, and off on every preset
+        /// today - see <c>SporeBombs/CoverMouthSporeBombPatch</c> for why the
+        /// mechanic is scoped to spore areas. Only the spore status is ever
+        /// suppressed either way: knockback and screen shake still land. Only takes
+        /// effect under <see cref="PresetId.Custom"/>.
         /// </summary>
-        public ConfigEntry<bool> CoverMouthBlocksSporeBombs { get; }
+        public ConfigEntry<bool> CoverMouthBlocksSporeBombsOverride { get; }
 
         // --- Wind -----------------------------------------------------------
         /// <summary>
@@ -676,21 +731,18 @@ namespace Fairoots
         public ConfigEntry<bool> DisableWindEntirely { get; }
 
         /// <summary>
-        /// Whether backpacks are always fully immune to wind force, regardless
-        /// of <see cref="WindItemForceMultiplierOverride"/>/preset. On by
-        /// default (ROADMAP.md's "backpack only" is the minimum immunity level
-        /// on every preset) - turn off if you want backpacks affected by wind
-        /// like any other ground item (scaled by the same item-force
-        /// multiplier as everything else). <b>Host-authoritative</b> (same as
-        /// <see cref="DisableWindEntirely"/>): read via
-        /// <see cref="PluginConfig.EffectiveWindBackpackAlwaysImmune"/>, only
-        /// the host's value is ever used. Not folded through the preset/
-        /// override system (deliberately flat) - a player override on top of
-        /// whatever preset is active, and always applies immediately regardless
-        /// of <see cref="ApplyChangesLive"/>, same reasoning as
-        /// <see cref="DisableWindEntirely"/>.
+        /// Custom-preset value for whether backpacks are fully immune to wind force
+        /// regardless of <see cref="WindItemForceMultiplierOverride"/>. Off =
+        /// vanilla, and the default; on under every preset 1-4 (ROADMAP.md's
+        /// "backpack only" is the minimum immunity level). Turn it off to have
+        /// backpacks blown around like any other ground item (scaled by the same
+        /// item-force multiplier as everything else). Only takes effect under
+        /// <see cref="PresetId.Custom"/>; read via
+        /// <see cref="PluginConfig.EffectiveWindBackpackAlwaysImmune"/>, which is
+        /// host-authoritative and always applies immediately regardless of
+        /// <see cref="ApplyChangesLive"/>.
         /// </summary>
-        public ConfigEntry<bool> WindBackpackAlwaysImmune { get; }
+        public ConfigEntry<bool> WindBackpackAlwaysImmuneOverride { get; }
 
         /// <summary>
         /// Custom-preset value for the multiplier applied to
@@ -738,45 +790,44 @@ namespace Fairoots
         public ConfigEntry<double> WindFallCameraDampenClampOverride { get; }
 
         /// <summary>
-        /// How many seconds after wind force was last applied to the local
-        /// character that a subsequent fall still counts as "wind-preceded" - for
-        /// both the camera-dampening clamp above and
-        /// <see cref="PreventWindRagdoll"/>. Flat setting (not folded through the
-        /// preset/override system) - it's a timing window, not a balance dial
-        /// that scales per preset - but host-authoritative like everything else
-        /// outside <c>General</c>/<c>Debug</c>: read via
+        /// Custom-preset value for how many seconds after wind force was last
+        /// applied to the local character a subsequent fall still counts as
+        /// "wind-preceded" - for both the camera-dampening clamp above and
+        /// <see cref="PreventWindRagdollOverride"/>. A gated parameter (a timing
+        /// window for two mechanics that both default to off), so its default is
+        /// the tuned number rather than a vanilla one. Only takes effect under
+        /// <see cref="PresetId.Custom"/>; read via
         /// <see cref="EffectiveWindRecentForceWindowSeconds"/>.
         /// </summary>
-        public ConfigEntry<float> WindRecentForceWindowSeconds { get; }
+        public ConfigEntry<float> WindRecentForceWindowSecondsOverride { get; }
 
         /// <summary>
-        /// Whether wind is allowed to ragdoll the player at all. On (the default,
-        /// and on under every preset): a fall that wind caused
+        /// Custom-preset value for whether wind is allowed to ragdoll the player at
+        /// all. On (every preset 1-4): a fall that wind caused
         /// (<see cref="Core.WindTuning.IsWindForceStillRecent"/>, same window as the
         /// camera clamp) keeps the player fully in control instead of collapsing
         /// into physics - <see cref="Core.WindTuning.ApplyWindRagdollImmunity"/>.
-        /// Off: vanilla, wind blowing you off a ledge ragdolls you, and only the
-        /// partial <see cref="WindFallCameraDampenClampOverride"/> floor applies.
-        /// Flat (not preset-gated - it's on everywhere, same shape as
-        /// <see cref="ClimbSheltersFromWind"/>) and host-authoritative: it decides
-        /// whether a player keeps control of their character, which is shared
-        /// balance, not local camera feel.
+        /// Off = vanilla, and the default: wind blowing you off a ledge ragdolls
+        /// you, and only the partial
+        /// <see cref="WindFallCameraDampenClampOverride"/> floor applies. Only takes
+        /// effect under <see cref="PresetId.Custom"/>; host-authoritative, since it
+        /// decides whether a player keeps control of their character.
         /// </summary>
-        public ConfigEntry<bool> PreventWindRagdoll { get; }
+        public ConfigEntry<bool> PreventWindRagdollOverride { get; }
 
         /// <summary>
-        /// Whether holding onto something (wall climbing, a rope, a vine, a climb
-        /// handle) makes the player fully immune to wind force, at the cost of
-        /// climbing much slower while the wind is actually pushing on them - see
-        /// <see cref="Core.ClimbWindResistance"/> for why this is a real mechanic
-        /// rather than the vanilla behavior an earlier research pass thought it
-        /// was. Flat (not preset-gated - every preset has it on, per ROADMAP.md's
-        /// "New: climb-to-counter-wind" row) but player-toggleable, same shape as
-        /// <see cref="WindBackpackAlwaysImmune"/>. Host-authoritative: read via
+        /// Custom-preset value for whether holding onto something (wall climbing, a
+        /// rope, a vine, a climb handle) makes the player fully immune to wind
+        /// force, at the cost of climbing slower while the wind is actually pushing
+        /// on them - see <see cref="Core.ClimbWindResistance"/> for why this is a
+        /// real mechanic rather than the vanilla behavior an earlier research pass
+        /// thought it was. Off = vanilla, and the default; on under every preset
+        /// except Subtle (<see cref="PresetCatalog.ClimbSheltersFromWind"/>). Only
+        /// takes effect under <see cref="PresetId.Custom"/>; read via
         /// <see cref="PluginConfig.EffectiveClimbSheltersFromWind"/>. The three
         /// speed multipliers below are what it costs; this is whether it happens.
         /// </summary>
-        public ConfigEntry<bool> ClimbSheltersFromWind { get; }
+        public ConfigEntry<bool> ClimbSheltersFromWindOverride { get; }
 
         /// <summary>
         /// Custom-preset value for the all-directions climb-speed multiplier
@@ -802,17 +853,18 @@ namespace Fairoots
         public ConfigEntry<double> ClimbWindIntoWindSpeedMultiplierOverride { get; }
 
         /// <summary>
-        /// How long the much-weaker-wind grace window lasts after letting go of a
-        /// climb (see <see cref="Core.ClimbWindResistance.GraceForceMultiplier"/>
-        /// for why it exists). Flat (not folded through the preset/override
-        /// system) - it's a timing window, not a balance dial, same reasoning as
-        /// <see cref="WindRecentForceWindowSeconds"/> - but unlike that one it IS
-        /// host-authoritative (<see cref="PluginConfig.EffectiveClimbShelterGraceSeconds"/>),
-        /// because it changes how much force actually gets applied rather than
-        /// how the local camera feels. Only has any effect while the climb
-        /// shelter itself is active (<see cref="ClimbSheltersFromWind"/>).
+        /// Custom-preset value for how long the much-weaker-wind grace window lasts
+        /// after letting go of a climb (see
+        /// <see cref="Core.ClimbWindResistance.GraceForceMultiplier"/> for why it
+        /// exists). A gated parameter, like
+        /// <see cref="WindRecentForceWindowSecondsOverride"/>: it only has any effect
+        /// while the climb shelter itself is on
+        /// (<see cref="ClimbSheltersFromWindOverride"/>), so its default is the tuned
+        /// number rather than a vanilla one. Only takes effect under
+        /// <see cref="PresetId.Custom"/>; read via
+        /// <see cref="PluginConfig.EffectiveClimbShelterGraceSeconds"/>.
         /// </summary>
-        public ConfigEntry<float> ClimbShelterGraceSeconds { get; }
+        public ConfigEntry<float> ClimbShelterGraceSecondsOverride { get; }
 
         /// <summary>
         /// Custom-preset value for how strong wind is during the let-go grace
@@ -1047,33 +1099,34 @@ namespace Fairoots
             SporeBombCullFractionOverride = config.Bind(
                 "Spore-Bombs",
                 "cull-fraction",
-                0.25,
+                ConfigDefaults.SporeBombCullFraction,
                 new ConfigDescription(
                     "Fraction of spore bombs to remove overall (foliage removal + seeded cull " +
                     "combined), e.g. 0.5 cuts them in half. Only takes effect when preset is " +
-                    "set to Custom (5) - ignored under presets 1-4. 0 = remove none beyond " +
-                    "the always-on foliage pass (vanilla-equivalent).",
+                    "set to Custom (5) - ignored under presets 1-4. 0 (the default) = remove " +
+                    "none beyond whatever the foliage pass takes, which is itself off by " +
+                    "default, so an untouched Custom preset removes nothing at all.",
                     new AcceptableValueRange<double>(0.0, 1.0)));
 
-            DisableFoliageRemoval = config.Bind(
+            EnableFoliageRemovalOverride = config.Bind(
                 "Spore-Bombs",
-                "disable-foliage-removal",
-                false,
-                "Turns off the always-on removal of spore bombs that spawned hidden inside a " +
-                "bush or clump of ferns. On by default in every preset because a bomb you " +
-                "physically cannot see before setting it off isn't a hazard you can play " +
-                "around, so this switch is for players who want even that left as vanilla. " +
-                "Turning it on does NOT mean more spore bombs overall: cull-fraction's " +
-                "removal target still applies, the seeded removal just picks from every " +
-                "spore bomb instead of only the visible ones. Off by default; no preset ever " +
-                "turns this on automatically. HOST-AUTHORITATIVE: only the host's value " +
-                "counts for the whole lobby. Takes effect on the next Roots level load " +
-                "(spore-bomb removal happens once, when the biome is placed).");
+                "enable-foliage-removal",
+                ConfigDefaults.EnableFoliageRemoval,
+                "Removes spore bombs that spawned hidden inside a bush or clump of ferns, " +
+                "because a bomb you physically cannot see before setting it off isn't a " +
+                "hazard you can play around. Off = vanilla, where the game leaves them " +
+                "wherever they landed. Turning it on does NOT mean fewer spore bombs " +
+                "overall than cull-fraction asks for: that removal target still applies, " +
+                "the seeded removal just picks the hidden ones first. Only takes effect " +
+                "when preset is set to Custom (5) - every preset 1-4 has it on. " +
+                "HOST-AUTHORITATIVE: only the host's value counts for the whole lobby. " +
+                "Takes effect on the next Roots level load (spore-bomb removal happens " +
+                "once, when the biome is placed).");
 
             SporeBombTriggerRadiusMultiplierOverride = config.Bind(
                 "Spore-Bombs",
                 "trigger-radius-multiplier",
-                0.75,
+                ConfigDefaults.SporeBombTriggerRadiusMultiplier,
                 new ConfigDescription(
                     "Multiplier applied to every kept spore bomb's trigger hitbox, e.g. 0.7 " +
                     "shrinks it to 70% of vanilla size, 2.0 doubles it. 1.0 always means " +
@@ -1085,7 +1138,7 @@ namespace Fairoots
             SporeBombKnockbackMultiplierOverride = config.Bind(
                 "Spore-Bombs",
                 "knockback-multiplier",
-                0.80,
+                ConfigDefaults.SporeBombKnockbackMultiplier,
                 new ConfigDescription(
                     "Multiplier applied to a spore bomb's knockback/explosion force on " +
                     "detonation, e.g. 0.6 cuts it to 60% of vanilla, 2.0 doubles it. 1.0 " +
@@ -1097,7 +1150,7 @@ namespace Fairoots
             SporeBombScreenshakeRangeCapOverride = config.Bind(
                 "Spore-Bombs",
                 "screenshake-range-cap-meters",
-                30.0,
+                ConfigDefaults.SporeBombScreenshakeRangeCapMeters,
                 new ConfigDescription(
                     "Caps how far away (in meters) a spore-bomb detonation's screen-shake can " +
                     "still be felt. 0 leaves the vanilla range (~75m, uncapped) alone; a " +
@@ -1108,7 +1161,7 @@ namespace Fairoots
             SporeBombVfxCountMultiplierOverride = config.Bind(
                 "Spore-Bombs",
                 "vfx-count-multiplier",
-                0.75,
+                ConfigDefaults.SporeBombVfxCountMultiplier,
                 new ConfigDescription(
                     "Multiplier applied to a spore bomb's particle/VFX orb count on " +
                     "detonation, e.g. 0.5 halves it, 2.0 doubles it. 1.0 always means vanilla " +
@@ -1120,7 +1173,7 @@ namespace Fairoots
             SporeBombTriggerHeightMultiplierOverride = config.Bind(
                 "Spore-Bombs",
                 "trigger-height-multiplier",
-                1.0,
+                ConfigDefaults.SporeBombTriggerHeightMultiplier,
                 new ConfigDescription(
                     "Multiplier controlling how high above its base a player can be and still " +
                     "set off a \"Spore Bomb\" or \"Poison Spore Bomb\" (not the round " +
@@ -1135,7 +1188,7 @@ namespace Fairoots
             SporeBombSporeAreaRadiusMultiplierOverride = config.Bind(
                 "Spore-Bombs",
                 "spore-area-radius-multiplier",
-                1.0,
+                ConfigDefaults.SporeBombSporeAreaRadiusMultiplier,
                 new ConfigDescription(
                     "Multiplier applied to the radius (and proportionally, the inner/outer " +
                     "fade) of the temporary spore area a regular \"Spore Bomb\"/\"Poison Spore " +
@@ -1145,22 +1198,23 @@ namespace Fairoots
                     "preset is set to Custom (5) - ignored under presets 1-4.",
                     new AcceptableValueRange<double>(0.0, 5.0)));
 
-            CoverMouthBlocksSporeBombs = config.Bind(
+            CoverMouthBlocksSporeBombsOverride = config.Bind(
                 "Spore-Bombs",
                 "cover-mouth-blocks-spore-bombs",
-                false,
+                ConfigDefaults.CoverMouthBlocksSporeBombs,
                 "Whether covering your mouth (see General/cover-mouth-key) also protects you from " +
                 "the small spore cloud a spore bomb leaves behind when it goes off. Off by " +
                 "default: the mechanic is meant for the biome's spore areas, which you can see " +
                 "coming and choose to walk into, whereas a spore bomb is a surprise you've " +
                 "already set off. Either way this only stops the spores - the blast still knocks " +
-                "you around. HOST-AUTHORITATIVE: only the host's value counts for the whole " +
-                "lobby.");
+                "you around. Only takes effect when preset is set to Custom (5) - it is off " +
+                "under presets 1-4 as well, for now. HOST-AUTHORITATIVE: only the host's value " +
+                "counts for the whole lobby.");
 
             DisableSporeAreas = config.Bind(
                 "Spore-Areas",
                 "disable-spore-areas",
-                false,
+                ConfigDefaults.DisableSporeAreas,
                 "Master switch: when on, the Roots biome's spore areas (\"Mushroom Spore Clouds\") " +
                 "are removed entirely - no Spores status, no green screen filter, and the emitter " +
                 "mushroom in the middle of the cloud plus the cloud itself disappear with them. " +
@@ -1203,7 +1257,7 @@ namespace Fairoots
             SporeAreaRemovalFractionOverride = config.Bind(
                 "Spore-Areas",
                 "removal-fraction",
-                0.0,
+                ConfigDefaults.SporeAreaRemovalFraction,
                 new ConfigDescription(
                     "Fraction of the level's spore areas to remove entirely, e.g. 0.25 removes a " +
                     "quarter of them. Which ones is decided by the seed, and always starts with " +
@@ -1219,7 +1273,7 @@ namespace Fairoots
             SporeAreaRadiusMultiplierOverride = config.Bind(
                 "Spore-Areas",
                 "radius-multiplier",
-                0.85,
+                ConfigDefaults.SporeAreaRadiusMultiplier,
                 new ConfigDescription(
                     "Multiplier applied to how far every spore area reaches, e.g. 0.7 shrinks it " +
                     "to 70% of vanilla, 1.5 makes it half again as big. The visible cloud is " +
@@ -1233,7 +1287,7 @@ namespace Fairoots
             SporeAreaStatusRateMultiplierOverride = config.Bind(
                 "Spore-Areas",
                 "status-rate-multiplier",
-                0.85,
+                ConfigDefaults.SporeAreaStatusRateMultiplier,
                 new ConfigDescription(
                     "Multiplier applied to how often/quickly you're given spores while standing " +
                     "in a spore area, e.g. 0.5 means the Spores meter fills half as fast, 2.0 " +
@@ -1247,7 +1301,7 @@ namespace Fairoots
             SporeClearTimeMultiplierOverride = config.Bind(
                 "Spores",
                 "clear-time-multiplier",
-                0.70,
+                ConfigDefaults.SporeClearTimeMultiplier,
                 new ConfigDescription(
                     "Multiplier applied to how long it takes for spores to wear off once you're " +
                     "out of them, e.g. 0.5 means they clear in half the time, 2.0 means twice as " +
@@ -1260,7 +1314,7 @@ namespace Fairoots
             SporeBuildUpMultiplierOverride = config.Bind(
                 "Spores",
                 "build-up-multiplier",
-                1.00,
+                ConfigDefaults.SporeBuildUpMultiplier,
                 new ConfigDescription(
                     "Multiplier applied to every dose of spores you're given, no matter what gave " +
                     "it to you - a spore area, a spore bomb's cloud, or a zombie's bite. 0.5 " +
@@ -1277,7 +1331,7 @@ namespace Fairoots
             DisableZombies = config.Bind(
                 "Creatures",
                 "disable-zombies",
-                false,
+                ConfigDefaults.DisableZombies,
                 "Master switch: when on, the Roots biome's mushroom zombies never spawn, and any " +
                 "already wandering around are removed. A zombie raised from a dead player is NOT " +
                 "affected - that's a player's death, not a hazard. HOST-AUTHORITATIVE: if you're " +
@@ -1289,7 +1343,7 @@ namespace Fairoots
             DisableBeetles = config.Bind(
                 "Creatures",
                 "disable-beetles",
-                false,
+                ConfigDefaults.DisableBeetles,
                 "Master switch: when on, the Roots biome's beetles (about 15 per level) are removed " +
                 "entirely - nothing to walk into, nothing to knock you off a ledge. Turning it back " +
                 "off brings back exactly the beetles this mod removed. HOST-AUTHORITATIVE: if " +
@@ -1300,7 +1354,7 @@ namespace Fairoots
             DisableSpiders = config.Bind(
                 "Creatures",
                 "disable-spiders",
-                false,
+                ConfigDefaults.DisableSpiders,
                 "Master switch: when on, the Roots biome's ceiling spiders (about 90 per level) " +
                 "never drop and never grab you, and their webs and bodies are hidden. " +
                 "HOST-AUTHORITATIVE: if you're not the host, this has no effect at all - only the " +
@@ -1310,7 +1364,7 @@ namespace Fairoots
             ZombieSpeedMultiplierOverride = config.Bind(
                 "Creatures",
                 "zombie-speed-multiplier",
-                0.9,
+                ConfigDefaults.ZombieSpeedMultiplier,
                 new ConfigDescription(
                     "Multiplier applied to how fast mushroom zombies move, e.g. 0.5 makes them " +
                     "half as fast, 1.5 half again as fast. 1.0 always means vanilla. Affects both " +
@@ -1323,7 +1377,7 @@ namespace Fairoots
             BeetleSpeedMultiplierOverride = config.Bind(
                 "Creatures",
                 "beetle-speed-multiplier",
-                0.9,
+                ConfigDefaults.BeetleSpeedMultiplier,
                 new ConfigDescription(
                     "Multiplier applied to how fast beetles move, e.g. 0.5 makes them half as " +
                     "fast, 1.5 half again as fast. 1.0 always means vanilla. 0 means a beetle " +
@@ -1335,7 +1389,7 @@ namespace Fairoots
             BeetleKnockbackMultiplierOverride = config.Bind(
                 "Creatures",
                 "beetle-knockback-multiplier",
-                0.8,
+                ConfigDefaults.BeetleKnockbackMultiplier,
                 new ConfigDescription(
                     "Multiplier applied to how hard a beetle's hit throws you, e.g. 0.5 halves " +
                     "the shove, 0 means it doesn't move you at all. 1.0 always means vanilla. " +
@@ -1350,7 +1404,7 @@ namespace Fairoots
             CreatureRagdollMultiplierOverride = config.Bind(
                 "Creatures",
                 "creature-ragdoll-multiplier",
-                0.85,
+                ConfigDefaults.CreatureRagdollMultiplier,
                 new ConfigDescription(
                     "Multiplier applied to how long a beetle's hit or a zombie's bite knocks you " +
                     "off your feet, e.g. 0.5 gets you back up twice as fast. 0 means you are " +
@@ -1366,7 +1420,7 @@ namespace Fairoots
             ZombieDeaggroEnabledOverride = config.Bind(
                 "Creatures",
                 "zombie-deaggro-enabled",
-                true,
+                ConfigDefaults.ZombieDeaggroEnabled,
                 "Whether zombies can ever lose track of you. In the unmodded game they CANNOT: " +
                 "once a zombie has seen you it chases you forever, at any distance, with no way " +
                 "to shake it. Turn this off to keep that vanilla behavior. Only takes effect when " +
@@ -1376,7 +1430,7 @@ namespace Fairoots
             ZombieDeaggroMultiplierOverride = config.Bind(
                 "Creatures",
                 "zombie-deaggro-multiplier",
-                0.85,
+                ConfigDefaults.ZombieDeaggroMultiplier,
                 new ConfigDescription(
                     "How hard it is to shake a zombie once it's after you. NOTE: unlike every " +
                     "other multiplier in this file, 1.0 does NOT mean vanilla - vanilla zombies " +
@@ -1392,7 +1446,7 @@ namespace Fairoots
             BeetleDeaggroMultiplierOverride = config.Bind(
                 "Creatures",
                 "beetle-deaggro-multiplier",
-                0.9,
+                ConfigDefaults.BeetleDeaggroMultiplier,
                 new ConfigDescription(
                     "How hard it is to shake a beetle once it's after you, as a multiplier on the " +
                     "distance it will keep chasing you from. 1.0 means vanilla (about 22m in " +
@@ -1407,30 +1461,36 @@ namespace Fairoots
                     "is set to Custom (5) - ignored under presets 1-4.",
                     new AcceptableValueRange<double>(0.1, 3.0)));
 
-            ZombieKnockoutSeconds = config.Bind(
+            ZombieKnockoutSecondsOverride = config.Bind(
                 "Creatures",
                 "zombie-knockout-seconds",
-                4.0,
+                ConfigDefaults.ZombieKnockoutSeconds,
                 new ConfigDescription(
                     "How many seconds a zombie is knocked out for when you hit it with a thrown " +
                     "item, the way you can already stun a spider by throwing something at it. " +
                     "The unmodded game already knocks a zombie down for about a second, so this " +
-                    "mostly decides how long that lasts; 0 leaves the vanilla behaviour alone. " +
+                    "mostly decides how long that lasts; 0 (the default) leaves the vanilla " +
+                    "behaviour alone. " +
+                    "Only takes effect when preset is set to Custom (5) - ignored under " +
+                    "presets 1-4. " +
                     "Deliberately less than the 5 seconds a spider gets. Note the zombie also " +
                     "needs a moment to get up and re-orient afterwards, so the total time it's " +
                     "out of the fight is a few seconds longer than this. HOST-AUTHORITATIVE: " +
                     "only the host's value counts for the whole lobby.",
                     new AcceptableValueRange<double>(0.0, 60.0)));
 
-            BeetleKnockoutSeconds = config.Bind(
+            BeetleKnockoutSecondsOverride = config.Bind(
                 "Creatures",
                 "beetle-knockout-seconds",
-                2.0,
+                ConfigDefaults.BeetleKnockoutSeconds,
                 new ConfigDescription(
                     "How many seconds a beetle is knocked onto its back for when you hit it with " +
                     "a thrown item. Unlike zombies and spiders, beetles are completely immune to " +
                     "thrown items in the unmodded game - nothing happens at all - so this adds " +
-                    "the interaction outright; 0 turns it back off. Shortest of the three on " +
+                    "the interaction outright; 0 (the default) turns it back off. " +
+                    "Only takes effect when preset is set to Custom (5) - ignored under " +
+                    "presets 1-4. " +
+                    "Shortest of the three on " +
                     "purpose: a beetle has a shell, so it should shrug off a thrown rock better " +
                     "than a zombie or a spider does. A knocked-out beetle can't chase or attack, " +
                     "and rights itself with its own flip animation afterwards. Only counts if " +
@@ -1438,10 +1498,10 @@ namespace Fairoots
                     "HOST-AUTHORITATIVE: only the host's value counts for the whole lobby.",
                     new AcceptableValueRange<double>(0.0, 60.0)));
 
-            CreatureKnockoutMinThrowSpeed = config.Bind(
+            CreatureKnockoutMinThrowSpeedOverride = config.Bind(
                 "Creatures",
                 "creature-knockout-min-throw-speed",
-                36.0,
+                ConfigDefaults.CreatureKnockoutMinThrowSpeed,
                 new ConfigDescription(
                     "How fast a thrown item has to be travelling, in meters per second, to knock " +
                     "out a beetle or a zombie - so a genuine throw does it and gently lobbing or " +
@@ -1453,15 +1513,16 @@ namespace Fairoots
                     "pick a value. The default is set from measured throws: medium throws land " +
                     "around 23-31 m/s and near-full-strength ones around 37-43, and the default " +
                     "of 36 was picked by play-testing as the point where a knockout needs a " +
-                    "genuinely committed throw. This is a flat setting, so it is the same under " +
-                    "every preset including Balanced. HOST-AUTHORITATIVE: only the host's value " +
-                    "counts for the whole lobby.",
+                    "genuinely committed throw. " +
+                    "Only takes effect when preset is set to Custom (5) - ignored under " +
+                    "presets 1-4. " + "HOST-AUTHORITATIVE: only the " +
+                    "host's value counts for the whole lobby.",
                     new AcceptableValueRange<double>(0.0, 50.0)));
 
-            CreatureKnockoutMaxThrowDistance = config.Bind(
+            CreatureKnockoutMaxThrowDistanceOverride = config.Bind(
                 "Creatures",
                 "creature-knockout-max-throw-distance",
-                12.0,
+                ConfigDefaults.CreatureKnockoutMaxThrowDistance,
                 new ConfigDescription(
                     "How close you have to be to a beetle or zombie, in meters, for a thrown item " +
                     "to knock it out. Together with creature-knockout-min-throw-speed above this " +
@@ -1469,52 +1530,60 @@ namespace Fairoots
                     "takes time to wind up and usually loses you the item. Without a distance " +
                     "limit a hard throw is still fast a long way out, so you could pick creatures " +
                     "off from somewhere safe. 0 removes the distance requirement. " +
+                    "Only takes effect when preset is set to Custom (5) - ignored under " +
+                    "presets 1-4. " +
                     "HOST-AUTHORITATIVE: only the host's value counts for the whole lobby.",
                     new AcceptableValueRange<double>(0.0, 200.0)));
 
-            BlowgunAffectsCreatures = config.Bind(
+            BlowgunAffectsCreaturesOverride = config.Bind(
                 "Creatures",
                 "blowgun-affects-creatures",
-                true,
+                ConfigDefaults.BlowgunAffectsCreatures,
                 "When on, shooting a creature with a blowgun dart takes it out of the fight: a " +
                 "zombie dies (exactly the way it already does on its own after two minutes, " +
                 "skeleton included), while a spider or a beetle is knocked out for a long time " +
                 "(see blowgun-creature-stun-seconds). Spiders and beetles get stunned rather than " +
                 "killed because the game has no death state for them at all. In the unmodded game " +
-                "a dart passes straight through a spider or beetle and merely poisons a zombie. On " +
-                "by default - darts are consumable and the blowgun is uncommon, so this can't be " +
-                "spammed. HOST-AUTHORITATIVE: only the host's value counts for the whole lobby.");
+                "a dart passes straight through a spider or beetle and merely poisons a zombie, " +
+                "which is what off (the default) restores. Only takes effect when preset is set " +
+                "to Custom (5) - every preset 1-4 has it on, since darts are consumable and the " +
+                "blowgun is uncommon, so this can't be spammed. HOST-AUTHORITATIVE: only the " +
+                "host's value counts for the whole lobby.");
 
-            BlowgunCreatureStunSeconds = config.Bind(
+            BlowgunCreatureStunSecondsOverride = config.Bind(
                 "Creatures",
                 "blowgun-creature-stun-seconds",
-                60.0,
+                ConfigDefaults.BlowgunCreatureStunSeconds,
                 new ConfigDescription(
                     "How many seconds a blowgun dart knocks out a spider or a beetle for. Doesn't " +
                     "apply to zombies, which die outright instead; set this to 0 if you want darts " +
                     "to kill zombies but leave spiders and beetles alone. Much longer than a " +
                     "thrown item's knockout on purpose - a dart costs you a consumable and only " +
-                    "works if you actually hit. HOST-AUTHORITATIVE: only the host's value counts " +
-                    "for the whole lobby.",
+                    "works if you actually hit. " +
+                    "Only takes effect when preset is set to Custom (5) - ignored under " +
+                    "presets 1-4. " + "HOST-AUTHORITATIVE: only the " +
+                    "host's value counts for the whole lobby.",
                     new AcceptableValueRange<double>(0.0, 600.0)));
 
-            ZombieWindMultiplier = config.Bind(
+            ZombieWindMultiplierOverride = config.Bind(
                 "Creatures",
                 "zombie-wind-multiplier",
-                1.5,
+                ConfigDefaults.ZombieWindMultiplier,
                 new ConfigDescription(
                     "Multiplier on how hard the wind pushes zombies around, e.g. 2.0 pushes them " +
                     "twice as hard as normal, 0 makes them immune. 1.0 means vanilla - note that " +
                     "vanilla is NOT zero: the game already pushes zombies at 60% of the force it " +
                     "uses on you, because a zombie counts as a bot character. Useful for making a " +
                     "storm a real hazard for the things chasing you and not just for you. " +
-                    "HOST-AUTHORITATIVE: only the host's value counts for the whole lobby.",
+                    "Only takes effect when preset is set to Custom (5) - ignored under " +
+                    "presets 1-4. HOST-AUTHORITATIVE: only the host's value counts for the whole " +
+                    "lobby.",
                     new AcceptableValueRange<double>(0.0, 5.0)));
 
-            BeetleWindSusceptibility = config.Bind(
+            BeetleWindSusceptibilityOverride = config.Bind(
                 "Creatures",
                 "beetle-wind-susceptibility",
-                0.5,
+                ConfigDefaults.BeetleWindSusceptibility,
                 new ConfigDescription(
                     "How much the wind slides beetles around, as a fraction of their own walking " +
                     "speed - 1.0 means wind moves a beetle about as fast as it walks, 0.5 half " +
@@ -1523,38 +1592,44 @@ namespace Fairoots
                     "by scaling anything - the game resets a walking beetle's velocity every " +
                     "physics tick, so any wind force on it is erased before it moves. Set 0 to " +
                     "restore that. Only applies while a beetle is walking normally, never while " +
-                    "it's tumbling, flipped or knocked out. HOST-AUTHORITATIVE: only the host's " +
-                    "value counts for the whole lobby.",
+                    "it's tumbling, flipped or knocked out. " +
+                    "Only takes effect when preset is set to Custom (5) - ignored under " +
+                    "presets 1-4. " + "HOST-AUTHORITATIVE: " +
+                    "only the host's value counts for the whole lobby.",
                     new AcceptableValueRange<double>(0.0, 5.0)));
 
-            DisableCoverMouth = config.Bind(
+            EnableCoverMouthOverride = config.Bind(
                 "Spore-Areas",
-                "disable-cover-mouth",
-                false,
-                "Master switch: when on, the cover-your-mouth mechanic doesn't exist - the key " +
-                "does nothing, for everyone in the run. HOST-AUTHORITATIVE: if you're not the " +
-                "host, this has no effect at all; only the host's value counts for the whole " +
-                "lobby. Off by default; no preset ever turns this on. If you just don't want to " +
-                "use the mechanic yourself, set cover-mouth-key to None in General instead - that " +
-                "works regardless of the host. Applies immediately, regardless of " +
-                "apply-changes-live.");
+                "enable-cover-mouth",
+                ConfigDefaults.EnableCoverMouth,
+                "Master switch for the cover-your-mouth mechanic: hold the key (see " +
+                "General/cover-mouth-key) to breathe through your hands and take no spores " +
+                "while inside a spore area, at the cost of stamina and both hands. Off = " +
+                "vanilla, where the key does nothing at all. Only takes effect when preset is " +
+                "set to Custom (5) - every preset 1-4 has it on. HOST-AUTHORITATIVE: if you're " +
+                "not the host, this has no effect at all; only the host's value counts for the " +
+                "whole lobby. If you just don't want to use the mechanic yourself, set " +
+                "cover-mouth-key to None in General instead - that works regardless of the " +
+                "host. Applies immediately, regardless of apply-changes-live.");
 
-            CoverMouthStaminaPerSecond = config.Bind(
+            CoverMouthStaminaPerSecondOverride = config.Bind(
                 "Spore-Areas",
                 "cover-mouth-stamina-per-second",
-                0.03f,
+                ConfigDefaults.CoverMouthStaminaPerSecond,
                 new ConfigDescription(
                     "How much stamina covering your mouth drains per second. Small by default - " +
                     "for scale, climbing a wall costs up to 0.2 per second, so this is about a " +
                     "sixth of that. You stop covering automatically when you run out of stamina. " +
-                    "0 makes it free. HOST-AUTHORITATIVE: only the host's value counts for the " +
+                    "0 makes it free. Only takes effect when preset is set to Custom (5) - " +
+                    "ignored under presets 1-4, which get cheaper the more forgiving they are. " +
+                    "HOST-AUTHORITATIVE: only the host's value counts for the " +
                     "whole lobby (the keybind itself is per-player - see General).",
                     new AcceptableValueRange<float>(0f, 0.5f)));
 
             DisableWindEntirely = config.Bind(
                 "Wind",
                 "disable-wind-entirely",
-                false,
+                ConfigDefaults.DisableWindEntirely,
                 "Master switch: when on, wind should NEVER occur at all - not vanilla-strength " +
                 "wind, genuinely no wind, ever. HOST-AUTHORITATIVE: if you're not the host, " +
                 "this has no effect at all - only the host's value counts for the whole lobby " +
@@ -1564,20 +1639,21 @@ namespace Fairoots
                 "no preset ever turns this on automatically. Applies immediately, regardless " +
                 "of apply-changes-live.");
 
-            WindBackpackAlwaysImmune = config.Bind(
+            WindBackpackAlwaysImmuneOverride = config.Bind(
                 "Wind",
                 "backpack-always-immune",
-                true,
-                "Whether backpacks are always fully immune to wind force, regardless of " +
-                "item-force-multiplier/preset. On by default. HOST-AUTHORITATIVE: only the " +
+                ConfigDefaults.WindBackpackAlwaysImmune,
+                "Whether backpacks are fully immune to wind force, regardless of " +
+                "item-force-multiplier. Off = vanilla, where a gust sends a dropped backpack " +
+                "down the mountain like anything else. Only takes effect when preset is set to " +
+                "Custom (5) - every preset 1-4 has it on. HOST-AUTHORITATIVE: only the " +
                 "host's value counts for the whole lobby, regardless of what non-host players " +
-                "have set locally. Turn off to let backpacks be affected by wind like any " +
-                "other ground item. Applies immediately, regardless of apply-changes-live.");
+                "have set locally. Applies immediately, regardless of apply-changes-live.");
 
             WindForceMultiplierOverride = config.Bind(
                 "Wind",
                 "force-multiplier",
-                0.80,
+                ConfigDefaults.WindForceMultiplier,
                 new ConfigDescription(
                     "Multiplier applied to wind's push force only (see " +
                     "gust-duration-multiplier below for timing), e.g. 0.6 cuts it to 60% of " +
@@ -1589,7 +1665,7 @@ namespace Fairoots
             WindGustDurationMultiplierOverride = config.Bind(
                 "Wind",
                 "gust-duration-multiplier",
-                0.80,
+                ConfigDefaults.WindGustDurationMultiplier,
                 new ConfigDescription(
                     "Multiplier applied to how long a gust lasts once it starts (in the same " +
                     "direction, the calm period between gusts scales inversely) - independent " +
@@ -1604,7 +1680,7 @@ namespace Fairoots
             WindItemForceMultiplierOverride = config.Bind(
                 "Wind",
                 "item-force-multiplier",
-                0.70,
+                ConfigDefaults.WindItemForceMultiplier,
                 new ConfigDescription(
                     "Multiplier applied to wind's push force on dropped items other than " +
                     "backpacks (backpacks are always fully immune to wind, on every preset), " +
@@ -1616,7 +1692,7 @@ namespace Fairoots
             WindObstacleOcclusionRangeMultiplierOverride = config.Bind(
                 "Wind",
                 "obstacle-occlusion-range-multiplier",
-                1.30,
+                ConfigDefaults.WindObstacleOcclusionRangeMultiplier,
                 new ConfigDescription(
                     "Multiplier applied to the existing obstacle-occlusion raycast's min/max " +
                     "distance (already enabled in Roots vanilla) - widening it lets standing " +
@@ -1628,7 +1704,7 @@ namespace Fairoots
             WindFallCameraDampenClampOverride = config.Bind(
                 "Wind",
                 "fall-camera-dampen-clamp",
-                0.35,
+                ConfigDefaults.WindFallCameraDampenClamp,
                 new ConfigDescription(
                     "Floor applied to camera-control while falling, but only when the fall " +
                     "was preceded by recent wind force (see fall-camera-dampen-window-seconds " +
@@ -1640,45 +1716,47 @@ namespace Fairoots
                     "set to Custom (5) - ignored under presets 1-4.",
                     new AcceptableValueRange<double>(0.0, 1.0)));
 
-            WindRecentForceWindowSeconds = config.Bind(
+            WindRecentForceWindowSecondsOverride = config.Bind(
                 "Wind",
                 "fall-camera-dampen-window-seconds",
-                1.5f,
+                ConfigDefaults.WindRecentForceWindowSeconds,
                 new ConfigDescription(
                     "How many seconds after wind last pushed you that a fall still counts as " +
                     "wind-preceded for fall-camera-dampen-clamp above and for " +
-                    "prevent-wind-ragdoll below. Not tied to any preset - applies the same " +
-                    "regardless of which preset is active. HOST-AUTHORITATIVE: only the host's " +
+                    "prevent-wind-ragdoll below. Only takes effect when preset is set to " +
+                    "Custom (5) - ignored under presets 1-4, and it does nothing while both of " +
+                    "those settings are off anyway. HOST-AUTHORITATIVE: only the host's " +
                     "value counts for the whole lobby.",
                     new AcceptableValueRange<float>(0.1f, 5f)));
 
-            PreventWindRagdoll = config.Bind(
+            PreventWindRagdollOverride = config.Bind(
                 "Wind",
                 "prevent-wind-ragdoll",
-                true,
-                "Whether wind is allowed to ragdoll you. On (the default, and on under every " +
-                "preset): when wind blows you off a ledge you keep full control of your " +
+                ConfigDefaults.PreventWindRagdoll,
+                "Whether wind is allowed to ragdoll you. On (every preset 1-4): when wind " +
+                "blows you off a ledge you keep full control of your " +
                 "character on the way down, so you can grab a wall or use a Rescue Hook " +
                 "instead of flailing helplessly. Off: vanilla, where being pushed off an edge " +
                 "collapses you into physics - fall-camera-dampen-clamp above then still " +
                 "softens it partway, if the preset sets one. Only ever applies to a fall wind " +
                 "actually caused (see fall-camera-dampen-window-seconds); an ordinary fall " +
-                "you walked into yourself ragdolls exactly like vanilla either way. " +
+                "you walked into yourself ragdolls exactly like vanilla either way. Only " +
+                "takes effect when preset is set to Custom (5) - ignored under presets 1-4. " +
                 "HOST-AUTHORITATIVE: only the host's value counts for the whole lobby. " +
                 "Applies immediately, regardless of apply-changes-live.");
 
-            ClimbSheltersFromWind = config.Bind(
+            ClimbSheltersFromWindOverride = config.Bind(
                 "Wind",
                 "climb-shelters-from-wind",
-                true,
+                ConfigDefaults.ClimbSheltersFromWind,
                 "Whether holding onto something shelters you from wind: while climbing a wall, " +
                 "a rope, a vine or a climb handle, wind can't push you at all - instead " +
                 "climbing gets much slower for as long as the wind is actually blowing on you " +
                 "(see the three climb-*-multiplier settings below). Vanilla only shelters you " +
                 "on a climb handle, so a gust mid-climb normally rips you off the wall, which " +
-                "is why walking into the wind is the only reliable tactic. On by default on " +
-                "every preset EXCEPT Subtle (1), where the mechanic doesn't exist at all - " +
-                "turning this on under Subtle does nothing. If the wind can't reach you " +
+                "is why walking into the wind is the only reliable tactic. Off = vanilla, " +
+                "and the default. Only takes effect when preset is set to Custom (5) - under " +
+                "presets 1-4 it is on everywhere except Subtle (1). If the wind can't reach you " +
                 "anyway - behind a rock, no gust - " +
                 "you climb at full speed, so this never costs you anything when it isn't " +
                 "protecting you. HOST-AUTHORITATIVE: only the host's value counts for the " +
@@ -1687,7 +1765,7 @@ namespace Fairoots
             ClimbWindSpeedMultiplierOverride = config.Bind(
                 "Wind",
                 "climb-speed-multiplier-in-wind",
-                0.90,
+                ConfigDefaults.ClimbWindSpeedMultiplier,
                 new ConfigDescription(
                     "How fast you climb while wind is pushing on you, as a fraction of normal " +
                     "climbing speed - the price of climb-shelters-from-wind above. E.g. 0.90 " +
@@ -1700,7 +1778,7 @@ namespace Fairoots
             ClimbWindUpwardSpeedMultiplierOverride = config.Bind(
                 "Wind",
                 "climb-upward-speed-multiplier-in-wind",
-                0.85,
+                ConfigDefaults.ClimbWindUpwardSpeedMultiplier,
                 new ConfigDescription(
                     "Extra slowdown on climbing UPWARD in wind, multiplied on top of " +
                     "climb-speed-multiplier-in-wind above (so 0.90 and 0.85 together mean " +
@@ -1714,7 +1792,7 @@ namespace Fairoots
             ClimbWindIntoWindSpeedMultiplierOverride = config.Bind(
                 "Wind",
                 "climb-into-wind-speed-multiplier",
-                0.85,
+                ConfigDefaults.ClimbWindIntoWindSpeedMultiplier,
                 new ConfigDescription(
                     "Extra slowdown on climbing INTO the wind (toward where it's blowing " +
                     "from), multiplied on top of climb-speed-multiplier-in-wind above. " +
@@ -1723,10 +1801,10 @@ namespace Fairoots
                     "under presets 1-4.",
                     new AcceptableValueRange<double>(0.05, 1.0)));
 
-            ClimbShelterGraceSeconds = config.Bind(
+            ClimbShelterGraceSecondsOverride = config.Bind(
                 "Wind",
                 "climb-shelter-grace-seconds",
-                0.5f,
+                ConfigDefaults.ClimbShelterGraceSeconds,
                 new ConfigDescription(
                     "How long wind stays much weaker after you let go of a climb - the window " +
                     "that stops finishing a climb mid-gust from catapulting you, and gives you " +
@@ -1734,16 +1812,16 @@ namespace Fairoots
                     "accident. Wind is held at climb-shelter-grace-force-multiplier below for " +
                     "most of the window, then ramps back to full over the tail of it so it " +
                     "doesn't end in a sudden shove. Set to 0 to switch the window off entirely " +
-                    "(full wind force the instant you let go, like vanilla). Not tied to any " +
-                    "preset - applies the same regardless of which preset is active, though it " +
-                    "does nothing while the climb shelter itself is off. HOST-AUTHORITATIVE: " +
+                    "(full wind force the instant you let go, like vanilla). Only takes " +
+                    "effect when preset is set to Custom (5) - ignored under presets 1-4, and " +
+                    "it does nothing while the climb shelter itself is off. HOST-AUTHORITATIVE: " +
                     "only the host's value counts for the whole lobby.",
                     new AcceptableValueRange<float>(0f, 3f)));
 
             ClimbWindGraceForceMultiplierOverride = config.Bind(
                 "Wind",
                 "climb-shelter-grace-force-multiplier",
-                0.15,
+                ConfigDefaults.ClimbWindGraceForceMultiplier,
                 new ConfigDescription(
                     "How strong wind is during the grace window above, as a fraction of " +
                     "normal - e.g. 0.15 means 15% force, close to immune but not quite. " +
@@ -2332,36 +2410,63 @@ namespace Fairoots
 
         /// <summary>
         /// Game-facing code should read this instead of
-        /// <see cref="WindBackpackAlwaysImmune"/>.Value. Host-authoritative -
-        /// flat (not preset/live-snapshot resolved, matching the raw config
-        /// entry itself), but still only the host's value counts.
+        /// <see cref="WindBackpackAlwaysImmuneOverride"/>.Value.
+        /// Host-authoritative: only the host's value counts. Preset-resolved and
+        /// always immediate, not level-load-snapshotted.
         /// </summary>
         public bool EffectiveWindBackpackAlwaysImmune =>
-            HostAuthority.Resolve("WindBackpackAlwaysImmune", WindBackpackAlwaysImmune.Value);
+            HostAuthority.Resolve("WindBackpackAlwaysImmune", WindBackpackAlwaysImmune);
+
+        /// <summary>Whether backpacks are fully wind-immune regardless of the item-force multiplier (off = vanilla). Resolved from the preset, or from the player's own value under Custom.</summary>
+        public bool WindBackpackAlwaysImmune =>
+            OverrideResolution.Resolve(
+                PresetCatalog.WindBackpackAlwaysImmune(Preset.Value),
+                WindBackpackAlwaysImmuneOverride.Value,
+                UseCustomOverrides);
 
         /// <summary>
         /// Game-facing code should read this instead of
-        /// <see cref="CoverMouthBlocksSporeBombs"/>.Value. Host-authoritative.
+        /// <see cref="CoverMouthBlocksSporeBombsOverride"/>.Value.
+        /// Host-authoritative.
         /// </summary>
         public bool EffectiveCoverMouthBlocksSporeBombs =>
-            HostAuthority.Resolve("CoverMouthBlocksSporeBombs", CoverMouthBlocksSporeBombs.Value);
+            HostAuthority.Resolve("CoverMouthBlocksSporeBombs", CoverMouthBlocksSporeBombs);
+
+        /// <summary>Whether covering your mouth also blocks a spore bomb's cloud, not just the persistent spore areas. Resolved from the preset, or from the player's own value under Custom.</summary>
+        public bool CoverMouthBlocksSporeBombs =>
+            OverrideResolution.Resolve(
+                PresetCatalog.CoverMouthBlocksSporeBombs(Preset.Value),
+                CoverMouthBlocksSporeBombsOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>Whether the cover-your-mouth mechanic exists at all (on under every preset 1-4).</summary>
+        public bool EnableCoverMouth =>
+            OverrideResolution.Resolve(
+                PresetCatalog.EnableCoverMouth(Preset.Value),
+                EnableCoverMouthOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>Game-facing code should read this instead of <see cref="EnableCoverMouthOverride"/>.Value. Host-authoritative - whether a counterplay mechanic exists in this run is shared balance.</summary>
+        public bool EffectiveEnableCoverMouth =>
+            HostAuthority.Resolve("EnableCoverMouth", EnableCoverMouth);
 
         /// <summary>
         /// Game-facing code should read this instead of
-        /// <see cref="DisableCoverMouth"/>.Value. Host-authoritative - flat, same
-        /// shape as <see cref="EffectiveDisableSporeAreas"/>.
-        /// </summary>
-        public bool EffectiveDisableCoverMouth =>
-            HostAuthority.Resolve("DisableCoverMouth", DisableCoverMouth.Value);
-
-        /// <summary>
-        /// Game-facing code should read this instead of
-        /// <see cref="CoverMouthStaminaPerSecond"/>.Value. Host-authoritative -
-        /// flat (not preset/live-snapshot resolved, matching the raw config entry),
-        /// but it decides what a counterplay move costs, which is shared balance.
+        /// <see cref="CoverMouthStaminaPerSecondOverride"/>.Value.
+        /// Host-authoritative: it decides what a counterplay move costs, which is
+        /// shared balance, unlike the keybind that triggers it. Preset-resolved but
+        /// always immediate (not level-load-snapshotted), matching the toggle it
+        /// belongs to.
         /// </summary>
         public float EffectiveCoverMouthStaminaPerSecond =>
-            HostAuthority.Resolve("CoverMouthStaminaPerSecond", CoverMouthStaminaPerSecond.Value);
+            HostAuthority.Resolve("CoverMouthStaminaPerSecond", CoverMouthStaminaPerSecond);
+
+        /// <summary>Stamina drained per second while holding a mouth cover - what the counterplay move costs. Resolved from the preset, or from the player's own value under Custom.</summary>
+        public float CoverMouthStaminaPerSecond =>
+            OverrideResolution.Resolve(
+                PresetCatalog.CoverMouthStaminaPerSecond(Preset.Value),
+                CoverMouthStaminaPerSecondOverride.Value,
+                UseCustomOverrides);
 
         /// <summary>
         /// Game-facing code should read this instead of
@@ -2412,61 +2517,123 @@ namespace Fairoots
 
         /// <summary>
         /// Game-facing code should read this instead of
-        /// <see cref="ZombieDeaggroEnabled"/>. Host-authoritative - whether a chase can
-        /// be escaped at all is shared balance, not local feel.
+        /// <see cref="ZombieKnockoutSecondsOverride"/>.Value. Host-authoritative -
+        /// how strong a counterplay move is, is shared balance.
         /// </summary>
         public double EffectiveZombieKnockoutSeconds =>
-            HostAuthority.Resolve("ZombieKnockoutSeconds", ZombieKnockoutSeconds.Value);
+            HostAuthority.Resolve("ZombieKnockoutSeconds", ZombieKnockoutSeconds);
+
+        /// <summary>How long a thrown item knocks a zombie out for, in seconds (0 = vanilla). Resolved from the preset, or from the player's own value under Custom.</summary>
+        public double ZombieKnockoutSeconds =>
+            OverrideResolution.Resolve(
+                PresetCatalog.ZombieKnockoutSeconds(Preset.Value),
+                ZombieKnockoutSecondsOverride.Value,
+                UseCustomOverrides);
 
         /// <summary>
         /// Game-facing code should read this instead of
-        /// <see cref="BeetleKnockoutSeconds"/>. Host-authoritative, flat - same shape as
-        /// <see cref="EffectiveCoverMouthStaminaPerSecond"/>.
+        /// <see cref="BeetleKnockoutSecondsOverride"/>.Value. Host-authoritative -
+        /// same shape as <see cref="EffectiveCoverMouthStaminaPerSecond"/>.
         /// </summary>
         public double EffectiveBeetleKnockoutSeconds =>
-            HostAuthority.Resolve("BeetleKnockoutSeconds", BeetleKnockoutSeconds.Value);
+            HostAuthority.Resolve("BeetleKnockoutSeconds", BeetleKnockoutSeconds);
+
+        /// <summary>How long a thrown item knocks a beetle onto its back for, in seconds (0 = vanilla). Resolved from the preset, or from the player's own value under Custom.</summary>
+        public double BeetleKnockoutSeconds =>
+            OverrideResolution.Resolve(
+                PresetCatalog.BeetleKnockoutSeconds(Preset.Value),
+                BeetleKnockoutSecondsOverride.Value,
+                UseCustomOverrides);
 
         /// <summary>
         /// Game-facing code should read this instead of
-        /// <see cref="CreatureKnockoutMinThrowSpeed"/>. Host-authoritative, flat.
+        /// <see cref="CreatureKnockoutMinThrowSpeedOverride"/>.Value. Host-authoritative,
+        /// preset-resolved and always immediate.
         /// </summary>
         public double EffectiveCreatureKnockoutMinThrowSpeed =>
-            HostAuthority.Resolve("CreatureKnockoutMinThrowSpeed", CreatureKnockoutMinThrowSpeed.Value);
+            HostAuthority.Resolve("CreatureKnockoutMinThrowSpeed", CreatureKnockoutMinThrowSpeed);
+
+        /// <summary>How fast a thrown item must travel, in m/s, to knock a creature out. Resolved from the preset, or from the player's own value under Custom.</summary>
+        public double CreatureKnockoutMinThrowSpeed =>
+            OverrideResolution.Resolve(
+                PresetCatalog.CreatureKnockoutMinThrowSpeed(Preset.Value),
+                CreatureKnockoutMinThrowSpeedOverride.Value,
+                UseCustomOverrides);
 
         /// <summary>
         /// Game-facing code should read this instead of
-        /// <see cref="CreatureKnockoutMaxThrowDistance"/>. Host-authoritative, flat.
+        /// <see cref="CreatureKnockoutMaxThrowDistanceOverride"/>.Value. Host-authoritative,
+        /// preset-resolved and always immediate.
         /// </summary>
         public double EffectiveCreatureKnockoutMaxThrowDistance =>
-            HostAuthority.Resolve("CreatureKnockoutMaxThrowDistance", CreatureKnockoutMaxThrowDistance.Value);
+            HostAuthority.Resolve("CreatureKnockoutMaxThrowDistance", CreatureKnockoutMaxThrowDistance);
+
+        /// <summary>How close the thrower must have been, in meters, for a thrown item to knock a creature out. Resolved from the preset, or from the player's own value under Custom.</summary>
+        public double CreatureKnockoutMaxThrowDistance =>
+            OverrideResolution.Resolve(
+                PresetCatalog.CreatureKnockoutMaxThrowDistance(Preset.Value),
+                CreatureKnockoutMaxThrowDistanceOverride.Value,
+                UseCustomOverrides);
 
         /// <summary>
         /// Game-facing code should read this instead of
-        /// <see cref="BlowgunAffectsCreatures"/>. Host-authoritative, flat.
+        /// <see cref="BlowgunAffectsCreaturesOverride"/>.Value. Host-authoritative,
+        /// preset-resolved and always immediate.
         /// </summary>
         public bool EffectiveBlowgunAffectsCreatures =>
-            HostAuthority.Resolve("BlowgunAffectsCreatures", BlowgunAffectsCreatures.Value);
+            HostAuthority.Resolve("BlowgunAffectsCreatures", BlowgunAffectsCreatures);
+
+        /// <summary>Whether a blowgun dart takes a creature out of the fight (off = vanilla). Resolved from the preset, or from the player's own value under Custom.</summary>
+        public bool BlowgunAffectsCreatures =>
+            OverrideResolution.Resolve(
+                PresetCatalog.BlowgunAffectsCreatures(Preset.Value),
+                BlowgunAffectsCreaturesOverride.Value,
+                UseCustomOverrides);
 
         /// <summary>
         /// Game-facing code should read this instead of
-        /// <see cref="BlowgunCreatureStunSeconds"/>. Host-authoritative, flat.
+        /// <see cref="BlowgunCreatureStunSecondsOverride"/>.Value. Host-authoritative,
+        /// preset-resolved and always immediate.
         /// </summary>
         public double EffectiveBlowgunCreatureStunSeconds =>
-            HostAuthority.Resolve("BlowgunCreatureStunSeconds", BlowgunCreatureStunSeconds.Value);
+            HostAuthority.Resolve("BlowgunCreatureStunSeconds", BlowgunCreatureStunSeconds);
+
+        /// <summary>How long a blowgun dart stuns a spider or beetle, in seconds. Resolved from the preset, or from the player's own value under Custom.</summary>
+        public double BlowgunCreatureStunSeconds =>
+            OverrideResolution.Resolve(
+                PresetCatalog.BlowgunCreatureStunSeconds(Preset.Value),
+                BlowgunCreatureStunSecondsOverride.Value,
+                UseCustomOverrides);
 
         /// <summary>
         /// Game-facing code should read this instead of
-        /// <see cref="ZombieWindMultiplier"/>. Host-authoritative, flat.
+        /// <see cref="ZombieWindMultiplierOverride"/>.Value. Host-authoritative,
+        /// preset-resolved and always immediate.
         /// </summary>
         public double EffectiveZombieWindMultiplier =>
-            HostAuthority.Resolve("ZombieWindMultiplier", ZombieWindMultiplier.Value);
+            HostAuthority.Resolve("ZombieWindMultiplier", ZombieWindMultiplier);
+
+        /// <summary>Multiplier on the wind force a zombie receives (1.0 = vanilla, which is already nonzero). Resolved from the preset, or from the player's own value under Custom.</summary>
+        public double ZombieWindMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.ZombieWindMultiplier(Preset.Value),
+                ZombieWindMultiplierOverride.Value,
+                UseCustomOverrides);
 
         /// <summary>
         /// Game-facing code should read this instead of
-        /// <see cref="BeetleWindSusceptibility"/>. Host-authoritative, flat.
+        /// <see cref="BeetleWindSusceptibilityOverride"/>.Value. Host-authoritative,
+        /// preset-resolved and always immediate.
         /// </summary>
         public double EffectiveBeetleWindSusceptibility =>
-            HostAuthority.Resolve("BeetleWindSusceptibility", BeetleWindSusceptibility.Value);
+            HostAuthority.Resolve("BeetleWindSusceptibility", BeetleWindSusceptibility);
+
+        /// <summary>How much wind slides a beetle, as a fraction of its own walking speed (0 = vanilla). Resolved from the preset, or from the player's own value under Custom.</summary>
+        public double BeetleWindSusceptibility =>
+            OverrideResolution.Resolve(
+                PresetCatalog.BeetleWindSusceptibility(Preset.Value),
+                BeetleWindSusceptibilityOverride.Value,
+                UseCustomOverrides);
 
         /// <summary>
         /// Game-facing code should read this instead of
@@ -2539,60 +2706,64 @@ namespace Fairoots
 
         /// <summary>
         /// Game-facing code should read this instead of
-        /// <see cref="WindRecentForceWindowSeconds"/>.Value. Host-authoritative,
-        /// flat - see <see cref="EffectiveWindFallCameraDampenClamp"/> for why this
-        /// one stopped being per-client too.
+        /// <see cref="WindRecentForceWindowSecondsOverride"/>.Value.
+        /// Host-authoritative - see
+        /// <see cref="EffectiveWindFallCameraDampenClamp"/> for why this one stopped
+        /// being per-client too.
         /// </summary>
         public float EffectiveWindRecentForceWindowSeconds =>
-            HostAuthority.Resolve("WindRecentForceWindowSeconds", WindRecentForceWindowSeconds.Value);
+            HostAuthority.Resolve("WindRecentForceWindowSeconds", WindRecentForceWindowSeconds);
+
+        /// <summary>How long after wind last pushed the player a fall still counts as wind-preceded. Resolved from the preset, or from the player's own value under Custom.</summary>
+        public float WindRecentForceWindowSeconds =>
+            OverrideResolution.Resolve(
+                PresetCatalog.WindRecentForceWindowSeconds(Preset.Value),
+                WindRecentForceWindowSecondsOverride.Value,
+                UseCustomOverrides);
 
         /// <summary>
         /// Game-facing code should read this instead of
-        /// <see cref="PreventWindRagdoll"/>.Value. Host-authoritative - flat, same
-        /// shape as <see cref="EffectiveClimbSheltersFromWind"/> minus the preset
-        /// gate (this one is on under every preset).
+        /// <see cref="PreventWindRagdollOverride"/>.Value. Host-authoritative -
+        /// same shape as <see cref="EffectiveClimbSheltersFromWind"/>, except that
+        /// this one is on under every preset rather than off on Subtle.
         /// </summary>
         public bool EffectivePreventWindRagdoll =>
-            HostAuthority.Resolve("PreventWindRagdoll", PreventWindRagdoll.Value);
+            HostAuthority.Resolve("PreventWindRagdoll", PreventWindRagdoll);
+
+        /// <summary>Whether a wind-caused fall leaves the player in control instead of ragdolling (off = vanilla). Resolved from the preset, or from the player's own value under Custom.</summary>
+        public bool PreventWindRagdoll =>
+            OverrideResolution.Resolve(
+                PresetCatalog.PreventWindRagdoll(Preset.Value),
+                PreventWindRagdollOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>Whether the bush/grass placement-removal pass runs. Host-authoritative - which spore bombs exist in the level is shared game state.</summary>
+        public bool EnableFoliageRemoval =>
+            OverrideResolution.Resolve(
+                PresetCatalog.EnableFoliageRemoval(Preset.Value),
+                EnableFoliageRemovalOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>Game-facing code should read this instead of <see cref="EnableFoliageRemovalOverride"/>.Value. Host-authoritative.</summary>
+        public bool EffectiveEnableFoliageRemoval =>
+            HostAuthority.Resolve("EnableFoliageRemoval", EnableFoliageRemoval);
+
+        /// <summary>Whether holding onto something shelters the player from wind (off under Subtle - see <see cref="PresetCatalog.ClimbSheltersFromWind"/>).</summary>
+        public bool ClimbSheltersFromWind =>
+            OverrideResolution.Resolve(
+                PresetCatalog.ClimbSheltersFromWind(Preset.Value),
+                ClimbSheltersFromWindOverride.Value,
+                UseCustomOverrides);
 
         /// <summary>
         /// Game-facing code should read this instead of
-        /// <see cref="DisableFoliageRemoval"/>.Value. Host-authoritative - flat,
-        /// same shape as <see cref="EffectiveDisableSporeAreas"/>: which spore bombs
-        /// exist in the level is shared game state.
+        /// <see cref="ClimbSheltersFromWindOverride"/>.Value. Host-authoritative:
+        /// whether wind can push a climber is shared game logic, not local feel.
+        /// Deliberately immediate rather than level-load-snapshotted, matching the
+        /// toggle it gates.
         /// </summary>
-        /// <remarks>
-        /// Folds the preset row in the same way
-        /// <see cref="EffectiveClimbSheltersFromWind"/> does, so
-        /// <see cref="PresetCatalog.SporeBombFoliageRemoval"/> stays the single
-        /// source of truth for "does this preset run the pass": the pass is off if
-        /// the player switched it off <em>or</em> the preset doesn't run it. No
-        /// preset currently turns it off, so today only the player's switch can.
-        /// </remarks>
-        public bool EffectiveDisableFoliageRemoval =>
-            HostAuthority.Resolve(
-                "DisableFoliageRemoval",
-                DisableFoliageRemoval.Value || !PresetCatalog.SporeBombFoliageRemoval(Preset.Value));
-
-        /// <summary>
-        /// Game-facing code should read this instead of
-        /// <see cref="ClimbSheltersFromWind"/>.Value. Host-authoritative - flat
-        /// (not preset/live-snapshot resolved, matching the raw config entry
-        /// itself), but only the host's value counts, same as
-        /// <see cref="EffectiveWindBackpackAlwaysImmune"/>: whether wind can push
-        /// a climber is shared game logic, not local feel.
-        /// </summary>
-        /// <remarks>
-        /// Folds the preset row in: the mechanic is off entirely under Subtle
-        /// (<see cref="PresetCatalog.ClimbToCounterWind"/>), so the player-facing
-        /// toggle can turn it off on top of that but can't turn it on there.
-        /// Deliberately immediate rather than level-load-snapshotted, matching
-        /// the flat toggle it gates.
-        /// </remarks>
         public bool EffectiveClimbSheltersFromWind =>
-            HostAuthority.Resolve(
-                "ClimbSheltersFromWind",
-                ClimbSheltersFromWind.Value && PresetCatalog.ClimbToCounterWind(Preset.Value));
+            HostAuthority.Resolve("ClimbSheltersFromWind", ClimbSheltersFromWind);
 
         /// <summary>Game-facing code should read this instead of <see cref="ClimbWindSpeedMultiplier"/>. Host-authoritative.</summary>
         public double EffectiveClimbWindSpeedMultiplier =>
@@ -2612,12 +2783,18 @@ namespace Fairoots
 
         /// <summary>
         /// Game-facing code should read this instead of
-        /// <see cref="ClimbShelterGraceSeconds"/>.Value. Host-authoritative -
-        /// flat (not preset/live-snapshot resolved, matching the raw config
-        /// entry), but it decides how much force actually lands on a player, so
-        /// only the host's value counts.
+        /// <see cref="ClimbShelterGraceSecondsOverride"/>.Value.
+        /// Host-authoritative: it decides how much force actually lands on a
+        /// player. Preset-resolved and always immediate.
         /// </summary>
         public float EffectiveClimbShelterGraceSeconds =>
-            HostAuthority.Resolve("ClimbShelterGraceSeconds", ClimbShelterGraceSeconds.Value);
+            HostAuthority.Resolve("ClimbShelterGraceSeconds", ClimbShelterGraceSeconds);
+
+        /// <summary>How long wind stays weakened after the player lets go of a climb. Resolved from the preset, or from the player's own value under Custom.</summary>
+        public float ClimbShelterGraceSeconds =>
+            OverrideResolution.Resolve(
+                PresetCatalog.ClimbShelterGraceSeconds(Preset.Value),
+                ClimbShelterGraceSecondsOverride.Value,
+                UseCustomOverrides);
     }
 }

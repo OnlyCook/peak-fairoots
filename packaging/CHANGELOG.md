@@ -2,15 +2,40 @@
 
 ## Unreleased
 
-- Wind can no longer ragdoll you off an edge (`Wind/prevent-wind-ragdoll`, on by
-  default under every preset): when a gust pushes you off, you stay in control on
+- **Every setting now starts at its vanilla value.** Install the mod, set
+  `General/preset` to `Custom`, change nothing, and Roots plays exactly like the
+  unmodded game — every multiplier 1.0, every removal fraction 0, every new
+  mechanic off. Custom is a blank slate you build up one dial at a time instead of
+  Balanced's numbers with the labels showing. Presets 1-4 are unaffected: they
+  ignore your per-mechanic settings and apply their own values, as before.
+- Settings that used to apply the same under every preset are now preset-driven,
+  which follows from the above: thrown-item knockouts, the blowgun-vs-creatures
+  rule, backpack wind immunity, wind-ragdoll immunity, the climb shelter, foliage
+  removal, cover-your-mouth and the creature wind dials all get a per-preset value
+  now, and get gentler or stronger with the preset you pick rather than sitting at
+  one number. Balanced keeps the numbers it already shipped with, so the default
+  preset feels the same as before. Only the `disable-*` kill switches, the keybinds
+  and `Debug` stay flat.
+- Renamed for that reason: `Spore-Bombs/disable-foliage-removal` is now
+  `Spore-Bombs/enable-foliage-removal`, and `Spore-Areas/disable-cover-mouth` is
+  now `Spore-Areas/enable-cover-mouth` — both default off (vanilla) and are turned
+  on by every preset. If you had either set by hand, set it again under the new
+  key.
+- Every balance setting, its default and its value under each of the four presets
+  is now documented in one table in the repo (`docs/PRESETS.md`), which is also
+  what the mod is built from — so the listed numbers can't drift out of step with
+  what actually ships.
+
+- Wind can no longer ragdoll you off an edge (`Wind/prevent-wind-ragdoll`, on
+  under every preset): when a gust pushes you off, you stay in control on
   the way down instead of flailing, so you can still grab a wall or fire a Rescue
   Hook. Only applies to falls wind actually caused — walking off a ledge yourself
   ragdolls exactly like vanilla. Turn it off for vanilla behaviour.
-- New `Spore-Bombs/disable-foliage-removal` (off by default) for anyone who wants
-  spore bombs hidden inside bushes and ferns left where the game put them. It
-  doesn't mean more spore bombs overall: the removal target still applies, the
-  removal just stops treating camouflaged bombs as the first to go.
+- Spore bombs hidden inside bushes and ferns can be left where the game put them
+  (`Spore-Bombs/enable-foliage-removal`, on under every preset — switch it off
+  under Custom). Switching it off doesn't mean more spore bombs overall: the
+  removal target still applies, the removal just stops treating camouflaged bombs
+  as the first to go.
 - Both on-screen warnings ("Breathing in spores!", "Spider dropping on you!") are
   now translated into all 14 languages the game ships with, and follow the game's
   language setting live.

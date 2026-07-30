@@ -115,7 +115,7 @@ namespace Fairoots.Tests
             // hands, so it isn't a free win even at the lightest preset.
             foreach (PresetId preset in new[] { PresetId.Subtle, PresetId.Balanced, PresetId.Generous, PresetId.Tame, PresetId.Custom })
             {
-                Assert.True(PresetCatalog.CoverMouth(preset));
+                Assert.True(PresetCatalog.EnableCoverMouth(preset));
             }
         }
     }

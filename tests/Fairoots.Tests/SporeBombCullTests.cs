@@ -117,7 +117,7 @@ namespace Fairoots.Tests
             Assert.Equal(40, s.Kept);
         }
 
-        // --- disable-foliage-removal (Spore-Bombs, 2026-07-30) -------------------
+        // --- enable-foliage-removal (Spore-Bombs, 2026-07-30) -------------------
 
         [Fact]
         public void FoliageRemovalDisabled_RemovesNoneForFoliage()

@@ -35,6 +35,16 @@ time. Not more randomness on top of randomness.
 3. **Generous** — meaningfully easier, most RNG-driven unfairness smoothed
    out.
 4. **Tame** — Roots stops fighting you over RNG; climb it.
+5. **Custom** — nothing but vanilla until you say otherwise. Every individual
+   setting ships at its unmodded value, so picking Custom and changing nothing
+   plays exactly like the base game; turn on one dial at a time and you can
+   actually tell what each one does. The four presets above ignore these settings
+   and apply their own numbers.
+
+Every value each preset uses is listed, setting by setting, in
+[`docs/PRESETS.md`](https://github.com/OnlyCook/peak-fairoots/blob/main/docs/PRESETS.md) —
+and that table is what the mod is built from, so it can't drift out of step with
+what actually ships.
 
 ## Requirements
 

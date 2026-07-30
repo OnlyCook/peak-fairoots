@@ -68,14 +68,15 @@ namespace Fairoots.SporeAreas
                 KeyCode key = cfg.CoverMouthKey.Value;
                 var character = Character.localCharacter;
 
-                // The host-authoritative kill switch and the per-player "None" keybind
-                // both land here: one ends the mechanic for the lobby, the other opts
+                // The host-authoritative master switch and the per-player "None" keybind
+                // both land here: one means the mechanic doesn't exist for the lobby
+                // (vanilla, or a preset/Custom value that leaves it off), the other opts
                 // this player out. Either way an active cover is dropped immediately
                 // rather than left latched.
-                if (key == KeyCode.None || character == null || cfg.EffectiveDisableCoverMouth)
+                if (key == KeyCode.None || character == null || !cfg.EffectiveEnableCoverMouth)
                 {
-                    SetCovering(false, character, cfg.EffectiveDisableCoverMouth
-                        ? "disabled by host"
+                    SetCovering(false, character, !cfg.EffectiveEnableCoverMouth
+                        ? "not enabled by host"
                         : "no keybind set, or no local character");
                     return;
                 }

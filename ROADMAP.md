@@ -202,63 +202,60 @@ used here only for TraditionalChinese, since the game's own
 
 ## Presets
 
-Four presets, numbered 1 (lightest touch) through 4 (heaviest). **Preset 2 is
-the default.** Presets are **non-destructive**: any per-mechanic setting the
-player has explicitly touched always overrides whatever the active preset
-would otherwise set for that mechanic — applying/switching a preset never
-silently clobbers a hand-tuned value.
+Four presets, numbered 1 (lightest touch) through 4 (heaviest), plus Custom (5).
+**Preset 2 is the default.** Under presets 1-4 the per-mechanic config settings
+are ignored entirely and the preset's own numbers apply; Custom is the only
+preset that reads what the player configured.
 
-**Every preset number in this table is a placeholder** (maintainer, 2026-07-27):
-they exist so a preset is testable at all, and they are expected to be re-tuned
-wholesale in Phase 9 once the full mechanic set is in — adding one mechanic
-changes what the others should be, so tuning them individually as each lands
-would be work thrown away. Pick something sensible per new mechanic, keep the
-direction consistent with the neighbouring rows, and move on.
+**The preset table now lives in [`docs/PRESETS.md`](docs/PRESETS.md), not here.**
+That file is the machine-readable source of truth: every setting, its default,
+and its value under each of the four presets, parsed by
+`scripts/apply-presets.sh` to generate the C# the mod actually reads
+(`Core/ConfigDefaults.g.cs` and `Core/Presets/PresetValues.g.cs`). It replaced
+the hand-maintained table that used to sit here, which had no way of staying in
+step with the code. Read it for any specific number; this section keeps only the
+framing that isn't a number.
 
-Exact numeric values below are **starting targets, not final** — several of
-the underlying vanilla defaults are Unity scene/asset data rather than
-compiled code (see `RESEARCH.md`'s per-mechanic "open questions"), so the
-precise vanilla baseline for things like wind force or spore-bomb spawn
-weight needs a runtime logging pass before the exact multiplier can be
-locked in. The columns below express intent (direction and rough magnitude)
-per preset; a testing/tuning pass against real gameplay is expected to adjust
-the specific numbers before each preset ships (per the maintainer's framing —
-these are "difficult to eyeball," extracted through testing, not guessed
-once and left alone).
+**Two rules that table encodes** (both stated in full there):
 
-| Mechanic | Preset 1 — Subtle | Preset 2 — Balanced (default) | Preset 3 — Generous | Preset 4 — Tame |
-|---|---|---|---|---|
-| New: climb-to-counter-wind (full wind immunity while holding on — see below) | ❌ off (too strong for Subtle — vanilla behavior kept) | ✅ on | ✅ on | ✅ on |
-| New: climb-to-counter-wind cost (climb speed while wind is pushing / extra upward / extra into-wind, each faded in by live wind pressure) | — (mechanic off) | ×0.90 / ×0.85 / ×0.85 (playtest-tuned) | ×0.93 / ×0.89 / ×0.89 | ×0.96 / ×0.94 / ×0.94 |
-| New: let-go grace window (wind force just after releasing a climb; window length is a flat 0.5s setting, not preset-gated) | — (mechanic off) | ×0.15 | ×0.12 | ×0.08 |
-| New: cover-mouth vs. spore areas | ✅ on | ✅ on | ✅ on | ✅ on |
-| Wind force / frequency (two independent config entries as of 2026-07-22 — `force-multiplier` and `gust-duration-multiplier` — but the same numbers per preset below, so presets 1-4 behave identically to the original combined row) | −10% | −20% | −40% | −65% |
-| Wind: items/backpack immunity (backpack immunity itself is now player-toggleable via the flat `Wind/backpack-always-immune` setting, added 2026-07-22 — on by default on every preset, as below) | backpack only | backpack + reduced item force | backpack immune, items −60% | backpack + items fully immune |
-| Wind: obstacle occlusion | off (vanilla) | on, coarse | on, tuned | on, generous radius |
-| Wind: fog-while-active density | vanilla | vanilla (reverted — see note) | vanilla (reverted — see note) | vanilla (reverted — see note) |
-| Wind-induced fall camera spin dampening (new — see below) | off | on, mild clamp | on, moderate clamp | on, strong clamp |
-| Spore bomb total removal target (bush/grass removal + seeded cull, combined — see below) | 0% seeded on top of bush removal | 25% | 50% (OVERVIEW's literal ask) | 75% |
-| Spore bomb bush/grass placement removal | ✅ on, all presets (see below) | ✅ on | ✅ on | ✅ on |
-| Spore bomb trigger radius | vanilla | −25% (playtest-confirmed) | −30% | −45% |
-| Spore bomb knockback/explosion force | vanilla | −20% | −40% | −60% |
-| Spore bomb screen-shake distance cap | vanilla (~75m, unconfirmed) | 30m | 20m | 10m |
-| Spore bomb particle/VFX count | vanilla | −25% | −50% | −65% |
-| Spore area count (seeded removal — see below) | 0% | 0% | 20% | 35% |
-| Spore area radius (hazard + visible cloud — see below) | vanilla | −15% | −30% | −45% |
-| Spore area lethality (status/sec) | vanilla | −15% | −35% | −55% |
-| Spore area screen-filter opacity (superseded — see the cloud-translucency note below) | vanilla | −20% | −40% | −60% |
-| Spore clear time (how long spores take to wear off — see below) | vanilla | −30% (live-tuned 2026-07-30, was −15%) | −35% | −55% |
-| Global spore build-up (every source at once — see below) | vanilla | vanilla | vanilla | vanilla |
-| Wind disperses spore areas | if not already vanilla behavior, on | on | on | on, generous |
-| Zombie move speed (split from the beetle row — different fields, different classes) | vanilla | −10% | −20% | −35% |
-| Beetle move speed | vanilla | −10% | −20% | −35% |
-| Zombie deaggro (vanilla: never) | off (still never, matches vanilla) | 0.85 | 0.60 | 0.35 |
-| Beetle deaggro stickiness | vanilla | 0.90 | 0.75 | 0.55 |
-| Beetle knockback force | vanilla | −20% | −35% | −50% |
-| Creature ragdoll duration (beetle hit + zombie bite) | vanilla | −15% | −35% | −60% |
-| Spider attack telegraph (on-screen label, **not** audio — see below) | flat setting, off by default | flat, off by default | flat, off by default | flat, off by default |
-| Creature disable options (zombies / beetles / spiders, three switches) | available, off by default | available, off by default | available, off by default | available, off by default |
-| Honeycomb / stove spawn-weight nudge | none | slight increase | moderate increase | generous increase |
+1. **Every config default is the vanilla value.** Install the mod, select the
+   Custom preset, change nothing, and the game plays exactly like unmodded PEAK -
+   every multiplier 1.0, every removal fraction 0, every new mechanic off. Custom
+   is a blank slate, not "Balanced with the numbers exposed". The documented
+   exceptions are the client-side cosmetic settings in `General` and the gated
+   parameters (a dial that means nothing until the mechanic it belongs to is on).
+2. **Every gameplay setting outside `General`/`Debug` is preset-driven.** This
+   follows from rule 1: if a mechanic is meant to be on under Balanced while its
+   config entry defaults to vanilla, only a preset row can turn it on. The old
+   category of "flat gameplay setting, same under every preset" is gone as of
+   2026-07-30; what stays flat is the `disable-*` kill switches (already vanilla
+   when off, and no preset sets them), the keybinds, and `Debug`.
+
+**Every preset number is a placeholder** (maintainer, 2026-07-27) except the
+handful `docs/PRESETS.md` marks as playtest-tuned: they exist so a preset is
+testable at all, and are expected to be re-tuned wholesale in Phase 9 once the
+full mechanic set is in - adding one mechanic changes what the others should be,
+so tuning them individually as each lands would be work thrown away. Pick
+something sensible per new mechanic, keep the direction consistent with the
+neighbouring rows, and move on.
+
+Presets are **non-destructive** in the sense that switching preset never
+rewrites a player's config file: their per-mechanic values sit untouched and
+ignored while a preset 1-4 is active, and come back the moment they switch to
+Custom.
+
+**Rows the old table had that `docs/PRESETS.md` deliberately doesn't**, since it
+lists shipped settings rather than intentions:
+
+- *Wind: fog-while-active density* — implemented and reverted as a precaution
+  (2026-07-22, see the Phase 5 note below). Vanilla on every preset, no setting.
+- *Wind disperses spore areas* — already native behavior: the biome's spore areas
+  are `WindAffectedStatusEmitter`s, so this row resolved to "vanilla already does
+  it" and never became a dial.
+- *Spore area screen-filter opacity* — superseded by the client-side cloud
+  translucency settings (see the mechanic note below).
+- *Honeycomb / stove spawn-weight nudge* — Phase 8, not implemented yet. It gets
+  rows in `docs/PRESETS.md` when it gets settings.
 
 Preset 2's specific numbers are meant to represent "the tuning the maintainer
 would ship if this were the base game's own balance pass" — i.e. the most
@@ -404,7 +401,7 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   multiplier). Left untouched for the "Explosive Spore Bomb" variant, which
   is genuinely round.
 
-  **Recolor (implemented 2026-07-26, not in the preset table above - a
+  **Recolor (implemented 2026-07-26, not in `docs/PRESETS.md`'s preset columns - a
   readability fix, not a balance dial):** vanilla spore bombs are green
   hazards sitting on green grass and green ground, so they camouflage into
   the terrain even when they aren't literally buried inside a fern (that
@@ -445,7 +442,7 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   `Debug/apply-changes-live`: a cosmetic toggle that waits for a level
   reload would just read as broken.
 
-  **Cloud translucency (implemented 2026-07-28, not in the preset table — a
+  **Cloud translucency (implemented 2026-07-28, not in `docs/PRESETS.md`'s preset columns — a
   readability fix, not a balance dial, same category as the recolor above):**
   `General/spore-area-cloud-opacity` and `General/spore-bomb-cloud-opacity`
   (both 0.35 by default, 1.0 = vanilla) scale down the alpha of the spore
@@ -515,12 +512,12 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   WarningLabelLocalization.cs`), the same way `Networking/
   ModPresenceLocalization` does it — as is the spider warning label.
 
-  **This supersedes the preset table's "Spore area screen-filter opacity" row**
+  **This supersedes the old preset table's "Spore area screen-filter opacity" row**
   as a plan. That row would reduce the opacity of the *overlay* — the one
   signal this feature exists to make readable — so implementing both as written
   would have them cancelling out. If the overlay ever does turn out to be too
   strong, the fix belongs in the same client-side cosmetic group as these, not
-  in the preset table.
+  in `docs/PRESETS.md`.
 - **Spore areas** (the status-effect gas clouds — a different hazard from
   spore bombs, despite the similar name) run through a single generic
   radius-based hazard-zone component with public radius/lethality/falloff
@@ -606,7 +603,7 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   the same reasoning that exempts the spore-bomb recolor — while what the mechanic
   *costs* (`Spore-Areas/cover-mouth-stamina-per-second`, default 0.03/s against
   climbing's 0.2/s) and whether it exists at all
-  (`Spore-Areas/disable-cover-mouth`) are host-authoritative, because those are
+  (`Spore-Areas/enable-cover-mouth`) are host-authoritative, because those are
   shared balance. A player who doesn't want it sets their own key to `None`, which
   needs no host cooperation: opting out of a move you could make isn't altering
   anyone else's game.
@@ -694,7 +691,7 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   broken.
 
   Preset values: vanilla / −30% / −35% / −55%. A genuinely new axis — nothing
-  else in the preset table touches recovery, only how much and how often spores
+  else in `docs/PRESETS.md` touches recovery, only how much and how often spores
   are applied. Balanced was live-tuned from −15% to **−30%** on 2026-07-30 (−15%
   wasn't noticeable enough to be worth being the default), which leaves Balanced
   and Generous only 5 points apart — Generous is the row to widen in the Phase 9
@@ -971,11 +968,11 @@ AssetRipper, not more decompilation). At the design level, still undecided:
   is more generous wins" and neither can ever *lower* the vanilla result. See
   `Core/WindTuning.cs`'s `ApplyWindRagdollImmunity`.
 - **Foliage removal opt-out — RESOLVED (2026-07-30).** The "let paranoid
-  players disable even the always-on bush/grass removal pass" toggle the
-  preset catalog left room for now exists:
-  `Spore-Bombs/disable-foliage-removal`, flat, host-authoritative, **off under
-  every preset** (i.e. the pass keeps running everywhere unless a player says
-  otherwise). Deliberately does not change how much gets removed overall —
+  players disable even the bush/grass removal pass" toggle the preset catalog
+  left room for now exists: `Spore-Bombs/enable-foliage-removal`,
+  host-authoritative, **on under every preset 1-4** and off in vanilla (so an
+  untouched Custom leaves camouflaged bombs where the game put them).
+  Deliberately does not change how much gets removed overall —
   `cull-fraction`'s target still lands, the seeded pass just selects from every
   spore bomb instead of only the visible ones — so it is an opt-out of *which*
   bombs go, not of the removal itself.

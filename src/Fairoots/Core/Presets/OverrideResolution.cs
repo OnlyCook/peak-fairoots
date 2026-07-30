@@ -12,12 +12,14 @@ namespace Fairoots.Core.Presets
     public static class OverrideResolution
     {
         /// <summary>
-        /// Resolve a numeric setting: <paramref name="configuredValue"/> applies
-        /// only when <paramref name="useOverride"/> (i.e. the active preset is
-        /// <see cref="PresetId.Custom"/>); otherwise the preset's own catalog
-        /// value always wins, regardless of what the player has configured.
+        /// Resolve a setting of any type: <paramref name="configuredValue"/>
+        /// applies only when <paramref name="useOverride"/> (i.e. the active
+        /// preset is <see cref="PresetId.Custom"/>); otherwise the preset's own
+        /// catalog value always wins, regardless of what the player has
+        /// configured. Generic because presets drive on/off toggles and timing
+        /// windows as well as multipliers - see <c>docs/PRESETS.md</c>.
         /// </summary>
-        public static double Resolve(double presetValue, double configuredValue, bool useOverride)
+        public static T Resolve<T>(T presetValue, T configuredValue, bool useOverride)
         {
             return useOverride ? configuredValue : presetValue;
         }

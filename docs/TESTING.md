@@ -212,9 +212,66 @@ Two layers, per ROADMAP.md's testing strategy:
      proportional to the beetle's own walking speed, so a differently-scaled prefab
      drifts proportionally, and a negative speed can never produce reverse drift.
 
+   - **Config defaults and the preset table** (`ConfigDefaultsTests`): guards the
+     rule `docs/PRESETS.md` exists to enforce — **every balance default is the
+     vanilla value**, so Custom-plus-untouched-settings is unmodded PEAK. It
+     restates by hand what vanilla means for each setting (1.0 for a multiplier, 0
+     for a removal fraction, off for a mechanic the game lacks) rather than
+     re-reading the table, which is the only way to catch a Default cell edited to
+     something that isn't vanilla. A setting that is neither listed nor explicitly
+     exempt fails the test, so a newly added one can't slip past. The two exempt
+     categories are pinned too: each **gated parameter** (a dial that only means
+     anything once some other setting is on) must name a parent that really does
+     default to off, and must itself ship a usable non-zero value — otherwise the
+     mechanic would come up broken the moment a player enabled it. Also pins which
+     preset-driven rows are deliberately vanilla on all four presets (so an
+     unfinished row can't hide among them), and that `PresetValues` throws on
+     Custom rather than quietly handing back Subtle's number.
+
+   **The preset tests assert shape, not values** (`PresetResolutionTests` and the
+   per-mechanic preset assertions). Since the numbers are re-tuned between play
+   sessions via `docs/PRESETS.md`, pinning "Balanced is 0.25" would break the build
+   on every tuning pass and the loop would stop being worth using. What is pinned
+   is the direction of the scale — Subtle closest to vanilla, each later preset at
+   least as forgiving, Tame strictly further than Subtle — plus anchors on values
+   that are design invariants rather than tuning choices (Subtle being exactly
+   vanilla for a given row, a fraction staying inside 0-1). Ties between
+   neighbouring presets are allowed: that's a legitimate tuning outcome.
+
 2. **Manual in-game loop** (this doc) — for anything only observable at
    runtime (feel, visual clutter, screen shake, actual spawn positions in a
    real level).
+
+## Tuning balance values (the Phase 9 loop)
+
+**Never edit balance numbers in code.** Every gameplay default and every
+per-preset value lives in one table, [`docs/PRESETS.md`](PRESETS.md), which is
+parsed into the C# the mod reads. (`General` and `Debug` aren't in it — nothing
+there is a balance value or preset-driven.) The loop is:
+
+```bash
+# 1. edit a cell in docs/PRESETS.md
+# 2. regenerate the two .g.cs files from it
+bash scripts/apply-presets.sh
+# 3. build + deploy, then play
+cd src/Fairoots && dotnet build -c Release -p:DeployToProfile=true
+```
+
+`bash scripts/apply-presets.sh --check` verifies without writing anything: it
+fails if the checked-in generated files are stale, if a value in the table is
+malformed (a bool that isn't `on`/`off`, preset columns half-filled, a new row
+missing its trailing `<!--Id-->` comment), or if a setting exists in the table
+that no code reads. Run it before committing a tuning
+pass.
+
+For tuning a *single* mechanic mid-session you don't need the loop at all: set
+`General/preset = Custom` and edit that mechanic's own config entry in-game (via
+PEAKLib.ModConfig or the config file — `Debug/apply-changes-live` is on by
+default, so most settings apply immediately). Under Custom every setting starts
+at its vanilla value, so whatever you change is the *only* thing differing from
+unmodded PEAK, which is what makes a single dial judgeable in isolation. Once a
+value feels right, write it into the preset column it belongs to in
+`docs/PRESETS.md` and regenerate.
 
 ## Build & deploy in one command
 
@@ -522,22 +579,27 @@ the `Spore-Bombs` entries are actually in effect.
 changes were correctly ignored until step 3's reload, and whether step 4's
 debug toggle stayed live throughout.
 
-### Foliage-removal opt-out (`Spore-Bombs/disable-foliage-removal`)
+### Foliage removal (`Spore-Bombs/enable-foliage-removal`)
 
 **Pre-req:** debug logging on, a fixed `seed`, and `Debug/show-removed-spore-bomb-
 markers = true` (the F10 overlay tags every removal `FOLIAGE` or `SEEDED`). This
 setting only applies at Roots level load, so each change needs a fresh run.
 
-1. Default (`false`): the level-load line should read `[SporeBombCull] N
-   candidate(s): removed M (foliage=X, seeded=Y, ...)` with `X > 0`, and the
-   overlay should show `FOLIAGE` markers sitting in ferns/bushes.
-2. Set it to `true`, same seed, fresh run: the log should now read
-   `foliage=off`, no `FOLIAGE` marker should appear anywhere, and you should be
-   able to find at least one spore bomb genuinely hidden inside foliage still in
-   the level.
-3. **The important check — total removals must not drop.** Compare `removed M`
-   between runs 1 and 2: `M` should be the same (the seeded pass absorbs the
-   whole target), only the split changes. A smaller `M` in run 2 is a bug.
+Note the polarity: this is preset-driven and **on under every preset 1-4**, so
+test it either by switching to Custom (where its default is off, like every other
+setting) or by flipping it under Custom.
+
+1. On (any preset 1-4, or Custom with it enabled): the level-load line should
+   read `[SporeBombCull] N candidate(s): removed M (foliage=X, seeded=Y, ...)`
+   with `X > 0`, and the overlay should show `FOLIAGE` markers sitting in
+   ferns/bushes.
+2. Off (Custom, untouched): the log should now read `foliage=off`, no `FOLIAGE`
+   marker should appear anywhere, and you should be able to find at least one
+   spore bomb genuinely hidden inside foliage still in the level.
+3. **The important check — total removals must not drop.** With the same
+   non-zero `cull-fraction` in both runs, `M` should be the same (the seeded pass
+   absorbs the whole target), only the split changes. A smaller `M` with foliage
+   removal off is a bug.
 4. Same seed twice with the setting on: identical bombs removed both runs
    (`SEEDED` markers in the same places). Change the seed: a different set, same
    count.
@@ -992,10 +1054,10 @@ is currently the only feedback that it engaged.
    2026-07-27: 66 releases, 66 resumes.
 8. Hold the key, walk fully out of the cloud, come back, release → behaves like a
    fresh entry, not an instant hit.
-9. Host sets `disable-cover-mouth = true` mid-run → the key goes dead for everyone
-   immediately, cancelling any cover in progress. A non-host setting it has no
-   effect; a player setting their own `cover-mouth-key = None` opts out regardless
-   of the host.
+9. Host sets `enable-cover-mouth = false` mid-run (under Custom — presets 1-4
+   have it on) → the key goes dead for everyone immediately, cancelling any cover
+   in progress. A non-host setting it has no effect; a player setting their own
+   `cover-mouth-key = None` opts out regardless of the host.
 10. Spore *bombs*: with `Spore-Bombs/cover-mouth-blocks-spore-bombs` off (the
     default) a bomb should still give you spores while covering. Turn it on and
     set one off while covered — no spores at all, though the blast should still

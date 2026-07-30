@@ -46,8 +46,8 @@ namespace Fairoots.Core
     ///   1. Foliage removal - seed-independent, and on for every preset. Every
     ///      candidate sitting inside bush/grass is removed. This is a geometric
     ///      fact, not a roll, so it needs no RNG. It can be switched off outright
-    ///      (<c>Spore-Bombs/disable-foliage-removal</c>, off by default under every
-    ///      preset - see <paramref name="foliageRemovalEnabled"/> on
+    ///      (<c>Spore-Bombs/enable-foliage-removal</c>, on under every preset 1-4
+    ///      but off in vanilla - see <paramref name="foliageRemovalEnabled"/> on
     ///      <see cref="Decide"/>), which makes the pass a no-op rather than
     ///      changing how much gets removed overall: the seeded pass below still
     ///      removes up to the same target, it just picks from every candidate
