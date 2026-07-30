@@ -238,6 +238,8 @@ once and left alone).
 | Spore area radius (hazard + visible cloud — see below) | vanilla | −15% | −30% | −45% |
 | Spore area lethality (status/sec) | vanilla | −15% | −35% | −55% |
 | Spore area screen-filter opacity (superseded — see the cloud-translucency note below) | vanilla | −20% | −40% | −60% |
+| Spore clear time (how long spores take to wear off — see below) | vanilla | −30% (live-tuned 2026-07-30, was −15%) | −35% | −55% |
+| Global spore build-up (every source at once — see below) | vanilla | vanilla | vanilla | vanilla |
 | Wind disperses spore areas | if not already vanilla behavior, on | on | on | on, generous |
 | Zombie move speed (split from the beetle row — different fields, different classes) | vanilla | −10% | −20% | −35% |
 | Beetle move speed | vanilla | −10% | −20% | −35% |
@@ -652,6 +654,72 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   for now; a rework would have to anchor the hands to something steadier than
   the animated head. Live-verified: 66 releases, 66 resumes, with
   ticks landing throughout.
+- **Spores — the status itself, not a hazard (implemented 2026-07-30).** Every
+  section above tunes a *thing that gives you spores*. The `Spores` section
+  tunes **having** them, with two dials that apply no matter where the spores
+  came from. Both are host-authoritative and Custom-only (presets 1-4 use the
+  catalog values below).
+
+  **How long spores take to wear off:** `Spores/clear-time-multiplier` (0.70
+  default). A multiplier on **time**, not on rate: 0.5 means spores clear in
+  half as long, 2.0 twice as long, 1.0 vanilla. Native recovery is gated on
+  `CharacterAfflictions.sporesReductionCooldown` (a delay measured from the last
+  spore application) and then drains `sporesReductionPerSecond` per second, so
+  total recovery is `cooldown + status / rate` — the dial multiplies the cooldown
+  and *divides* the rate, which is the only way the two compose into a clean
+  multiplier on the whole wait. Scaling the rate alone would leave a fixed dead
+  delay in front of it, so "half as long" wouldn't be, and at the small end the
+  dial would asymptote at the cooldown instead of approaching zero.
+
+  Both are **serialized prefab fields**, so their real values are *not* knowable
+  from the decompile — which is why the patch logs the live baseline and the
+  resulting clear time in seconds once per session, at Info level. That log line
+  is the only place vanilla recovery is actually stated, and it's what makes the
+  multiplier checkable in-game rather than taken on faith. It also covers the one
+  case where the dial can't work: if a build ever shipped
+  `sporesReductionPerSecond` at 0 (spores never drain on their own), no
+  multiplier invents a drain rate out of nothing — a "clear faster" setting
+  silently becoming "spores now clear at all" would be a bigger change than the
+  setting promises — and the log says so outright instead of leaving it looking
+  broken.
+
+  Preset values: vanilla / −30% / −35% / −55%. A genuinely new axis — nothing
+  else in the preset table touches recovery, only how much and how often spores
+  are applied. Balanced was live-tuned from −15% to **−30%** on 2026-07-30 (−15%
+  wasn't noticeable enough to be worth being the default), which leaves Balanced
+  and Generous only 5 points apart — Generous is the row to widen in the Phase 9
+  tuning pass, not Balanced.
+
+  **Global spore build-up:** `Spores/build-up-multiplier` (**1.0** default —
+  i.e. fully opt-in, the only dial in the mod that ships doing nothing; see the
+  compounding note below for why) scales
+  every incoming dose of the Spores status. Hooked at
+  `CharacterAfflictions.AddStatus`, the one seam every source funnels through —
+  a spore area's emitter, the `AOE` a bomb's detonation re-explodes on a timer, a
+  zombie's bite *and* the `Affliction_ZombieBite` that keeps adding spores per
+  frame afterwards, and anything else the game ever applies spores from
+  (the decompile-derived list of sources is only as complete as the decompile
+  happened to be, which is the actual argument for hooking the shared seam
+  instead of each hazard).
+
+  **It compounds with the per-hazard rate dials rather than replacing them**, and
+  that's the intended reading: `Spore-Areas/status-rate-multiplier` means "this
+  hazard is weaker," this means "spores are weaker everywhere," so setting both
+  to 0.5 gives a quarter rate inside an area. The config description says so
+  explicitly, because the alternative — silently winning over the per-hazard
+  values — would make those settings stop meaning what they say.
+
+  **Consequently no preset moves this dial off 1.0, its Custom default is 1.0 too,
+  and both are deliberate rather than an unfilled row.** The presets already
+  express "fewer spores" through the per-hazard rows; giving this one preset values
+  too would compound with rows that mean the same thing (Tame's −55% area rate
+  would land at −80%) and make the per-hazard numbers unreadable. The Custom
+  default was moved from 0.85 to 1.0 on 2026-07-30 for the same reason applied one
+  level down: a global multiplier that ships pre-reduced quietly shifts every
+  per-hazard number a Custom player then tunes, so this is the one setting in the
+  mod that does nothing until it's deliberately reached for. Don't "finish" the row
+  in the Phase 9 tuning pass without rebalancing the per-hazard rows at the same
+  time.
 - **Creatures — implemented 2026-07-29 (Phase 7). Several of this section's
   original assumptions turned out to be wrong; what actually shipped, and
   why, is below.** Confirmed correct: zombies have **no distance-based

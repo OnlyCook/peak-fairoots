@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- New `Spores` section with two settings that apply to the Spores status itself
+  rather than to one hazard: `clear-time-multiplier` (0.7 default) changes how
+  long spores take to wear off once you're out of them — 0.5 means half the time,
+  including the short pause before the meter starts dropping — and
+  `build-up-multiplier` scales every dose of spores you're given, whatever gave it
+  to you: a spore area, a spore bomb's cloud, or a zombie's bite. The build-up
+  setting stacks on top of the per-hazard settings, so it's left at vanilla (1.0)
+  by default and no preset changes it — it does nothing until you set it yourself.
+
 - Spore clouds can now be made see-through (`General/spore-area-cloud-opacity`
   and `General/spore-bomb-cloud-opacity`, 0.35 by default) so the game's own
   Spores screen overlay is readable through them — in vanilla the cloud and the

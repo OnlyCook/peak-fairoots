@@ -500,6 +500,36 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       removed-vs-kept median comparison, which is what makes the cluster-first
       claim checkable against a real level instead of taken on faith (the
       per-removal lines alone are in scene order, so they can't show it).
+  - **`Spores/`** — the two dials that act on the Spores **status** rather than on
+    any one hazard that applies it. Everything in `SporeBombs/` and `SporeAreas/`
+    tunes a thing that gives you spores; this folder tunes having them. Both
+    settings live in the `Spores` config section and are host-authoritative.
+    - `SporeDecayPatch.cs` — `Spores/clear-time-multiplier`: how long spores take
+      to wear off. Scales **two** native fields together and in opposite
+      directions (`CharacterAfflictions.sporesReductionPerSecond` divided,
+      `sporesReductionCooldown` multiplied), because native recovery is
+      `cooldown + status / rate` and only that pairing turns the setting into a
+      clean multiplier on the whole wait — see `Core/SporeStatusTuning.cs`. Field
+      scaling with a per-instance baseline cache (the `WindChillZoneTuningPatch`
+      pattern) rather than a transpiler on the private `UpdateNormalStatuses`,
+      which handles every status type in one method. **Its baseline cache is
+      deliberately never cleared on level teardown**, unlike the creature
+      patches': a `Character` outlives a biome segment, so dropping a live
+      character's baseline would re-cache the already-scaled field as vanilla and
+      compound the multiplier permanently — read that file's remarks before adding
+      a `ClearLevelState`. Also owns the one-time Info-level log of what vanilla
+      recovery actually is in seconds; those two fields are serialized prefab
+      values, so that log line is the only place the real number is ever stated.
+    - `SporeBuildUpPatch.cs` — `Spores/build-up-multiplier`: scales every incoming
+      dose of Spores, from any source. A prefix on
+      `CharacterAfflictions.AddStatus` (`ref float amount`, so the original still
+      does all its SFX/VFX/networking/zombification work) because that is the one
+      seam a spore area's emitter, a bomb's `AOE`, a zombie's bite and
+      `Affliction_ZombieBite` all funnel through — hooking each hazard instead
+      would only ever cover the sources the decompile happened to reveal. Reads
+      `Effective*` fresh per application, so it needs no reapply hook. Runs at
+      `Priority.Low` so `Diagnostics/SporeStatusSourcePatch` still logs the amount
+      a source *asked* for. Compounds with the per-hazard rate dials on purpose.
   - **`Creatures/`** — the Phase 7 creature mechanics. **Read this first: the
     three Roots creatures share no code whatsoever**, and nearly every quirk in
     this folder comes from that. A beetle is a `Beetle : Mob` (a rigidbody prop
@@ -615,6 +645,15 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       rate dial scales `amount` rather than the tick interval (the native
       per-tick amount is proportional to the interval, so the rate doesn't
       contain it - scaling the interval changes granularity only, not rate).
+    - `SporeStatusTuning.cs` — pure arithmetic for the two `Spores`-section dials
+      (recovery time and global build-up). Not seed-gated, same shape as
+      `SporeAreaTuning.cs`. Documents why the clear-time dial divides the drain
+      rate while multiplying the cooldown, why a vanilla rate of 0 is left alone,
+      and why the build-up dial refuses to scale non-positive amounts (several
+      native paths reach `AddStatus` with one, and scaling a subtraction by a
+      "fewer spores" dial would *add* spores). `SecondsToClear` exists purely so
+      the tests can assert the "0.5 means half as long" promise end-to-end across
+      both fields at once instead of checking each direction in isolation.
     - `LabelColors.cs` — the outline color for Fairoots' own on-screen text:
       same hue and saturation as the text, HSV value scaled down. Darkened rather
       than flattened to black (the rule `peak-sense-of-direction`'s `ColorUtil`
@@ -847,7 +886,9 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
 `SporeBombs/`, `Wind/`, `SporeAreas/` and `Creatures/` (above) are the
 mechanic-group folders, one per section of `OVERVIEW.md`, each holding the
 Harmony patches that scan the scene and apply removals/tweaks and delegating
-every seeded decision to `Core/`. All four are now in. What's left
+every seeded decision to `Core/`. All four are now in, plus `Spores/`, which is
+the one folder that doesn't map to an `OVERVIEW.md` section — it groups the dials
+that act on the *status* instead of on a hazard (added 2026-07-30). What's left
 (`ROADMAP.md` Phases 8-9) needs no new folder: the achievement spawn-weight
 nudge intercepts the game's own weighted item selection, and the preset tuning
 pass only changes numbers in `Core/Presets/PresetCatalog.cs`.

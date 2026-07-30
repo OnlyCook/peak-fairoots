@@ -326,6 +326,50 @@ namespace Fairoots
         /// </summary>
         public ConfigEntry<double> SporeAreaStatusRateMultiplierOverride { get; }
 
+        // --- Spores ---------------------------------------------------------
+        // The two dials that act on the Spores *status* rather than on any one
+        // hazard that applies it. Everything under Spore-Bombs and Spore-Areas
+        // above changes a hazard; these change what having spores is like no
+        // matter where they came from. See Core/SporeStatusTuning.cs for how the
+        // two groups compose (they compound, on purpose).
+
+        /// <summary>
+        /// Custom-preset value for the multiplier on how long the Spores status takes
+        /// to drain off a player once nothing is applying it any more - scaling both
+        /// the drain rate (<c>CharacterAfflictions.sporesReductionPerSecond</c>) and
+        /// the delay before draining starts (<c>sporesReductionCooldown</c>) so the
+        /// multiplier reads as a multiplier on <em>time</em>: 0.5 means spores clear
+        /// in half as long, 2.0 twice as long. See
+        /// <see cref="Core.SporeStatusTuning.ScaleDecayRate"/> for why the rate is
+        /// divided rather than multiplied, and
+        /// <see cref="Core.SporeStatusTuning.ScaleDecayCooldown"/> for why the
+        /// cooldown has to move with it. 1.0 = vanilla. Only takes effect under
+        /// <see cref="PresetId.Custom"/>; see
+        /// <see cref="SporeBombCullFractionOverride"/>.
+        /// </summary>
+        public ConfigEntry<double> SporeClearTimeMultiplierOverride { get; }
+
+        /// <summary>
+        /// Custom-preset value for the multiplier applied to <em>every</em> incoming
+        /// Spores application, whatever applied it - spore areas, a spore bomb's
+        /// cloud, a zombie's bite and the lingering affliction it leaves. Hooked at
+        /// <c>CharacterAfflictions.AddStatus</c>, the one seam every spore source
+        /// funnels through (see <see cref="Core.SporeStatusTuning.ScaleBuildUp"/>).
+        /// 1.0 = vanilla, 0 = spores are never applied at all.
+        ///
+        /// <b>Compounds with the per-hazard rate dials</b> (notably
+        /// <see cref="SporeAreaStatusRateMultiplierOverride"/>) rather than
+        /// overriding them, since they scale a hazard's own emitter and this scales
+        /// the result. That's why no shipped preset moves this one off 1.0 - see
+        /// <c>PresetCatalog.SporeBuildUpMultiplier</c> - and why <b>its Custom default
+        /// is 1.0 as well</b> (set 2026-07-30 at the maintainer's request): every other
+        /// dial in the mod ships pre-tuned, but this one stacks on top of dials that
+        /// already express the same intent, so it's the one setting that does nothing
+        /// until a player deliberately reaches for it. Only takes effect under
+        /// <see cref="PresetId.Custom"/>.
+        /// </summary>
+        public ConfigEntry<double> SporeBuildUpMultiplierOverride { get; }
+
         // --- Creatures ------------------------------------------------------
         /// <summary>
         /// Master kill switch for the Roots biome's NPC mushroom zombies. When on,
@@ -1147,6 +1191,36 @@ namespace Fairoots
                     "Custom (5) - ignored under presets 1-4.",
                     new AcceptableValueRange<double>(0.0, 3.0)));
 
+            SporeClearTimeMultiplierOverride = config.Bind(
+                "Spores",
+                "clear-time-multiplier",
+                0.70,
+                new ConfigDescription(
+                    "Multiplier applied to how long it takes for spores to wear off once you're " +
+                    "out of them, e.g. 0.5 means they clear in half the time, 2.0 means twice as " +
+                    "long. Covers the whole wait, including the short pause before the meter " +
+                    "starts going down at all. 1.0 always means vanilla. This only affects " +
+                    "recovery - how fast you GET spores is build-up-multiplier below. Only takes " +
+                    "effect when preset is set to Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.05, 5.0)));
+
+            SporeBuildUpMultiplierOverride = config.Bind(
+                "Spores",
+                "build-up-multiplier",
+                1.00,
+                new ConfigDescription(
+                    "Multiplier applied to every dose of spores you're given, no matter what gave " +
+                    "it to you - a spore area, a spore bomb's cloud, or a zombie's bite. 0.5 " +
+                    "means every dose counts for half, 0 means you never get spores at all, 2.0 " +
+                    "means double. 1.0 always means vanilla. NOTE: this stacks on top of the " +
+                    "per-hazard settings - if Spore-Areas/status-rate-multiplier is 0.5 and this " +
+                    "is 0.5, standing in a spore area gives you a quarter of vanilla. Because of " +
+                    "that this one is fully OPT-IN: it defaults to 1.0 (vanilla) and no preset " +
+                    "changes it, so it does nothing at all until you set it yourself. The presets " +
+                    "tune each hazard separately instead. Only takes effect when preset is set to " +
+                    "Custom (5) - ignored under presets 1-4.",
+                    new AcceptableValueRange<double>(0.0, 3.0)));
+
             DisableZombies = config.Bind(
                 "Creatures",
                 "disable-zombies",
@@ -1898,6 +1972,20 @@ namespace Fairoots
                 SporeAreaStatusRateMultiplierOverride.Value,
                 UseCustomOverrides);
 
+        /// <summary>The effective multiplier on how long the Spores status takes to clear.</summary>
+        public double SporeClearTimeMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.SporeClearTimeMultiplier(Preset.Value),
+                SporeClearTimeMultiplierOverride.Value,
+                UseCustomOverrides);
+
+        /// <summary>The effective multiplier on every incoming Spores application, from any source.</summary>
+        public double SporeBuildUpMultiplier =>
+            OverrideResolution.Resolve(
+                PresetCatalog.SporeBuildUpMultiplier(Preset.Value),
+                SporeBuildUpMultiplierOverride.Value,
+                UseCustomOverrides);
+
         /// <summary>The effective movement-speed multiplier for every mushroom zombie.</summary>
         public double ZombieSpeedMultiplier =>
             OverrideResolution.Resolve(
@@ -2029,6 +2117,8 @@ namespace Fairoots
         private double _snapSporeAreaRemovalFraction;
         private double _snapSporeAreaRadiusMultiplierValue;
         private double _snapSporeAreaStatusRateMultiplier;
+        private double _snapSporeClearTimeMultiplier;
+        private double _snapSporeBuildUpMultiplier;
         private double _snapZombieSpeedMultiplier;
         private double _snapBeetleSpeedMultiplier;
         private double _snapBeetleKnockbackMultiplier;
@@ -2064,6 +2154,8 @@ namespace Fairoots
             _snapSporeAreaRemovalFraction = SporeAreaRemovalFraction;
             _snapSporeAreaRadiusMultiplierValue = SporeAreaRadiusMultiplier;
             _snapSporeAreaStatusRateMultiplier = SporeAreaStatusRateMultiplier;
+            _snapSporeClearTimeMultiplier = SporeClearTimeMultiplier;
+            _snapSporeBuildUpMultiplier = SporeBuildUpMultiplier;
             _snapZombieSpeedMultiplier = ZombieSpeedMultiplier;
             _snapBeetleSpeedMultiplier = BeetleSpeedMultiplier;
             _snapBeetleKnockbackMultiplier = BeetleKnockbackMultiplier;
@@ -2137,6 +2229,20 @@ namespace Fairoots
         /// <summary>Game-facing code should read this instead of <see cref="SporeAreaStatusRateMultiplier"/>. Host-authoritative.</summary>
         public double EffectiveSporeAreaStatusRateMultiplier =>
             HostAuthority.Resolve("SporeAreaStatusRateMultiplier", UseLiveValue ? SporeAreaStatusRateMultiplier : _snapSporeAreaStatusRateMultiplier);
+
+        /// <summary>Game-facing code should read this instead of <see cref="SporeClearTimeMultiplier"/>. Host-authoritative.</summary>
+        public double EffectiveSporeClearTimeMultiplier =>
+            HostAuthority.Resolve("SporeClearTimeMultiplier", UseLiveValue ? SporeClearTimeMultiplier : _snapSporeClearTimeMultiplier);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="SporeBuildUpMultiplier"/>. Host-authoritative - a player who
+        /// scaled their own spore intake down would be playing a different game from
+        /// the rest of the lobby, which is exactly what the host-authority rule
+        /// exists to prevent (ROADMAP.md's "Host authority" section).
+        /// </summary>
+        public double EffectiveSporeBuildUpMultiplier =>
+            HostAuthority.Resolve("SporeBuildUpMultiplier", UseLiveValue ? SporeBuildUpMultiplier : _snapSporeBuildUpMultiplier);
 
         /// <summary>Game-facing code should read this instead of <see cref="WindForceMultiplier"/>. Host-authoritative.</summary>
         public double EffectiveWindForceMultiplier =>

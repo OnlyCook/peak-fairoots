@@ -69,6 +69,7 @@ namespace Fairoots
                     Creatures.CreatureSpeedPatch.ReapplyToAll();
                     Creatures.CreatureKnockbackPatch.ReapplyToAll();
                     Creatures.CreatureRagdollPatch.ReapplyToAll();
+                    Spores.SporeDecayPatch.ReapplyToAll();
                 }
             };
 
@@ -142,6 +143,16 @@ namespace Fairoots
             };
             Cfg.SporeAreaRadiusMultiplierOverride.SettingChanged += reapplySporeAreaTuning;
             Cfg.SporeAreaStatusRateMultiplierOverride.SettingChanged += reapplySporeAreaTuning;
+
+            // Spores/clear-time-multiplier is written onto CharacterAfflictions fields,
+            // so it needs the same gated reapply as the dials above. Its sibling
+            // Spores/build-up-multiplier deliberately has no hook: that patch reads its
+            // Effective* value fresh on every single spore application, the same
+            // arrangement as the two deaggro dials noted above.
+            Cfg.SporeClearTimeMultiplierOverride.SettingChanged += (s, e) =>
+            {
+                if (Cfg.ApplyChangesLive.Value) Spores.SporeDecayPatch.ReapplyToAll();
+            };
 
             // The pose's clip choice is cached after its first lookup (it logs the
             // whole emote list, so it shouldn't re-run every frame) - drop that cache

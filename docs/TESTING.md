@@ -75,6 +75,25 @@ Two layers, per ROADMAP.md's testing strategy:
      applies the status. The load-bearing one: `innerFade` stays the same
      *fraction* of the radius at every multiplier, so the falloff shape is
      preserved and the radius dial can't quietly double as a lethality dial.
+   - **Spore status dials** (`SporeStatusTuningTests`): the `Spores` section's two
+     multipliers, not seed-gated, so invariant proofs again. The load-bearing one
+     is that the clear-time multiplier scales **total** recovery time (`cooldown +
+     status / rate`) by exactly the configured factor — the setting only means
+     "half as long" if the drain rate is divided while the cooldown is multiplied,
+     each direction is easy to get backwards, and neither shows up in a build log.
+     Asserted end-to-end on the combined time *and* per-field, since two
+     compensating sign errors would satisfy the combined check alone; plus the
+     maintainer's own worked example (a 15s vanilla clear becomes 7.5s at 0.5).
+     Also: the multiplier clamps instead of dividing by zero, and a vanilla drain
+     rate of 0 stays 0 at every multiplier (a "clear faster" dial must not become
+     a "spores now clear at all" dial). For the build-up dial: the literal ask
+     (0.5 on a dose of 10 gives 5), non-positive amounts are left untouched
+     (several native paths reach `AddStatus` with one, and scaling a subtraction
+     would *add* spores), the result never goes negative, and a documented proof
+     that it **compounds** with the spore-area rate dial rather than replacing it.
+     Two preset-table guards: Subtle's clear time is exactly vanilla, and *no*
+     preset moves the global build-up dial off 1.0 — deliberate, since the presets
+     already reduce build-up per hazard.
    - **Spore-cloud translucency** (`SporeCloudOpacityTests`): not seed-gated, so
      invariant proofs again — a multiplier of 1.0 is *exactly* vanilla (the
      restore path depends on it), 0 is fully invisible, thinning can never make a
@@ -822,6 +841,74 @@ change it while watching.
 **Report back:** whether Balanced's 0.85 is a meaningful improvement or too
 timid, and whether the resized cloud still *looks* right (a heavily shrunk cloud
 shouldn't look like a sparse puff, a heavily enlarged one shouldn't look thin).
+
+### Spores: clear time (`Spores/clear-time-multiplier`)
+
+**Pre-req:** debug logging on, `preset = Custom` (presets 1-4 use 1.00 / 0.70 /
+0.65 / 0.45 — Balanced was raised from 0.85 on 2026-07-30 after the first live
+pass). Live-updatable, but the value that matters is the one in effect while the
+meter is actually draining.
+
+**Read the log line first — it's the whole baseline for this test.** Once per
+session, at Info level:
+
+```
+[Spores] vanilla spore recovery: 3.00s delay + 0.0500/s = 23.0s to clear a full
+meter. At x0.500 that becomes 11.5s.
+```
+
+Those two field values are serialized on the player prefab and appear *nowhere*
+in the decompiled game code, so this line is the only statement of what vanilla
+recovery actually is. If it instead warns that `sporesReductionPerSecond is 0`,
+the dial is inert by design (nothing to scale — see `Core/SporeStatusTuning.cs`)
+and the rest of this section doesn't apply.
+
+1. At `1.0`, get a decent amount of spores, leave the cloud, and time the meter
+   emptying with a stopwatch. It should match the log's vanilla figure, scaled
+   for however full the meter was.
+2. Set `0.5` and repeat from a similar meter level: it must take **about half**
+   as long, including the pause before the meter starts moving at all — that
+   pause is scaled too, so it should visibly shorten, not stay put.
+3. Set `2.0` and repeat: about twice as long, with a noticeably longer pause.
+4. Back to `1.0` and time it again — it must match step 1 exactly (both fields
+   are applied from a cached vanilla baseline, so repeated changes can't
+   compound and 1.0 always restores true vanilla).
+5. Verbose lines show the per-character write:
+   `"Player" sporesReductionPerSecond 0.05 -> 0.1, cooldown 3.00s -> 1.50s`.
+   Rate and cooldown must move in **opposite** directions.
+
+**Report back:** the real vanilla clear time from the log line (it goes in the
+config description, which currently doesn't quote a number), and whether
+Balanced's 0.70 now lands right — and if so, whether Generous (0.65) needs
+widening, since one live pass has already squeezed the two to 5 points apart.
+
+### Spores: global build-up (`Spores/build-up-multiplier`)
+
+**Pre-req:** debug logging on, `preset = Custom` — **no preset changes this
+dial and its own default is 1.00**, so out of the box it does nothing at all and
+that is not a bug (it stacks on top of the per-hazard dials, which is exactly why
+it ships neutral; the presets reduce build-up per hazard instead). Reads its value
+fresh on every application, so changes apply instantly with no reapply.
+
+1. Set `0.5` and stand in a spore area. The meter must fill at **about half** the
+   usual pace. Verbose log (throttled to one line every 2s):
+   `[Spores] build-up x0.500: +0.01250 -> +0.00625 Spores`.
+2. Confirm it covers **every** source, not just areas — this is the point of the
+   setting. Walk into a spore bomb's cloud, and take a zombie bite (the bite's
+   lingering affliction keeps adding spores for a while afterwards; that should
+   be reduced too).
+3. Set `0` — you must be unable to gain any spores at all from any source, while
+   the clouds themselves are still there and still visible.
+4. Set `1.0` — exactly vanilla, and the verbose line above should stop appearing
+   entirely (the patch returns early rather than multiplying by 1).
+5. **Compounding check** (the intended behaviour, worth confirming rather than
+   assuming): set this to `0.5` *and* `Spore-Areas/status-rate-multiplier` to
+   `0.5`. Inside a spore area the meter should fill at roughly a **quarter** of
+   vanilla, not a half — the two dials multiply.
+
+**Report back:** whether one global knob is actually the useful shape here, or
+whether the per-hazard dials cover it well enough that this mostly adds
+confusion.
 
 ### Cover your mouth vs. spore areas (`General/cover-mouth-key`)
 

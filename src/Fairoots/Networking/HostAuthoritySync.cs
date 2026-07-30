@@ -2,6 +2,7 @@ using ExitGames.Client.Photon;
 using Fairoots.Diagnostics;
 using Fairoots.SporeAreas;
 using Fairoots.SporeBombs;
+using Fairoots.Spores;
 using Fairoots.Wind;
 using Photon.Pun;
 
@@ -65,11 +66,16 @@ namespace Fairoots.Networking
                 return; // our own local values are already authoritative - nothing to refresh.
             }
 
-            Diag.V("[HostAuthoritySync] room properties updated - reapplying cached wind/trigger-radius/spore-area state.");
+            Diag.V("[HostAuthoritySync] room properties updated - reapplying cached wind/trigger-radius/spore-area/spore-decay state.");
             WindChillZoneTuningPatch.ReapplyAll();
             SporeBombCullPatch.ReapplyTriggerRadiusToAll();
             SporeAreaDisablePatch.ReapplyToAll();
             SporeAreaTuningPatch.ReapplyToAll();
+            // The clear-time dial is cached onto CharacterAfflictions fields at Awake,
+            // so a client that spawned before the host's first publish would otherwise
+            // stay on its own local value. The build-up dial needs no equivalent - its
+            // prefix reads Effective* fresh on every single application.
+            SporeDecayPatch.ReapplyToAll();
         }
     }
 }

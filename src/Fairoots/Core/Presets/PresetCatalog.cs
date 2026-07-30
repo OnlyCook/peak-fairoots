@@ -243,6 +243,61 @@ namespace Fairoots.Core.Presets
         }
 
         /// <summary>
+        /// Multiplier applied to how long the Spores status takes to drain off a
+        /// player once nothing is applying it any more
+        /// (<see cref="SporeStatusTuning.ScaleDecayRate"/> and
+        /// <see cref="SporeStatusTuning.ScaleDecayCooldown"/>). 1.0 = vanilla
+        /// (Subtle); below 1.0 clears faster. Starting estimates pending playtest.
+        ///
+        /// A genuinely new axis: nothing else in the catalog touches recovery, only
+        /// how much and how often spores are applied in the first place. That's
+        /// exactly why it can carry real per-preset numbers while
+        /// <see cref="SporeBuildUpMultiplier"/> can't.
+        /// </summary>
+        public static double SporeClearTimeMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                // 0.70, set 2026-07-30 after live testing: 0.85 was not noticeable
+                // enough at the default preset. Note this leaves Balanced and
+                // Generous only 0.05 apart - see the row's note in ROADMAP.md.
+                case PresetId.Balanced: return 0.70;
+                case PresetId.Generous: return 0.65;
+                case PresetId.Tame: return 0.45;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
+        /// Multiplier applied to <em>every</em> incoming Spores application, whatever
+        /// its source (<see cref="SporeStatusTuning.ScaleBuildUp"/>).
+        ///
+        /// <b>Deliberately 1.0 on all four presets - this is not an unfilled row.</b>
+        /// The presets already reduce spore build-up per hazard
+        /// (<see cref="SporeAreaStatusRateMultiplier"/> for the areas, the spore-bomb
+        /// removal/radius rows for the bombs), and this dial multiplies on top of all
+        /// of them at once (see <see cref="SporeStatusTuning"/>). Giving it preset
+        /// values too would compound with rows that already express the same intent -
+        /// Tame's 0.45 area rate would land at 0.20 - and make the per-hazard numbers
+        /// stop meaning what they say. So it stays a Custom-only global lever for
+        /// players who want one knob for all spores; the presets express the same idea
+        /// through the per-hazard rows instead. Do not "finish" this row in the
+        /// Phase 9 tuning pass without also rebalancing those.
+        /// </summary>
+        public static double SporeBuildUpMultiplier(PresetId preset)
+        {
+            switch (CatalogKey(preset))
+            {
+                case PresetId.Subtle: return 1.00;
+                case PresetId.Balanced: return 1.00;
+                case PresetId.Generous: return 1.00;
+                case PresetId.Tame: return 1.00;
+                default: throw new ArgumentOutOfRangeException(nameof(preset), preset, null);
+            }
+        }
+
+        /// <summary>
         /// Multiplier applied to a mushroom zombie's movement speed, per ROADMAP.md's
         /// "Zombie/beetle move speed" row (-10%/-20%/-35%). 1.0 = vanilla (Subtle).
         ///

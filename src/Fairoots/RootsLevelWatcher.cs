@@ -140,6 +140,15 @@ namespace Fairoots
             Creatures.CreatureKnockbackPatch.ReapplyToAll();
             Creatures.CreatureRagdollPatch.ReapplyToAll();
 
+            // Spore recovery speed: the Awake hook already covers every character that
+            // came up after the config was ready, so this only exists to pick up the
+            // level-load snapshot (apply-changes-live off) and the host's freshly
+            // published value. Deliberately not paired with a ClearLevelState above -
+            // a Character outlives the biome segment, and dropping its cached vanilla
+            // baseline while it's still alive would compound the multiplier (see
+            // SporeDecayPatch's remarks).
+            Spores.SporeDecayPatch.ReapplyToAll();
+
             // Last: caches this level's spore areas for the per-frame "is the player
             // in spores?" query, after every pass that could have removed or
             // deactivated one has already run.

@@ -2,7 +2,7 @@
     "name": "Fairoots",
     "version_number": "0.1.0",
     "website_url": "https://github.com/OnlyCook/peak-fairoots",
-    "description": "Makes the Roots biome more fair and balanced: seed-deterministic spore bomb culling, gentler wind, calmer creatures, and four presets from subtle to easy-conquer.",
+    "description": "Adds balancing and Quality of Life to the Roots biome (comes with 4 presets, highly customizable)",
     "dependencies": [
         "BepInEx-BepInExPack_PEAK-5.4.2403"
     ]

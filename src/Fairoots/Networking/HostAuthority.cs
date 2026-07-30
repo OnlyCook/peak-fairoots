@@ -198,6 +198,8 @@ namespace Fairoots.Networking
                 { KeyPrefix + "SporeAreaRemovalFraction", cfg.EffectiveSporeAreaRemovalFraction },
                 { KeyPrefix + "SporeAreaRadiusMultiplier", cfg.EffectiveSporeAreaRadiusMultiplier },
                 { KeyPrefix + "SporeAreaStatusRateMultiplier", cfg.EffectiveSporeAreaStatusRateMultiplier },
+                { KeyPrefix + "SporeClearTimeMultiplier", cfg.EffectiveSporeClearTimeMultiplier },
+                { KeyPrefix + "SporeBuildUpMultiplier", cfg.EffectiveSporeBuildUpMultiplier },
                 { KeyPrefix + "CoverMouthStaminaPerSecond", cfg.EffectiveCoverMouthStaminaPerSecond },
                 { KeyPrefix + "DisableCoverMouth", cfg.EffectiveDisableCoverMouth },
                 { KeyPrefix + "CoverMouthBlocksSporeBombs", cfg.EffectiveCoverMouthBlocksSporeBombs },
