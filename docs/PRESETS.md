@@ -2,7 +2,7 @@
 
 ## The two rules the tables follow
 
-**1. Every default is the vanilla value.** Freshly install Fairoots (or delete its config file), set `General/preset` to `Custom`, change nothing else, and the game plays exactly like unmodded PEAK: every multiplier is `1.0`, every removal fraction is `0`, and every new mechanic is `off`. Custom is a blank slate you build up from, not Balanced with the numbers exposed.
+**1. Every default is the vanilla value.** Freshly install Fairoots (or delete its config file), set `General/preset` to `Custom`, change nothing else, and the game plays exactly like unmodded PEAK: every multiplier is `1.0`, every removal fraction is `0`, and every new mechanic is `off`. Custom is a blank slate you build up from, not balanced with the numbers exposed.
 
 The rows marked `*` on the default are the one documented exception: **gated parameters**, a dial that only means anything while some other setting is on. There is no vanilla value for the cost of a mechanic vanilla doesn't have, so the default is the sensible tuned number and the parent toggle is what defaults to off. So when the parent row isn't enabled these values aren't read anyway and therefore still play like vanilla.
 
@@ -92,37 +92,20 @@ Dials on the *Spores* status effect itself rather than on any one hazard that ap
 |---|---|---|---|---|---|---|
 | `disable-wind-entirely` | bool | off | — | — | — | — | <!--DisableWindEntirely-->
 | `backpack-always-immune` | bool | off | on | on | on | on | <!--WindBackpackAlwaysImmune-->
-| `force-multiplier` | double | 1.0 | 0.90 | 0.80 | 0.60 | 0.35 | <!--WindForceMultiplier-->
-| `gust-duration-multiplier` | double | 1.0 | 0.90 | 0.80 | 0.60 | 0.35 | <!--WindGustDurationMultiplier-->
-| `item-force-multiplier` | double | 1.0 | 1.00 | 0.70 | 0.40 | 0.00 | <!--WindItemForceMultiplier-->
-| `obstacle-occlusion-range-multiplier` | double | 1.0 | 1.00 | 1.30 | 1.60 | 2.00 | <!--WindObstacleOcclusionRangeMultiplier-->
-| `fall-camera-dampen-clamp` | double | 0.0 | 0.00 | 0.35 | 0.55 | 0.75 | <!--WindFallCameraDampenClamp-->
-| `fall-camera-dampen-window-seconds` | float | 1.5* | 1.0 | 1.5 | 2.0 | 2.5 | <!--WindRecentForceWindowSeconds-->
+| `force-multiplier` | double | 1.0 | 0.95 | 0.95 | 0.90 | 0.85 | <!--WindForceMultiplier-->
+| `gust-duration-multiplier` | double | 1.0 | 1.00 | 1.00 | 0.90 | 0.90 | <!--WindGustDurationMultiplier-->
+| `item-force-multiplier` | double | 1.0 | 0.70 | 0.60 | 0.40 | 0.20 | <!--WindItemForceMultiplier-->
+| `obstacle-occlusion-range-multiplier` | double | 1.0 | 1.00 | 1.20 | 1.30 | 1.50 | <!--WindObstacleOcclusionRangeMultiplier-->
+| `fall-camera-dampen-clamp` | double | 0.0 | 0.20 | 0.35 | 0.55 | 0.75 | <!--WindFallCameraDampenClamp-->
+| └ `fall-camera-dampen-window-seconds` | float | 1.5* | 1.0 | 1.5 | 2.0 | 2.5 | <!--WindRecentForceWindowSeconds-->
 | `prevent-wind-ragdoll` | bool | off | on | on | on | on | <!--PreventWindRagdoll-->
 | `climb-shelters-from-wind` | bool | off | off | on | on | on | <!--ClimbSheltersFromWind-->
-| `climb-speed-multiplier-in-wind` | double | 1.0 | 1.00 | 0.90 | 0.93 | 0.96 | <!--ClimbWindSpeedMultiplier-->
-| `climb-upward-speed-multiplier-in-wind` | double | 1.0 | 1.00 | 0.85 | 0.89 | 0.94 | <!--ClimbWindUpwardSpeedMultiplier-->
-| `climb-into-wind-speed-multiplier` | double | 1.0 | 1.00 | 0.85 | 0.89 | 0.94 | <!--ClimbWindIntoWindSpeedMultiplier-->
-| `climb-shelter-grace-seconds` | float | 0.5* | 0.3 | 0.5 | 0.7 | 1.0 | <!--ClimbShelterGraceSeconds-->
-| `climb-shelter-grace-force-multiplier` | double | 1.0 | 1.00 | 0.15 | 0.12 | 0.08 | <!--ClimbWindGraceForceMultiplier-->
-- `item-force-multiplier` reaching `0.00` on Tame is what "every item, backpacks
-  included, is fully wind-immune" means.
-- `obstacle-occlusion-range-multiplier` runs **above** 1.0: the occlusion
-  raycast is already enabled in Roots (vanilla min 4 / max 5 units), so the
-  presets widen how far it reaches rather than switching it on.
-- `climb-shelters-from-wind` is off on Subtle: handing out outright wind
-  immunity is the least subtle thing in the mod. The three climb-speed
-  multipliers are what the shelter costs while wind is actually pushing on the
-  climber, and are gentler on the more forgiving presets — "forgiving" here
-  means paying less for the shelter. Their Subtle values are moot (mechanic off)
-  and left at 1.0 rather than a number implying a slowdown that never happens.
-- `climb-speed-multiplier-in-wind` Balanced `0.90` and the two `0.85`s are
-  **playtest-tuned, not placeholders** (the original 0.55 estimate made waiting
-  a gust out strictly better than climbing through it, which is the failure mode
-  the mechanic exists to remove).
-- `climb-shelter-grace-force-multiplier` stays deliberately non-zero: full
-  immunity in the let-go window would let a player wall-tap across an exposed
-  stretch.
-- `fall-camera-dampen-window-seconds` and `climb-shelter-grace-seconds` are
-  gated parameters (`*`) — timing windows that only matter while the mechanic
-  they belong to is on.
+| └ `climb-speed-multiplier-in-wind` | double | 1.0 | 0.85 | 0.90 | 0.93 | 0.96 | <!--ClimbWindSpeedMultiplier-->
+| └ `climb-upward-speed-multiplier-in-wind` | double | 1.0 | 0.80 | 0.85 | 0.89 | 0.94 | <!--ClimbWindUpwardSpeedMultiplier-->
+| └ `climb-into-wind-speed-multiplier` | double | 1.0 | 0.80 | 0.85 | 0.89 | 0.94 | <!--ClimbWindIntoWindSpeedMultiplier-->
+| └ `climb-shelter-grace-seconds` | float | 0.5* | 0.4 | 0.5 | 0.5 | 0.6 | <!--ClimbShelterGraceSeconds-->
+| └ `climb-shelter-grace-force-multiplier` | double | 1.0 | 0.25 | 0.15 | 0.12 | 0.10 | <!--ClimbWindGraceForceMultiplier-->
+- `item-force-multiplier` reaching `0.00` means every item/backpacks are fully wind-immune.
+- `obstacle-occlusion-range-multiplier` runs **above** 1.0: the occlusion raycast is already enabled in Roots (vanilla min 4 / max 5 units), so the presets widen how far it reaches.
+- `climb-shelters-from-wind` means you are immune from the wind while climbing, the game kind of already includes this but you aren't immune, the wind's force is just much less.
+- `climb-shelter-grace-force-multiplier` stays deliberately non-zero: full immunity in the let-go window would let a player wall-tap across an exposed stretch.
