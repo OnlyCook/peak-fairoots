@@ -16,9 +16,12 @@ namespace Fairoots.Wind
     /// being helplessly spun by uncontrolled ragdoll-head physics - RESEARCH.md Q6).
     ///
     /// Two cooperating patches, both scoped to <see cref="Character.localCharacter"/>
-    /// only (this is a camera-feel effect, not networked physics - see
-    /// RESEARCH.md Q6's remarks on why the underlying mechanism is fall-general,
-    /// not wind-specific code):
+    /// only - a character's ragdoll control is driven by whoever owns it, so every
+    /// client applying this to its own character is exactly the full coverage (and
+    /// why both settings still have to be host-authoritative: the values must match
+    /// across the lobby, even though each client applies them itself). See
+    /// RESEARCH.md Q6's remarks on why the underlying mechanism is fall-general, not
+    /// wind-specific code:
     /// 1. A postfix on <c>WindChillZone.AddWindForceToCharacter</c> records
     ///    "when did wind force last actually apply to me" - re-deriving the same
     ///    two escape checks (<c>photonView.IsMine</c>, actively gripping a climb
@@ -27,9 +30,12 @@ namespace Fairoots.Wind
     ///    doesn't record a false timestamp.
     /// 2. A postfix on <c>CharacterData.GetTargetRagdollControll()</c> - the exact
     ///    method RESEARCH.md Q6 identified as the source of the unconditional
-    ///    "0 the instant fallSeconds &gt; 0" result - raises that floor via
-    ///    <see cref="WindTuning.ApplyFallCameraDampening"/> whenever the recorded
-    ///    timestamp is still within the configured window.
+    ///    "0 the instant fallSeconds &gt; 0" result - raises that floor whenever the
+    ///    recorded timestamp is still within the configured window, either all the
+    ///    way to full control (<c>Wind/prevent-wind-ragdoll</c>, on by default under
+    ///    every preset - <see cref="WindTuning.ApplyWindRagdollImmunity"/>) or
+    ///    partway (<c>Wind/fall-camera-dampen-clamp</c> -
+    ///    <see cref="WindTuning.ApplyFallCameraDampening"/>).
     /// </summary>
     [HarmonyPatch(typeof(WindChillZone), "AddWindForceToCharacter")]
     internal static class WindRecentForceTrackerPatch
@@ -94,9 +100,16 @@ namespace Fairoots.Wind
                     return; // not the unconditional-0 fall branch this feature targets.
                 }
 
-                float windowSeconds = Plugin.Cfg.WindRecentForceWindowSeconds.Value;
+                float windowSeconds = Plugin.Cfg.EffectiveWindRecentForceWindowSeconds;
                 bool fallIsWindPreceded = WindTuning.IsWindForceStillRecent(
                     WindRecentForceTrackerPatch.LastWindForceTime, Time.time, windowSeconds);
+
+                // Both mechanics key off the same "did wind cause this fall" test and
+                // both only ever raise the floor, so they can just be applied in
+                // sequence - with prevent-wind-ragdoll on, its full-control result
+                // already dominates whatever clamp the preset asked for.
+                __result = WindTuning.ApplyWindRagdollImmunity(
+                    __result, fallIsWindPreceded, Plugin.Cfg.EffectivePreventWindRagdoll);
 
                 float clamp = (float)Plugin.Cfg.EffectiveWindFallCameraDampenClamp;
                 __result = WindTuning.ApplyFallCameraDampening(__result, fallIsWindPreceded, clamp);

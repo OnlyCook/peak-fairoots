@@ -1,4 +1,5 @@
 using ExitGames.Client.Photon;
+using Fairoots.Creatures;
 using Fairoots.Diagnostics;
 using Fairoots.SporeAreas;
 using Fairoots.SporeBombs;
@@ -66,11 +67,23 @@ namespace Fairoots.Networking
                 return; // our own local values are already authoritative - nothing to refresh.
             }
 
-            Diag.V("[HostAuthoritySync] room properties updated - reapplying cached wind/trigger-radius/spore-area/spore-decay state.");
+            Diag.V("[HostAuthoritySync] room properties updated - reapplying cached wind/trigger-radius/spore-area/creature/spore-decay state.");
             WindChillZoneTuningPatch.ReapplyAll();
             SporeBombCullPatch.ReapplyTriggerRadiusToAll();
             SporeAreaDisablePatch.ReapplyToAll();
             SporeAreaTuningPatch.ReapplyToAll();
+            // The three creature kill switches. Live-reported (2026-07-30): a host
+            // turning creatures off never hid them for anyone else, because hiding a
+            // beetle/spider is a one-shot SetActive on that client's own scene
+            // objects - there is nothing that re-reads the setting per frame to
+            // self-heal, so without this the switch only ever applied to whoever
+            // flipped it. The zombie half needs no reapply of its own (its prefix
+            // reads Effective* fresh, and spawning is the host's decision anyway),
+            // but the same pass covers it and logs all three.
+            CreatureDisablePatch.ReapplyToAll();
+            CreatureSpeedPatch.ReapplyToAll();
+            CreatureKnockbackPatch.ReapplyToAll();
+            CreatureRagdollPatch.ReapplyToAll();
             // The clear-time dial is cached onto CharacterAfflictions fields at Awake,
             // so a client that spawned before the host's first publish would otherwise
             // stay on its own local value. The build-up dial needs no equivalent - its

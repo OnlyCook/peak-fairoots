@@ -40,15 +40,6 @@ namespace Fairoots.Ui
     internal static class SporeWarningLabel
     {
         /// <summary>
-        /// English only for now, by the maintainer's explicit scoping - localization
-        /// into the game's other 13 languages comes later, and when it does it lands
-        /// the same way <c>Networking/ModPresenceLocalization</c> does it (a table
-        /// indexed by <c>LocalizedText.Language</c>'s declaration order) rather than
-        /// by changing anything here.
-        /// </summary>
-        private const string WarningText = "Breathing in spores!";
-
-        /// <summary>
         /// Where the label sits, in reference-resolution pixels below the top edge.
         /// The canvas is 1920x1080-referenced and the crosshair is the screen centre,
         /// so 270 is the midpoint between the top of the screen and the crosshair -
@@ -71,6 +62,14 @@ namespace Fairoots.Ui
 
         /// <summary>Last colour written, so the material isn't re-tinted every frame for no reason.</summary>
         private static Color _appliedColor;
+
+        /// <summary>
+        /// The language the current text was resolved for, so a language change made
+        /// mid-session (the game's settings menu does it without a scene reload) is
+        /// picked up instead of the label keeping whatever was active the frame it
+        /// was built. Nullable so the first <see cref="ApplyText"/> always writes.
+        /// </summary>
+        private static LocalizedText.Language? _appliedLanguage;
 
         /// <summary>Polled from <c>Plugin.Update</c>.</summary>
         internal static void Tick()
@@ -96,6 +95,7 @@ namespace Fairoots.Ui
                     Build();
                 }
 
+                ApplyText();
                 ApplyColor();
                 Fade(wanted);
             }
@@ -143,7 +143,6 @@ namespace Fairoots.Ui
 
             _text = textGo.AddComponent<TextMeshProUGUI>();
             _text.font = NativeUiAssets.Font;
-            _text.text = WarningText;
             _text.fontSize = 40f;
             _text.alignment = TextAlignmentOptions.Center;
             _text.raycastTarget = false;
@@ -157,6 +156,25 @@ namespace Fairoots.Ui
             _outlineColorId = Shader.PropertyToID("_OutlineColor");
 
             Diag.Info("[SporeWarningLabel] built (native font + outlined material found)");
+        }
+
+        /// <summary>
+        /// Writes the label's text in the game's current language
+        /// (<see cref="WarningLabelLocalization"/>), and only when that language has
+        /// actually changed - assigning <c>TextMeshProUGUI.text</c> forces a mesh
+        /// rebuild, so doing it unconditionally every frame would be a per-frame
+        /// re-layout for a string that almost never changes.
+        /// </summary>
+        private static void ApplyText()
+        {
+            LocalizedText.Language language = WarningLabelLocalization.CurrentLanguage;
+            if (_appliedLanguage == language)
+            {
+                return;
+            }
+
+            _appliedLanguage = language;
+            _text.text = WarningLabelLocalization.Get(WarningLabelKey.BreathingInSpores);
         }
 
         private static void ApplyColor()

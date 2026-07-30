@@ -147,20 +147,29 @@ reads.** See `Core`-adjacent `Fairoots/Networking/`:
   progress or a host migration (Photon promoting a new master client after
   the previous host disconnects).
 
-**What stays purely client-local, deliberately excluded from host
-authority:** the wind-preceded-fall camera-dampening clamp/window (a
-camera-feel/accessibility setting — it only affects how *your own* camera
-reacts to *your own* fall, never anyone else's experience or the shared
-world state), the spore-bomb recolor (`General/recolor-spore-bombs`, added
+**Widened 2026-07-30 (maintainer's call, after co-op playtesting): the rule
+is now every setting outside `General` and `Debug`, with no exceptions.** No
+setting that can change the environment/biome may be decided by a client; if
+a non-host changes one it does nothing until they become the host themselves.
+This retired the one carve-out that existed — the wind-preceded-fall
+camera-dampening clamp and its window (`Wind/fall-camera-dampen-clamp`,
+`Wind/fall-camera-dampen-window-seconds`), previously excluded as
+"camera-feel/accessibility." Both are host-authoritative now, and the new
+`Wind/prevent-wind-ragdoll` toggle that shares their wind-preceded-fall test
+was host-authoritative from the start.
+
+**What stays purely client-local:** the spore-bomb recolor
+(`General/recolor-spore-bombs`, added
 2026-07-26 — purely cosmetic, see the spore-bomb mechanic note below), the
 spore-cloud translucency pair (`General/spore-area-cloud-opacity` and
 `General/spore-bomb-cloud-opacity`, added 2026-07-28 — likewise purely
 cosmetic, changing how densely one player's own screen draws a cloud and
-nothing about the hazard itself), and
-the entire `Debug` section (diagnostics/overlays, never gameplay-affecting;
-this is also where `apply-changes-live` lives, since freezing values
-mid-run is a comparison-testing tool). Everything else that decides what
-spawns, what gets removed, or how much force applies is host-authoritative.
+nothing about the hazard itself), the two on-screen warning labels and the
+cover-mouth keybind, and the entire `Debug` section (diagnostics/overlays,
+never gameplay-affecting; this is also where `apply-changes-live` lives, since
+freezing values mid-run is a comparison-testing tool). `General`'s seed and
+preset are the two host-decided entries in that section, by definition.
+Everything outside those two sections is host-authoritative.
 
 **Enforcement (added 2026-07-22, refined 2026-07-22): every client must
 actually have Fairoots installed, and this is checked, not just
@@ -501,9 +510,10 @@ Brief summary only — see `RESEARCH.md` for exact classes/fields/citations.
   principle here.** Everything else listed above makes the game's *own* feedback
   legible — it thins a cloud the game already drew, or raises a warning the game
   already owns. This adds a HUD element PEAK never had, which is a louder
-  intervention and a matter of taste rather than fairness. English only for now;
-  localization into the other 13 languages is a later pass and lands the way
-  `Networking/ModPresenceLocalization` already does it.
+  intervention and a matter of taste rather than fairness. Fully localized into
+  all 14 languages the game ships with as of 2026-07-30 (`Ui/
+  WarningLabelLocalization.cs`), the same way `Networking/
+  ModPresenceLocalization` does it — as is the spider warning label.
 
   **This supersedes the preset table's "Spore area screen-filter opacity" row**
   as a plan. That row would reduce the opacity of the *overlay* — the one
@@ -948,3 +958,24 @@ AssetRipper, not more decompilation). At the design level, still undecided:
   `CharacterData.GetTargetRagdollControll()` is about to return its
   unconditional 0 for a fall in progress. See `CODEBASE.md`'s `Wind/` section
   and `Core/WindTuning.cs`'s `IsWindForceStillRecent`/`ApplyFallCameraDampening`.
+- **Wind ragdolling you off an edge — RESOLVED (2026-07-30).** The partial
+  camera clamp above turned out to be the softer half of what was wanted; the
+  maintainer's call after co-op playtesting is that wind should not be able to
+  ragdoll the player *at all*. Shipped as `Wind/prevent-wind-ragdoll`, a flat
+  host-authoritative toggle that is **on under every preset** (including
+  Subtle): while a fall is wind-preceded — the same window and the same
+  timestamp the clamp uses — ragdoll control is held at full instead of
+  vanilla's 0, so you keep control on the way down and can still grab a wall or
+  use a Rescue Hook. Turning it off restores vanilla, with the partial clamp
+  still applying on top if the preset sets one; the two compose by "whichever
+  is more generous wins" and neither can ever *lower* the vanilla result. See
+  `Core/WindTuning.cs`'s `ApplyWindRagdollImmunity`.
+- **Foliage removal opt-out — RESOLVED (2026-07-30).** The "let paranoid
+  players disable even the always-on bush/grass removal pass" toggle the
+  preset catalog left room for now exists:
+  `Spore-Bombs/disable-foliage-removal`, flat, host-authoritative, **off under
+  every preset** (i.e. the pass keeps running everywhere unless a player says
+  otherwise). Deliberately does not change how much gets removed overall —
+  `cull-fraction`'s target still lands, the seeded pass just selects from every
+  spore bomb instead of only the visible ones — so it is an opt-out of *which*
+  bombs go, not of the removal itself.

@@ -10,7 +10,8 @@ namespace Fairoots.SporeBombs
     /// <summary>
     /// Phase 4 (ROADMAP.md): the actual spore-bomb removal logic. Scans an
     /// already-placed Roots scene and applies the two-pass decision from
-    /// <see cref="SporeBombCull"/>: unconditional foliage removal, then a seeded
+    /// <see cref="SporeBombCull"/>: foliage removal (on under every preset, but
+    /// switchable off via <c>Spore-Bombs/disable-foliage-removal</c>), then a seeded
     /// cull budgeted against it.
     ///
     /// Triggered by <see cref="RootsLevelWatcher"/> - NOT a Harmony postfix on
@@ -152,8 +153,14 @@ namespace Fairoots.SporeBombs
                     return;
                 }
 
+                // Collected even when the removal pass is switched off: the F10
+                // removed-marker overlay and the foliage probe both explain their
+                // findings out of this list, and it's one pass over the same
+                // renderers the scan already walked.
                 CollectFoliageVertices(rootsSegment);
                 Diag.V($"[SporeBombCull] {LastFoliageVertices.Count} foliage vertex sample(s) collected for proximity test");
+
+                bool foliageRemoval = !Plugin.Cfg.EffectiveDisableFoliageRemoval;
 
                 var positions = new List<GridPos>(candidates.Count);
                 var inFoliage = new List<bool>(candidates.Count);
@@ -167,7 +174,8 @@ namespace Fairoots.SporeBombs
                     positions,
                     inFoliage,
                     Plugin.Cfg.EffectiveSporeBombCullFraction,
-                    Plugin.Cfg.EffectiveSeed);
+                    Plugin.Cfg.EffectiveSeed,
+                    foliageRemoval);
 
                 int removed = 0;
                 int shrunk = 0;
@@ -221,7 +229,8 @@ namespace Fairoots.SporeBombs
                 var summary = SporeBombCull.Summarize(outcomes);
                 Diag.Info(
                     $"[SporeBombCull] {summary.Total} candidate(s): removed {removed} " +
-                    $"(foliage={summary.FoliageRemoved}, seeded={summary.SeededRemoved}), kept {summary.Kept}, " +
+                    $"(foliage={(foliageRemoval ? summary.FoliageRemoved.ToString() : "off")}, " +
+                    $"seeded={summary.SeededRemoved}), kept {summary.Kept}, " +
                     $"trigger-radius shrunk on {shrunk} (multiplier={triggerRadiusMultiplier:0.##}), " +
                     $"recolor={(recolor ? $"ON target={sporeColor}" : "OFF")}");
             }

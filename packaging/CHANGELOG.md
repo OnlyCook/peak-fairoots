@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+- Wind can no longer ragdoll you off an edge (`Wind/prevent-wind-ragdoll`, on by
+  default under every preset): when a gust pushes you off, you stay in control on
+  the way down instead of flailing, so you can still grab a wall or fire a Rescue
+  Hook. Only applies to falls wind actually caused — walking off a ledge yourself
+  ragdolls exactly like vanilla. Turn it off for vanilla behaviour.
+- New `Spore-Bombs/disable-foliage-removal` (off by default) for anyone who wants
+  spore bombs hidden inside bushes and ferns left where the game put them. It
+  doesn't mean more spore bombs overall: the removal target still applies, the
+  removal just stops treating camouflaged bombs as the first to go.
+- Both on-screen warnings ("Breathing in spores!", "Spider dropping on you!") are
+  now translated into all 14 languages the game ships with, and follow the game's
+  language setting live.
+- Fixed: creature settings the host changed mid-run did nothing for everyone
+  else — beetles and spiders stayed visible on other players' screens after the
+  host disabled them, and the speed/knockback/ragdoll dials likewise only applied
+  to whoever changed them.
+- Every setting outside `General` and `Debug` is now host-only, with no
+  exceptions: the two wind-preceded-fall settings
+  (`fall-camera-dampen-clamp`, `fall-camera-dampen-window-seconds`) used to be
+  per-player and are now the host's call like everything else.
+
 - New `Spores` section with two settings that apply to the Spores status itself
   rather than to one hazard: `clear-time-multiplier` (0.7 default) changes how
   long spores take to wear off once you're out of them — 0.5 means half the time,
@@ -24,7 +45,7 @@
 - Optional on-screen "Breathing in spores!" warning
   (`General/show-spore-cloud-label`, off by default) in the game's own font and
   the Spores status colour, shown whenever you're standing in spores — either
-  hazard. English only for now.
+  hazard.
 - A spore bomb's visible cloud now grows and shrinks with
   `Spore-Bombs/spore-area-radius-multiplier`, so it matches the area that
   actually applies spores.

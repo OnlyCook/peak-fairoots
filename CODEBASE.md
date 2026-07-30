@@ -57,10 +57,15 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
     every `Effective*` accessor is also host-authoritative** (wrapped in
     `Networking/HostAuthority.Resolve` — see that folder below): a no-op on
     the host, but overridden by the host's published value on every other
-    client. The only accessors deliberately excluded (stay purely per-client)
-    are `EffectiveWindFallCameraDampenClamp` and the flat
-    `WindRecentForceWindowSeconds`/`Debug` section entries — plus
-    `recolor-spore-bombs`, which has no `Effective*` accessor at all: it's
+    client. **As of 2026-07-30 that is every single one, with no exceptions**
+    (maintainer's call): the rule is now "everything outside `General` and
+    `Debug` is host-authoritative," which retired the last two carve-outs —
+    `EffectiveWindFallCameraDampenClamp` and the flat
+    `WindRecentForceWindowSeconds`, both previously per-client as
+    camera-feel/accessibility settings. What has no host lookup is what has no
+    `Effective*` accessor at all: the `Debug` section, and `General`'s cosmetic
+    entries — the two warning-label toggles, the cloud-opacity pair, the
+    cover-mouth keybind, and `recolor-spore-bombs`, which is
     purely cosmetic (what one player sees on their own screen), so there's
     neither a host lookup nor a level-load snapshot to apply, and game-facing
     code reads `Plugin.Cfg.RecolorSporeBombs.Value` directly.
@@ -90,13 +95,20 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       or on a local config change) and cached onto live fields, not re-read
       every frame, so a client whose own level load raced ahead of the host's
       first `PublishAll` would otherwise stay stuck on its local fallback
-      value for the rest of that level; this re-runs
-      `WindChillZoneTuningPatch.ReapplyAll()` /
-      `SporeBombCullPatch.ReapplyTriggerRadiusToAll()` whenever a fresh
-      room-property write actually lands, closing that race regardless of who
-      wins it. The spore-bomb detonation tuning (knockback/VFX/screen-shake
-      cap) doesn't need this - it already reads `Plugin.Cfg.Effective*` fresh
-      at the moment of each detonation.
+      value for the rest of that level; this re-runs every reapply pass whose
+      state is cached rather than re-read — `WindChillZoneTuningPatch` /
+      `SporeBombCullPatch.ReapplyTriggerRadiusToAll` / `SporeAreaDisablePatch` /
+      `SporeAreaTuningPatch` / `SporeDecayPatch`, plus the four creature passes
+      (`CreatureDisablePatch`, `CreatureSpeedPatch`, `CreatureKnockbackPatch`,
+      `CreatureRagdollPatch`) — whenever a fresh room-property write actually
+      lands, closing that race regardless of who wins it. **The creature passes
+      were missing here until 2026-07-30** and that was a real, live-reported
+      co-op bug, not just a race: hiding a beetle or a spider is a one-shot
+      `SetActive` on each client's own scene objects with nothing that re-reads
+      the setting per frame, so a host turning creatures off never hid them for
+      anybody else. The spore-bomb detonation tuning (knockback/VFX/screen-shake
+      cap) genuinely doesn't need this - it already reads `Plugin.Cfg.Effective*`
+      fresh at the moment of each detonation.
     - `ModPresenceCheck.cs` — tracks who in the lobby has Fairoots installed,
       backing the "every client needs Fairoots installed" requirement
       (ROADMAP.md's Host authority section): every client marks itself via a
@@ -180,6 +192,17 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       you — same "the label matches the status it warns about" rule as the spore
       label's `colorSpores`; there is no `colorWeb` in the build. Presence comes
       from `Creatures/SpiderStrikeWarning`, never a scene scan.
+    - `WarningLabelLocalization.cs` — both labels' text in all 14 languages the
+      game ships with (added 2026-07-30, live-reported as the one player-visible
+      string in the mod that ignored the game's language setting). Same
+      `Dictionary<Key, string[]>`-indexed-by-`LocalizedText.Language` shape, and
+      the same English/TraditionalChinese fallback convention, as
+      `Networking/ModPresenceLocalization` — it reuses that folder's
+      `LocalizationHelper` outright rather than growing a second copy. Both labels
+      re-resolve their text whenever `LocalizedText.CURRENT_LANGUAGE` changes
+      (they build their `TextMeshProUGUI` once and then only tick colour/alpha, and
+      the language can change mid-session with no scene reload), but only then —
+      assigning `.text` forces a mesh rebuild.
   - `ParticleOpacity.cs` — the shared "thin out this VFX" applier behind both
     spore-cloud translucency settings (`SporeAreas/SporeCloudOpacityPatch` and
     `SporeBombs/SporeBombCloudOpacity`), game-facing so deliberately outside
@@ -628,10 +651,16 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       `SporeAreaCull` needed the same logic; the pre-existing spore-bomb cull
       tests passing unchanged is the proof the extraction was
       behavior-preserving.
-    - `SporeBombCull.cs` — the two-pass spore-bomb removal decision: unconditional
-      foliage removal, then a `ClusteredRemovalSelection` cull budgeted against
-      it. Returns per-candidate outcomes; `SporeBombCullPatch` maps them back
-      onto real GameObjects.
+    - `SporeBombCull.cs` — the two-pass spore-bomb removal decision: foliage
+      removal, then a `ClusteredRemovalSelection` cull budgeted against it.
+      Returns per-candidate outcomes; `SporeBombCullPatch` maps them back onto
+      real GameObjects. The foliage pass runs under every preset but can be
+      switched off outright (`Spore-Bombs/disable-foliage-removal`, added
+      2026-07-30 → `Decide`'s `foliageRemovalEnabled`), which makes the pass a
+      no-op **without** changing the overall removal target: the seeded pass
+      still removes up to the same count, it just selects from every candidate
+      instead of only the non-camouflaged ones. So it's an opt-out of *which*
+      bombs go, not of removal.
     - `CoverMouth.cs` — the cover-mouth input state machine (hold vs. toggle, plus
       the outside veto that force-cancels a cover and can't be latched around) and
       its framerate-independent stamina cost. Unity-free so the awkward part is
@@ -761,10 +790,16 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
     - `WindTuning.cs` — pure arithmetic for wind force/gust-duration scaling,
       non-backpack item-force scaling, and obstacle-occlusion raycast-distance
       scaling (not seed-gated, same reasoning as `SporeBombExplosionTuning`),
-      plus the wind-preceded-fall camera-dampening decision
-      (`IsWindForceStillRecent` + `ApplyFallCameraDampening`) — the
-      maintainer's scoping call (ROADMAP.md "Open questions"): dampen only
-      falls preceded by recent wind force, not every Roots fall. Deliberately
+      plus the two wind-preceded-fall decisions, which share one recency test
+      (`IsWindForceStillRecent`): `ApplyWindRagdollImmunity`
+      (`Wind/prevent-wind-ragdoll`, added 2026-07-30 — holds ragdoll control at
+      full so wind can't ragdoll you off an edge at all; on under every preset)
+      and the older, softer `ApplyFallCameraDampening` (a partial floor). Both
+      only ever *raise* the vanilla result, so the patch just applies them in
+      sequence and the more generous one wins. Both are scoped to wind-preceded
+      falls by the maintainer's original scoping call (ROADMAP.md "Open
+      questions"): only falls preceded by recent wind force, never every Roots
+      fall. Deliberately
       does **not** include fog-density scaling — reverted as a precaution
       (the actual density/opacity relationship lives in shader code this mod
       has no way to decompile or verify, so scaling
@@ -823,15 +858,21 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
     `Plugin.cs`, bypassing `ApplyChangesLive` (same treatment as
     `KeepVanillaTriggerRadius`).
   - `WindFallCameraDampingPatch.cs` — two cooperating patches, both scoped to
-    `Character.localCharacter` only (a camera-feel effect, not networked
-    physics): `WindRecentForceTrackerPatch` records a timestamp on
+    `Character.localCharacter` only (a character's ragdoll control is driven by
+    whoever owns it, so every client applying this to its own character is the
+    full coverage — which is also why both settings are still
+    host-authoritative: the values have to match across the lobby even though
+    each client applies them itself): `WindRecentForceTrackerPatch` records a timestamp on
     `WindChillZone.AddWindForceToCharacter`'s postfix (re-deriving the
     original method's own early-return checks, since a postfix always fires
     even when the original bailed out without applying force); the actual
     dampening patches `CharacterData.GetTargetRagdollControll()` (the method
     RESEARCH.md Q6 traced as the source of the "0 the instant any fall
     starts" camera-spin mechanism), raising its floor only when the fall is
-    within the configured recency window of a real wind-force application.
+    within the configured recency window of a real wind-force application —
+    all the way to full control while `Wind/prevent-wind-ragdoll` is on
+    (the default), otherwise partway, up to
+    `Wind/fall-camera-dampen-clamp`'s preset value.
   - `ClimbWindShelterPatch.cs` — the climb-to-shelter-from-wind mechanic
     (ROADMAP.md's "New: climb-to-counter-wind" row). **Corrects an earlier
     claim in this file that the mechanic already existed natively and needed

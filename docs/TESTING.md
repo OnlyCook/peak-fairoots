@@ -471,9 +471,10 @@ it logs each entry/exit with the reason.
 6. Turn the setting off mid-run: it should disappear immediately.
 
 **Report back:** the wording (it's a placeholder pick, not a decided string),
-the size, and the vertical position. English only for now — localization into
-the game's other 13 languages is a later pass and doesn't change any of the
-above.
+the size, and the vertical position. The text is localized into all 14 languages
+the game ships with, so it's also worth switching the game's language mid-run
+once: the label should re-word itself without a scene reload, and the string
+should still fit on one line (both labels have word wrap off by design).
 
 ### Bomb cloud VFX vs. its spore radius (`Spore-Bombs/spore-area-radius-multiplier`)
 
@@ -520,6 +521,30 @@ the `Spore-Bombs` entries are actually in effect.
 **Report back:** whether step 1's changes applied instantly, whether step 2's
 changes were correctly ignored until step 3's reload, and whether step 4's
 debug toggle stayed live throughout.
+
+### Foliage-removal opt-out (`Spore-Bombs/disable-foliage-removal`)
+
+**Pre-req:** debug logging on, a fixed `seed`, and `Debug/show-removed-spore-bomb-
+markers = true` (the F10 overlay tags every removal `FOLIAGE` or `SEEDED`). This
+setting only applies at Roots level load, so each change needs a fresh run.
+
+1. Default (`false`): the level-load line should read `[SporeBombCull] N
+   candidate(s): removed M (foliage=X, seeded=Y, ...)` with `X > 0`, and the
+   overlay should show `FOLIAGE` markers sitting in ferns/bushes.
+2. Set it to `true`, same seed, fresh run: the log should now read
+   `foliage=off`, no `FOLIAGE` marker should appear anywhere, and you should be
+   able to find at least one spore bomb genuinely hidden inside foliage still in
+   the level.
+3. **The important check — total removals must not drop.** Compare `removed M`
+   between runs 1 and 2: `M` should be the same (the seeded pass absorbs the
+   whole target), only the split changes. A smaller `M` in run 2 is a bug.
+4. Same seed twice with the setting on: identical bombs removed both runs
+   (`SEEDED` markers in the same places). Change the seed: a different set, same
+   count.
+
+**Report back:** whether the count held steady across the toggle, and whether
+leaving camouflaged bombs in actually feels as unfair as expected (this switch
+exists to be able to answer that).
 
 ### Trigger-box wireframe + vanilla-size comparison (for the README screenshot)
 
@@ -699,6 +724,34 @@ fog/visibility looked unchanged from vanilla throughout.
 whether a non-wind fall was completely unaffected, and whether 0.35 is a good
 default or needs adjusting (the maintainer's own framing: strong enough to
 let you react, not so strong it removes all sense of falling).
+
+**Note:** with `Wind/prevent-wind-ragdoll` on (the default under every preset —
+see the next section) the clamp is redundant, because full control already beats
+any partial floor. Turn `prevent-wind-ragdoll` **off** first if you want to test
+the clamp on its own.
+
+### Wind can't ragdoll you (`Wind/prevent-wind-ragdoll`)
+
+**Pre-req:** debug logging on, in a Roots run, default `prevent-wind-ragdoll =
+true` and `fall-camera-dampen-window-seconds = 1.5`.
+
+1. Stand near an exposed ledge and let a gust push you off. You should stay
+   **fully in control** on the way down — an upright, animated fall, not a
+   flailing ragdoll — with enough control to grab a wall or fire a Rescue Hook.
+2. Walk off the same ledge yourself with **no wind active**: this must ragdoll
+   exactly like vanilla. The mechanic is scoped to falls wind actually caused,
+   and a self-inflicted fall isn't one.
+3. Get pushed near the edge, wait out the gust (longer than 1.5s), then jump —
+   also vanilla, confirming the recency window is what gates it.
+4. Turn the setting **off** and repeat step 1: wind should ragdoll you again,
+   softened only partway if the preset sets a `fall-camera-dampen-clamp`
+   (Balanced 0.35 / Generous 0.55 / Tame 0.75; Subtle 0, i.e. full vanilla spin).
+5. Being ragdolled by something that *isn't* wind (a beetle hit, a zombie bite,
+   fall damage on landing) must be completely unaffected in every case above.
+
+**Report back:** whether keeping control actually converted "blown off a ledge"
+from a death sentence into a recoverable moment, and whether full immunity feels
+right for every preset (including Subtle) or wants to be preset-gated after all.
 
 ### Climb to shelter from wind
 
@@ -1111,16 +1164,27 @@ section for the full rationale/mechanism before testing this.
    non-host to master client - the new host's own config should immediately
    become authoritative for whoever's left (via `HostAuthoritySync`'s
    `OnMasterClientSwitched`), without needing a level reload.
-6. Confirm the wind-preceded-fall camera-dampening clamp is the one exception
-   that stays per-client: each player should be able to set their own
-   `fall-camera-dampen-clamp` independently and have it apply to their own
-   camera regardless of what the host or other players have set.
+6. **Creatures (this was broken until 2026-07-30 — worth re-testing
+   specifically).** With both players already in a Roots level, host flips
+   `Creatures/disable-beetles` and `Creatures/disable-spiders` on: the beetles
+   and spiders must vanish on the **non-host's** screen too, within a moment and
+   with no reload. Flip them back off and they must come back for both. Then
+   have the non-host flip the same switches themselves — nothing should change
+   for anyone, since only the host's value counts. Repeat for
+   `Creatures/zombie-speed-multiplier` (a host change should be visibly felt by
+   the client on the next chase).
+7. **No per-client exceptions left (changed 2026-07-30).** The
+   wind-preceded-fall settings used to be deliberately per-client and no longer
+   are: with the host on `fall-camera-dampen-clamp = 0` /
+   `prevent-wind-ragdoll = false`, a non-host who sets both generously for
+   themselves should still ragdoll exactly like vanilla when wind blows them off
+   a ledge. Their own values should start applying the moment they become the
+   host (step 5).
 
 **Report back:** whether the non-host client's spore bombs/wind genuinely
 matched the host's config (not their own), whether live host changes
-propagated to the client promptly, whether disable-wind-entirely affected
-both players, and whether the camera-dampening clamp correctly stayed
-per-player independent.
+propagated to the client promptly (creatures especially), and whether
+disable-wind-entirely affected both players.
 
 ### Mod-presence enforcement (multiplayer — needs a second player/PC without Fairoots installed)
 

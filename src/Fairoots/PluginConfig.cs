@@ -39,15 +39,22 @@ namespace Fairoots
     /// the host, this is a no-op (the local value already is the authoritative
     /// one); on any other client, it's overridden by whatever the host has
     /// published, so an individual client's own local config for these can
-    /// never diverge from the host's. Purely local per-player feel settings -
-    /// <see cref="EffectiveWindFallCameraDampenClamp"/>,
-    /// <see cref="WindRecentForceWindowSeconds"/>,
+    /// never diverge from the host's.
+    ///
+    /// <b>Widened 2026-07-30 (maintainer's call): the rule is now every setting
+    /// outside <c>General</c> and <c>Debug</c>, with no exceptions.</b> The two
+    /// wind-preceded-fall settings (<see cref="EffectiveWindFallCameraDampenClamp"/>,
+    /// <see cref="WindRecentForceWindowSeconds"/>) used to be excluded as "purely
+    /// local camera feel" and no longer are - if a setting can change how the biome
+    /// behaves for the player, a non-host flipping it does nothing until they are the
+    /// host themselves. What stays per-client: everything in <c>Debug</c>, and
+    /// <c>General</c>'s genuinely cosmetic/local entries -
     /// <see cref="RecolorSporeBombs"/>, <see cref="SporeAreaCloudOpacity"/>,
-    /// <see cref="SporeBombCloudOpacity"/> and
-    /// <see cref="ShowOverlayInSporeBombClouds"/> and
-    /// <see cref="ShowSporeCloudLabel"/> (all five purely cosmetic - see
-    /// their own remarks), and everything in <c>Debug</c> - are deliberately excluded, since they
-    /// don't affect anyone but the player who set them.
+    /// <see cref="SporeBombCloudOpacity"/>,
+    /// <see cref="ShowOverlayInSporeBombClouds"/>,
+    /// <see cref="ShowSporeCloudLabel"/>, <see cref="ShowSpiderWarningLabel"/> and
+    /// the cover-mouth keybind - since they only change what one player sees or
+    /// presses. <c>General</c>'s seed and preset are host-decided by definition.
     /// </summary>
     public class PluginConfig
     {
@@ -170,6 +177,19 @@ namespace Fairoots
         /// numbers regardless of this value. Defaults to Balanced's number.
         /// </summary>
         public ConfigEntry<double> SporeBombCullFractionOverride { get; }
+
+        /// <summary>
+        /// Turns off the unconditional bush/grass placement-removal pass
+        /// (<see cref="Core.SporeBombCull"/>'s pass 1). Flat and off by default
+        /// under every preset (<see cref="PresetCatalog.SporeBombFoliageRemoval"/>
+        /// stays <c>true</c> everywhere) - the pass is one of the mod's always-on
+        /// bug fixes, so this exists for the player who wants even that left alone,
+        /// not as something a preset ever reaches for. Doesn't change how much gets
+        /// removed overall: <see cref="SporeBombCullFractionOverride"/>'s target
+        /// still applies, the seeded pass just picks from every candidate instead of
+        /// only the non-camouflaged ones.
+        /// </summary>
+        public ConfigEntry<bool> DisableFoliageRemoval { get; }
 
         /// <summary>
         /// Custom-preset value for the trigger-hitbox radius multiplier applied to
@@ -719,12 +739,30 @@ namespace Fairoots
 
         /// <summary>
         /// How many seconds after wind force was last applied to the local
-        /// character that a subsequent fall still counts as "wind-preceded" for
-        /// the camera-dampening clamp above. Flat setting (not folded through the
+        /// character that a subsequent fall still counts as "wind-preceded" - for
+        /// both the camera-dampening clamp above and
+        /// <see cref="PreventWindRagdoll"/>. Flat setting (not folded through the
         /// preset/override system) - it's a timing window, not a balance dial
-        /// that scales per preset.
+        /// that scales per preset - but host-authoritative like everything else
+        /// outside <c>General</c>/<c>Debug</c>: read via
+        /// <see cref="EffectiveWindRecentForceWindowSeconds"/>.
         /// </summary>
         public ConfigEntry<float> WindRecentForceWindowSeconds { get; }
+
+        /// <summary>
+        /// Whether wind is allowed to ragdoll the player at all. On (the default,
+        /// and on under every preset): a fall that wind caused
+        /// (<see cref="Core.WindTuning.IsWindForceStillRecent"/>, same window as the
+        /// camera clamp) keeps the player fully in control instead of collapsing
+        /// into physics - <see cref="Core.WindTuning.ApplyWindRagdollImmunity"/>.
+        /// Off: vanilla, wind blowing you off a ledge ragdolls you, and only the
+        /// partial <see cref="WindFallCameraDampenClampOverride"/> floor applies.
+        /// Flat (not preset-gated - it's on everywhere, same shape as
+        /// <see cref="ClimbSheltersFromWind"/>) and host-authoritative: it decides
+        /// whether a player keeps control of their character, which is shared
+        /// balance, not local camera feel.
+        /// </summary>
+        public ConfigEntry<bool> PreventWindRagdoll { get; }
 
         /// <summary>
         /// Whether holding onto something (wall climbing, a rope, a vine, a climb
@@ -1016,6 +1054,21 @@ namespace Fairoots
                     "set to Custom (5) - ignored under presets 1-4. 0 = remove none beyond " +
                     "the always-on foliage pass (vanilla-equivalent).",
                     new AcceptableValueRange<double>(0.0, 1.0)));
+
+            DisableFoliageRemoval = config.Bind(
+                "Spore-Bombs",
+                "disable-foliage-removal",
+                false,
+                "Turns off the always-on removal of spore bombs that spawned hidden inside a " +
+                "bush or clump of ferns. On by default in every preset because a bomb you " +
+                "physically cannot see before setting it off isn't a hazard you can play " +
+                "around, so this switch is for players who want even that left as vanilla. " +
+                "Turning it on does NOT mean more spore bombs overall: cull-fraction's " +
+                "removal target still applies, the seeded removal just picks from every " +
+                "spore bomb instead of only the visible ones. Off by default; no preset ever " +
+                "turns this on automatically. HOST-AUTHORITATIVE: only the host's value " +
+                "counts for the whole lobby. Takes effect on the next Roots level load " +
+                "(spore-bomb removal happens once, when the biome is placed).");
 
             SporeBombTriggerRadiusMultiplierOverride = config.Bind(
                 "Spore-Bombs",
@@ -1593,9 +1646,26 @@ namespace Fairoots
                 1.5f,
                 new ConfigDescription(
                     "How many seconds after wind last pushed you that a fall still counts as " +
-                    "wind-preceded for fall-camera-dampen-clamp above. Not tied to any preset - " +
-                    "applies the same regardless of which preset is active.",
+                    "wind-preceded for fall-camera-dampen-clamp above and for " +
+                    "prevent-wind-ragdoll below. Not tied to any preset - applies the same " +
+                    "regardless of which preset is active. HOST-AUTHORITATIVE: only the host's " +
+                    "value counts for the whole lobby.",
                     new AcceptableValueRange<float>(0.1f, 5f)));
+
+            PreventWindRagdoll = config.Bind(
+                "Wind",
+                "prevent-wind-ragdoll",
+                true,
+                "Whether wind is allowed to ragdoll you. On (the default, and on under every " +
+                "preset): when wind blows you off a ledge you keep full control of your " +
+                "character on the way down, so you can grab a wall or use a Rescue Hook " +
+                "instead of flailing helplessly. Off: vanilla, where being pushed off an edge " +
+                "collapses you into physics - fall-camera-dampen-clamp above then still " +
+                "softens it partway, if the preset sets one. Only ever applies to a fall wind " +
+                "actually caused (see fall-camera-dampen-window-seconds); an ordinary fall " +
+                "you walked into yourself ragdolls exactly like vanilla either way. " +
+                "HOST-AUTHORITATIVE: only the host's value counts for the whole lobby. " +
+                "Applies immediately, regardless of apply-changes-live.");
 
             ClimbSheltersFromWind = config.Bind(
                 "Wind",
@@ -2458,11 +2528,51 @@ namespace Fairoots
 
         /// <summary>
         /// Game-facing code should read this instead of
-        /// <see cref="WindFallCameraDampenClamp"/>. Deliberately NOT
-        /// host-authoritative - purely local camera-feel/accessibility, doesn't
-        /// affect anyone but the player it's set for (see class remarks).
+        /// <see cref="WindFallCameraDampenClamp"/>. Host-authoritative as of
+        /// 2026-07-30 (maintainer's call): every setting outside <c>General</c> and
+        /// <c>Debug</c> may only change the biome when the host changes it, with no
+        /// exception carved out for "it's only camera feel" - a client setting this
+        /// for themselves now does nothing until they are the host.
         /// </summary>
-        public double EffectiveWindFallCameraDampenClamp => UseLiveValue ? WindFallCameraDampenClamp : _snapWindFallCameraDampenClamp;
+        public double EffectiveWindFallCameraDampenClamp =>
+            HostAuthority.Resolve("WindFallCameraDampenClamp", UseLiveValue ? WindFallCameraDampenClamp : _snapWindFallCameraDampenClamp);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="WindRecentForceWindowSeconds"/>.Value. Host-authoritative,
+        /// flat - see <see cref="EffectiveWindFallCameraDampenClamp"/> for why this
+        /// one stopped being per-client too.
+        /// </summary>
+        public float EffectiveWindRecentForceWindowSeconds =>
+            HostAuthority.Resolve("WindRecentForceWindowSeconds", WindRecentForceWindowSeconds.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="PreventWindRagdoll"/>.Value. Host-authoritative - flat, same
+        /// shape as <see cref="EffectiveClimbSheltersFromWind"/> minus the preset
+        /// gate (this one is on under every preset).
+        /// </summary>
+        public bool EffectivePreventWindRagdoll =>
+            HostAuthority.Resolve("PreventWindRagdoll", PreventWindRagdoll.Value);
+
+        /// <summary>
+        /// Game-facing code should read this instead of
+        /// <see cref="DisableFoliageRemoval"/>.Value. Host-authoritative - flat,
+        /// same shape as <see cref="EffectiveDisableSporeAreas"/>: which spore bombs
+        /// exist in the level is shared game state.
+        /// </summary>
+        /// <remarks>
+        /// Folds the preset row in the same way
+        /// <see cref="EffectiveClimbSheltersFromWind"/> does, so
+        /// <see cref="PresetCatalog.SporeBombFoliageRemoval"/> stays the single
+        /// source of truth for "does this preset run the pass": the pass is off if
+        /// the player switched it off <em>or</em> the preset doesn't run it. No
+        /// preset currently turns it off, so today only the player's switch can.
+        /// </remarks>
+        public bool EffectiveDisableFoliageRemoval =>
+            HostAuthority.Resolve(
+                "DisableFoliageRemoval",
+                DisableFoliageRemoval.Value || !PresetCatalog.SporeBombFoliageRemoval(Preset.Value));
 
         /// <summary>
         /// Game-facing code should read this instead of

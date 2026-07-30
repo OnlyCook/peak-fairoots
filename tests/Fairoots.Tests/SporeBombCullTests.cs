@@ -117,6 +117,80 @@ namespace Fairoots.Tests
             Assert.Equal(40, s.Kept);
         }
 
+        // --- disable-foliage-removal (Spore-Bombs, 2026-07-30) -------------------
+
+        [Fact]
+        public void FoliageRemovalDisabled_RemovesNoneForFoliage()
+        {
+            // Every 3rd candidate is in foliage, but the pass is off: not one
+            // candidate may come back tagged RemovedFoliage, and with a removal
+            // target of 0 that means nothing is removed at all.
+            var (pos, fol) = MakeField(90, i => i % 3 == 0);
+            var outcomes = SporeBombCull.Decide(pos, fol, 0.0, userSeed: 4, foliageRemovalEnabled: false);
+            var s = SporeBombCull.Summarize(outcomes);
+
+            Assert.Equal(0, s.FoliageRemoved);
+            Assert.Equal(0, s.TotalRemoved);
+            Assert.Equal(90, s.Kept);
+            Assert.DoesNotContain(CullOutcome.RemovedFoliage, outcomes);
+        }
+
+        [Fact]
+        public void FoliageRemovalDisabled_KeepsTheSameOverallRemovalTarget()
+        {
+            // The setting must not turn into "more spore bombs overall": the 50%
+            // target still lands, it's just all seeded now (20 foliage + 30 seeded
+            // with the pass on - see SeededCull_IsBudgetedAgainstFoliage - vs. 0 + 50
+            // with it off).
+            var (pos, fol) = MakeField(100, i => i < 20);
+            var s = SporeBombCull.Summarize(
+                SporeBombCull.Decide(pos, fol, 0.5, userSeed: 7, foliageRemovalEnabled: false));
+
+            Assert.Equal(0, s.FoliageRemoved);
+            Assert.Equal(50, s.SeededRemoved);
+            Assert.Equal(50, s.Kept);
+        }
+
+        [Fact]
+        public void FoliageRemovalDisabled_MakesFoliageCandidatesEligibleToSurvive()
+        {
+            // The actual player-visible promise: with the pass off, a bomb hidden in
+            // a bush can survive. 60 of 100 in foliage at a 50% target means at
+            // least 10 of them must still be standing (the budget can't reach them
+            // all), and per-instance - not just as a count.
+            var (pos, fol) = MakeField(100, i => i < 60);
+            var outcomes = SporeBombCull.Decide(pos, fol, 0.5, userSeed: 3, foliageRemovalEnabled: false);
+
+            int foliageSurvivors = Enumerable.Range(0, 100)
+                .Count(i => fol[i] && outcomes[i] == CullOutcome.Kept);
+            Assert.True(foliageSurvivors >= 10, $"expected at least 10 foliage survivors, got {foliageSurvivors}");
+
+            // Contrast: with the pass on, the same field leaves none of them.
+            var onOutcomes = SporeBombCull.Decide(pos, fol, 0.5, userSeed: 3, foliageRemovalEnabled: true);
+            Assert.DoesNotContain(
+                Enumerable.Range(0, 100),
+                i => fol[i] && onOutcomes[i] == CullOutcome.Kept);
+        }
+
+        [Fact]
+        public void FoliageRemovalDisabled_IsStillSeedDeterministic()
+        {
+            // CLAUDE.md's rule applies to the new code path too: same seed twice =>
+            // the same specific bombs, and a different seed => a different set at
+            // the same count.
+            var (pos, fol) = MakeField(100, i => i % 4 == 0);
+
+            var a = SporeBombCull.Decide(pos, fol, 0.5, userSeed: 555, foliageRemovalEnabled: false);
+            var b = SporeBombCull.Decide(pos, fol, 0.5, userSeed: 555, foliageRemovalEnabled: false);
+            Assert.Equal(a, b);
+
+            var c = SporeBombCull.Decide(pos, fol, 0.5, userSeed: 556, foliageRemovalEnabled: false);
+            Assert.NotEqual(a, c);
+            Assert.Equal(
+                a.Count(o => o != CullOutcome.Kept),
+                c.Count(o => o != CullOutcome.Kept));
+        }
+
         [Fact]
         public void DifferentSeed_ChangesWhichSurvivorsAreCulled()
         {

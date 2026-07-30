@@ -135,6 +135,39 @@ namespace Fairoots.Core
         }
 
         /// <summary>
+        /// Full control, i.e. "not a ragdoll at all" -
+        /// <c>CharacterData.GetTargetRagdollControll()</c>'s own maximum, which is
+        /// what <see cref="ApplyWindRagdollImmunity"/> hands back.
+        /// </summary>
+        public const float FullRagdollControl = 1f;
+
+        /// <summary>
+        /// <c>Wind/prevent-wind-ragdoll</c> (live-reported gap, 2026-07-30): while a
+        /// fall is wind-preceded (<see cref="IsWindForceStillRecent"/>), the player
+        /// keeps <see cref="FullRagdollControl"/> instead of vanilla's
+        /// unconditional 0 - so being blown off a ledge no longer collapses you into
+        /// physics on the way down, and you can still grab a wall or use a Rescue
+        /// Hook. The stronger sibling of <see cref="ApplyFallCameraDampening"/>,
+        /// which only raises the floor partway; when this is on it makes that clamp
+        /// redundant, and when it's off the clamp still applies on its own (the
+        /// two compose by <see cref="Math.Max"/>, so whichever is more generous
+        /// wins and neither can ever <em>lower</em> the vanilla result).
+        ///
+        /// Deliberately scoped to wind-preceded falls only, exactly like the clamp:
+        /// an ordinary fall is the player's own doing and ragdolls as vanilla does.
+        /// </summary>
+        public static float ApplyWindRagdollImmunity(
+            float vanillaTargetRagdollControl, bool fallIsWindPreceded, bool immunityEnabled)
+        {
+            if (!immunityEnabled || !fallIsWindPreceded)
+            {
+                return vanillaTargetRagdollControl;
+            }
+
+            return Math.Max(vanillaTargetRagdollControl, FullRagdollControl);
+        }
+
+        /// <summary>
         /// Raises <c>CharacterData.GetTargetRagdollControll()</c>'s result from 0
         /// (vanilla's unconditional value the instant any fall starts, RESEARCH.md
         /// Q6) up to <paramref name="dampenClampValue"/> when the fall was

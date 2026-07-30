@@ -127,5 +127,57 @@ namespace Fairoots.Tests
             // e.g. the carrier/passed-out branches already returning >= the clamp.
             Assert.Equal(1f, WindTuning.ApplyFallCameraDampening(vanillaTargetRagdollControl: 1f, fallIsWindPreceded: true, dampenClampValue: 0.35f));
         }
+
+        // --- prevent-wind-ragdoll (Wind/prevent-wind-ragdoll, 2026-07-30) --------
+
+        [Fact]
+        public void ApplyWindRagdollImmunity_Disabled_LeavesVanillaRagdollAlone()
+        {
+            // Off is the vanilla contract the setting promises: wind blowing you off
+            // an edge ragdolls you exactly as the game would.
+            Assert.Equal(0f, WindTuning.ApplyWindRagdollImmunity(
+                vanillaTargetRagdollControl: 0f, fallIsWindPreceded: true, immunityEnabled: false));
+        }
+
+        [Fact]
+        public void ApplyWindRagdollImmunity_OrdinaryFall_LeavesVanillaRagdollAlone()
+        {
+            // Scoped to wind-preceded falls only - walking off a ledge yourself is
+            // still your own doing, same scoping as the camera clamp.
+            Assert.Equal(0f, WindTuning.ApplyWindRagdollImmunity(
+                vanillaTargetRagdollControl: 0f, fallIsWindPreceded: false, immunityEnabled: true));
+        }
+
+        [Fact]
+        public void ApplyWindRagdollImmunity_WindPrecededFall_GivesFullControl()
+        {
+            Assert.Equal(WindTuning.FullRagdollControl, WindTuning.ApplyWindRagdollImmunity(
+                vanillaTargetRagdollControl: 0f, fallIsWindPreceded: true, immunityEnabled: true));
+        }
+
+        [Fact]
+        public void ApplyWindRagdollImmunity_ThenClamp_ImmunityWins()
+        {
+            // How the patch actually composes the two (immunity first, then the
+            // clamp): with immunity on, the partial clamp can never claw control
+            // back down, no matter which preset's value is in play.
+            float result = WindTuning.ApplyWindRagdollImmunity(
+                vanillaTargetRagdollControl: 0f, fallIsWindPreceded: true, immunityEnabled: true);
+            result = WindTuning.ApplyFallCameraDampening(result, fallIsWindPreceded: true, dampenClampValue: 0.35f);
+
+            Assert.Equal(WindTuning.FullRagdollControl, result);
+        }
+
+        [Fact]
+        public void ApplyWindRagdollImmunity_Off_StillLeavesTheClampWorking()
+        {
+            // The other half of the same composition: turning immunity off must not
+            // take the pre-existing partial dampening with it.
+            float result = WindTuning.ApplyWindRagdollImmunity(
+                vanillaTargetRagdollControl: 0f, fallIsWindPreceded: true, immunityEnabled: false);
+            result = WindTuning.ApplyFallCameraDampening(result, fallIsWindPreceded: true, dampenClampValue: 0.35f);
+
+            Assert.Equal(0.35f, result);
+        }
     }
 }

@@ -42,13 +42,6 @@ namespace Fairoots.Ui
     internal static class SpiderWarningLabel
     {
         /// <summary>
-        /// English only for now, matching <see cref="SporeWarningLabel"/>'s scoping -
-        /// localization lands later for both at once, the way
-        /// <c>Networking/ModPresenceLocalization</c> does it.
-        /// </summary>
-        private const string WarningText = "Spider dropping on you!";
-
-        /// <summary>
         /// Sits below <see cref="SporeWarningLabel"/>'s 270px so the two can be on
         /// screen together - being spored and being jumped on are entirely
         /// independent, and one warning silently covering the other would be worse
@@ -64,6 +57,12 @@ namespace Fairoots.Ui
         private static Material _material;
         private static int _outlineColorId = -1;
         private static Color _appliedColor;
+
+        /// <summary>
+        /// Language the current text was resolved for - same arrangement, and the
+        /// same reason, as <see cref="SporeWarningLabel"/>'s.
+        /// </summary>
+        private static LocalizedText.Language? _appliedLanguage;
 
         /// <summary>Cached live Poison status colour; resolved once, like the spore label's.</summary>
         private static Rgb? _poisonColor;
@@ -97,6 +96,7 @@ namespace Fairoots.Ui
                     Build();
                 }
 
+                ApplyText();
                 ApplyColor();
                 Fade(wanted);
             }
@@ -139,7 +139,6 @@ namespace Fairoots.Ui
 
             _text = textGo.AddComponent<TextMeshProUGUI>();
             _text.font = NativeUiAssets.Font;
-            _text.text = WarningText;
             _text.fontSize = 40f;
             _text.alignment = TextAlignmentOptions.Center;
             _text.raycastTarget = false;
@@ -150,6 +149,19 @@ namespace Fairoots.Ui
             _outlineColorId = Shader.PropertyToID("_OutlineColor");
 
             Diag.Info("[SpiderWarningLabel] built (native font + outlined material found)");
+        }
+
+        /// <summary>Text in the game's current language - see <c>SporeWarningLabel.ApplyText</c>.</summary>
+        private static void ApplyText()
+        {
+            LocalizedText.Language language = WarningLabelLocalization.CurrentLanguage;
+            if (_appliedLanguage == language)
+            {
+                return;
+            }
+
+            _appliedLanguage = language;
+            _text.text = WarningLabelLocalization.Get(WarningLabelKey.SpiderDropping);
         }
 
         private static void ApplyColor()

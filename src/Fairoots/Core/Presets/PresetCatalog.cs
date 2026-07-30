@@ -450,10 +450,14 @@ namespace Fairoots.Core.Presets
         }
 
         /// <summary>
-        /// The unconditional bush/grass placement-removal pass is on for every
-        /// preset, including Subtle (ROADMAP.md - the game never prevents a spore
-        /// bomb landing in foliage, so this gap is always fixed). Kept as a method
-        /// for symmetry / a future "let paranoid players disable even this" toggle.
+        /// The bush/grass placement-removal pass is on for every preset, including
+        /// Subtle (ROADMAP.md - the game never prevents a spore bomb landing in
+        /// foliage, so this gap is always fixed). The "let paranoid players disable
+        /// even this" toggle this method was kept around for now exists
+        /// (<c>Spore-Bombs/disable-foliage-removal</c>, added 2026-07-30) and folds
+        /// through <c>PluginConfig.EffectiveDisableFoliageRemoval</c> on top of this
+        /// row, so a preset could still turn the pass off outright by returning
+        /// <c>false</c> here - none does.
         /// </summary>
         public static bool SporeBombFoliageRemoval(PresetId preset) => true;
 

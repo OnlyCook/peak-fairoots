@@ -43,9 +43,15 @@ namespace Fairoots.Core
     /// returned per-index outcomes back onto the actual GameObjects.
     ///
     /// Two passes, the second budgeted against the first:
-    ///   1. Foliage removal - unconditional, seed-independent. Every candidate
-    ///      sitting inside bush/grass is removed. This is a geometric fact, not a
-    ///      roll, so it needs no RNG.
+    ///   1. Foliage removal - seed-independent, and on for every preset. Every
+    ///      candidate sitting inside bush/grass is removed. This is a geometric
+    ///      fact, not a roll, so it needs no RNG. It can be switched off outright
+    ///      (<c>Spore-Bombs/disable-foliage-removal</c>, off by default under every
+    ///      preset - see <paramref name="foliageRemovalEnabled"/> on
+    ///      <see cref="Decide"/>), which makes the pass a no-op rather than
+    ///      changing how much gets removed overall: the seeded pass below still
+    ///      removes up to the same target, it just picks from every candidate
+    ///      instead of only the non-camouflaged ones.
     ///   2. Seeded cull - removes only enough *additional* candidates to reach the
     ///      preset's total removal target. If pass 1 already met/exceeded the
     ///      target, pass 2 removes nothing. It never removes more than the target
@@ -72,11 +78,19 @@ namespace Fairoots.Core
         /// Target fraction of the total to remove overall (foliage + seeded
         /// combined), in [0, 1]. e.g. 0.5 = "cut spore bombs in half".
         /// </param>
+        /// <param name="foliageRemovalEnabled">
+        /// Whether pass 1 runs at all. <c>false</c> ignores
+        /// <paramref name="inFoliage"/> entirely, so a bomb hidden in a bush is
+        /// treated like any other candidate: it survives unless the seeded pass
+        /// happens to pick it. The removal target is unaffected either way - see
+        /// the class remarks.
+        /// </param>
         public static CullOutcome[] Decide(
             IReadOnlyList<GridPos> positions,
             IReadOnlyList<bool> inFoliage,
             double cullFraction,
             int userSeed,
+            bool foliageRemovalEnabled = true,
             string mechanicTag = MechanicTag)
         {
             if (positions == null) throw new ArgumentNullException(nameof(positions));
@@ -90,12 +104,14 @@ namespace Fairoots.Core
             int total = positions.Count;
             var outcomes = new CullOutcome[total];
 
-            // Pass 1: unconditional foliage removal. Collect the survivors' indices.
+            // Pass 1: foliage removal (skipped entirely when it's switched off).
+            // Collect the survivors' indices - with the pass off that's everything,
+            // so the seeded pass below selects over the full candidate set.
             int foliageRemoved = 0;
             var survivors = new List<int>(total);
             for (int i = 0; i < total; i++)
             {
-                if (inFoliage[i])
+                if (foliageRemovalEnabled && inFoliage[i])
                 {
                     outcomes[i] = CullOutcome.RemovedFoliage;
                     foliageRemoved++;

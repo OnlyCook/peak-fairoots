@@ -10,11 +10,20 @@ namespace Fairoots.Networking
     /// logic - what spore bombs get removed, wind force/timing/item/backpack
     /// immunity, whether wind occurs at all - is decided by the host's config
     /// only; an individual (non-host) client's own local config for these is
-    /// never used, no matter what they've set it to. Purely local, per-player
-    /// feel/accessibility settings (the wind-preceded-fall camera dampening
-    /// clamp/window, every <c>Debug</c> setting) are deliberately excluded from
-    /// this and stay per-client - see <see cref="PluginConfig"/>'s remarks on
-    /// which <c>Effective*</c> accessors call into this class and which don't.
+    /// never used, no matter what they've set it to.
+    ///
+    /// <b>The rule is now the whole config file minus two sections</b> (maintainer's
+    /// call, 2026-07-30): every setting outside <c>General</c> and <c>Debug</c> is
+    /// host-authoritative, full stop. The earlier carve-out for "purely local
+    /// per-player feel" (the wind-preceded-fall camera dampening clamp and its
+    /// window) is gone - if a setting can change the biome, only the host's copy of
+    /// it does, and a client's own value starts mattering the moment they become the
+    /// host themselves. <c>General</c>'s genuinely cosmetic/local choices (label
+    /// visibility, cloud opacity, the recolor, the cover-mouth keybind) and every
+    /// <c>Debug</c> setting stay per-client by design. The two exceptions inside
+    /// <c>General</c> are the seed and the preset, which are host-decided by
+    /// definition - the seed is published directly below, and the preset needs no key
+    /// of its own because every value it resolves to is published individually.
     ///
     /// Mechanism: the host publishes every host-authoritative resolved value as
     /// a Photon room custom property (<see cref="PublishAll"/>) whenever it
@@ -169,6 +178,7 @@ namespace Fairoots.Networking
                 { KeyPrefix + "SporeBombScreenshakeRangeCapMeters", cfg.EffectiveSporeBombScreenshakeRangeCapMeters },
                 { KeyPrefix + "SporeBombVfxCountMultiplier", cfg.EffectiveSporeBombVfxCountMultiplier },
                 { KeyPrefix + "SporeBombTriggerHeightMultiplier", cfg.EffectiveSporeBombTriggerHeightMultiplier },
+                { KeyPrefix + "DisableFoliageRemoval", cfg.EffectiveDisableFoliageRemoval },
                 { KeyPrefix + "SporeBombSporeAreaRadiusMultiplier", cfg.EffectiveSporeBombSporeAreaRadiusMultiplier },
                 { KeyPrefix + "WindForceMultiplier", cfg.EffectiveWindForceMultiplier },
                 { KeyPrefix + "WindGustDurationMultiplier", cfg.EffectiveWindGustDurationMultiplier },
@@ -176,6 +186,9 @@ namespace Fairoots.Networking
                 { KeyPrefix + "WindObstacleOcclusionRangeMultiplier", cfg.EffectiveWindObstacleOcclusionRangeMultiplier },
                 { KeyPrefix + "WindBackpackAlwaysImmune", cfg.EffectiveWindBackpackAlwaysImmune },
                 { KeyPrefix + "DisableWindEntirely", cfg.EffectiveDisableWindEntirely },
+                { KeyPrefix + "WindFallCameraDampenClamp", cfg.EffectiveWindFallCameraDampenClamp },
+                { KeyPrefix + "WindRecentForceWindowSeconds", cfg.EffectiveWindRecentForceWindowSeconds },
+                { KeyPrefix + "PreventWindRagdoll", cfg.EffectivePreventWindRagdoll },
                 { KeyPrefix + "DisableSporeAreas", cfg.EffectiveDisableSporeAreas },
                 { KeyPrefix + "DisableZombies", cfg.EffectiveDisableZombies },
                 { KeyPrefix + "ZombieSpeedMultiplier", cfg.EffectiveZombieSpeedMultiplier },
