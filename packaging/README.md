@@ -40,4 +40,4 @@ Every value each preset uses is listed, setting by setting, in [`docs/PRESETS.md
 
 ## Feedback & bug reports
 
-Found a bug or have a suggestion? Please send me an email at `theactualcooker@gmail.com`.
+Found a bug or have a suggestion? Please **[fill out this form](forms.gle/PLACEHOLDER)** or send me an email at `theactualcooker@gmail.com`.

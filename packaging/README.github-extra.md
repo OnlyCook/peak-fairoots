@@ -4,11 +4,9 @@
 
 ## For players
 
-Not yet published on r2modman, Thunderstore or Nexus Mods (see the "Status"
-note above). Until then, install manually:
-
-1. Install [BepInExPack PEAK](https://thunderstore.io/c/peak/p/BepInEx/BepInExPack_PEAK/).
-2. Extract this mod's zip into `BepInEx/plugins/OnlyCook-Fairoots/`.
+- You can install the mod through r2modman as `Fairoots`,
+- On [Thunderstore](https://thunderstore.io/c/peak/p/OnlyCook/Fairoots/),
+- Or on [Nexus Mods](https://www.nexusmods.com/peak/mods/198)
 
 ## For developers
 
