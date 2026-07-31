@@ -8,13 +8,16 @@ Fully configurable through **4 presets + a Custom slate**, from light balancing 
 
 - **Cover your mouth**: press `X` to hold your breath while standing in a spore area.
 - **Throw items at creatures**: spiders can already be bonked in vanilla, Fairoots extends the same counterplay to zombies and beetles too, throw something with enough force and knock them out for a while.
-- **Spore bombs redone**: vanilla's trigger radius and height are much larger than the prop itself, which this mod fixes while also removing all Spore Bombs that spawned inside grass or bush props.
+- **Spore bombs redone**: vanilla's trigger radius and height are much larger than the prop itself, which this mod fixes while also removing all spore bombs that spawned inside grass or bush props.
+- **Climbing counters wind**: never make wind push you off an edge while climbing.
 
 Every randomized decision Fairoots makes (which spore bombs get removed, for example) is bound to your run's seed: same seed + same Roots level = same result, every time. Not more randomness stacked on top of randomness.
 
 ## What else it does
 
-Beyond the highlights above, Fairoots also softens (or, if you configure it that way, sharpens) wind knockback and duration, zombie/beetle speed and aggression, spore cloud size and *Spore* status build-up, screenshake range and much more.
+Beyond the highlights above, this mod also softens (or, if you configure it that way, sharpens) wind knockback and duration, zombie/beetle speed and aggression, spore cloud size and *Spore* status clear time, and much more.
+
+It also offers a bunch of client-sided features: make spore bombs a darker red to spot them easier, add a clear indicator while prone to getting the *Spores* status effect, or make it easier to see in spore clouds/areas.
 
 ## How to use
 
@@ -25,7 +28,7 @@ Open the config file or use [PEAKLib.ModConfig](https://thunderstore.io/c/peak/p
 1. **Subtle**: both new mechanics on, everything else barely nudged, still pretty similar to vanilla difficulty.
 2. **Balanced (default)**: a bit more forgiving than Subtle, the tuning I'd ship if this were the base game's own balance pass.
 3. **Generous**: meaningfully easier, most of the RNG-driven unfairness smoothed out.
-4. **Tame**: if you don't want to bother with this biome's RNG at all.
+4. **Tame**: if you don't want to bother with this biome's shenanigans at all.
 5. **Custom**: nothing but vanilla until you say otherwise. Every setting ships at its unmodded value, so picking Custom and changing nothing plays exactly like the base game, here you can freely configure everything about this mod. This is also the preset to use if you want to make Roots harder rather than easier.
 
 - *Example 1:* let's say you dislike spore areas and only want to remove those, you can with the Custom preset, then just enable `Spore-Areas/disable-spore-areas` and you're golden!
