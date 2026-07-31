@@ -2,7 +2,7 @@
 
 ## The two rules the tables follow
 
-**1. Every default is the vanilla value.** Freshly install Fairoots (or delete its config file), set `General/preset` to `Custom`, change nothing else, and the game plays exactly like unmodded PEAK: every multiplier is `1.0`, every removal fraction is `0`, and every new mechanic is `off`. Custom is a blank slate you build up from, not balanced with the numbers exposed.
+**1. Every default is the vanilla value.** Freshly install Fairoots (or delete its config file), set `Host/preset` to `Custom`, change nothing else, and the game plays exactly like unmodded PEAK: every multiplier is `1.0`, every removal fraction is `0`, and every new mechanic is `off`. Custom is a blank slate you build up from, not balanced with the numbers exposed.
 
 The rows marked `*` on the default are the one documented exception: **gated parameters**, a dial that only means anything while some other setting is on. There is no vanilla value for the cost of a mechanic vanilla doesn't have, so the default is the sensible tuned number and the parent toggle is what defaults to off. So when the parent row isn't enabled these values aren't read anyway and therefore still play like vanilla.
 

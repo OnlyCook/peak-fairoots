@@ -258,8 +258,8 @@ Two layers, per ROADMAP.md's testing strategy:
 
 **Never edit balance numbers in code.** Every gameplay default and every
 per-preset value lives in one table, [`docs/PRESETS.md`](PRESETS.md), which is
-parsed into the C# the mod reads. (`General` and `Debug` aren't in it — nothing
-there is a balance value or preset-driven.) The loop is:
+parsed into the C# the mod reads. (`General`, `Host` and `Debug` aren't in it —
+nothing there is a balance value or preset-driven.) The loop is:
 
 ```bash
 # 1. edit a cell in docs/PRESETS.md
@@ -277,7 +277,7 @@ that no code reads. Run it before committing a tuning
 pass.
 
 For tuning a *single* mechanic mid-session you don't need the loop at all: set
-`General/preset = Custom` and edit that mechanic's own config entry in-game (via
+`Host/preset = Custom` and edit that mechanic's own config entry in-game (via
 PEAKLib.ModConfig or the config file — turn `Debug/apply-changes-live` on
 *before* loading into Roots so most settings apply immediately; it is off by
 default and is read once per Roots load, so flipping it while already standing in

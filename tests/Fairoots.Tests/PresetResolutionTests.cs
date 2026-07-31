@@ -26,12 +26,14 @@ namespace Fairoots.Tests
     public class PresetResolutionTests
     {
         [Fact]
-        public void NonCustomPreset_IgnoresConfiguredValue()
+        public void NonCustomPreset_PurePreset_IgnoresConfiguredValue()
         {
             double resolved = OverrideResolution.Resolve(
                 presetValue: 0.5,
                 configuredValue: 0.9,
-                useOverride: false);
+                defaultValue: 0.0,
+                preset: PresetId.Balanced,
+                applyPurePreset: true);
             Assert.Equal(0.5, resolved);
         }
 
@@ -41,7 +43,9 @@ namespace Fairoots.Tests
             double resolved = OverrideResolution.Resolve(
                 presetValue: 0.5,
                 configuredValue: 0.9,
-                useOverride: true);
+                defaultValue: 0.0,
+                preset: PresetId.Custom,
+                applyPurePreset: true);
             Assert.Equal(0.9, resolved);
         }
 
@@ -51,22 +55,67 @@ namespace Fairoots.Tests
             double resolved = OverrideResolution.Resolve(
                 presetValue: 0.5,
                 configuredValue: 0.0,
-                useOverride: true);
+                defaultValue: 0.0,
+                preset: PresetId.Custom,
+                applyPurePreset: true);
             Assert.Equal(0.0, resolved);
         }
 
         [Fact]
-        public void SwitchingAwayFromCustom_DiscardsConfiguredValue()
+        public void SwitchingAwayFromCustom_PurePreset_DiscardsConfiguredValue()
         {
             // Player set 0.33 under Custom. Any non-Custom preset ignores it and
-            // returns its own catalog value instead.
+            // returns its own catalog value instead, as long as apply-pure-preset
+            // is on.
             const double configured = 0.33;
             foreach (PresetId p in new[] { PresetId.Subtle, PresetId.Balanced, PresetId.Generous, PresetId.Tame })
             {
                 double resolved = OverrideResolution.Resolve(
-                    PresetCatalog.SporeBombCullFraction(p), configured, useOverride: false);
+                    PresetCatalog.SporeBombCullFraction(p),
+                    configured,
+                    ConfigDefaults.SporeBombCullFraction,
+                    p,
+                    applyPurePreset: true);
                 Assert.Equal(PresetCatalog.SporeBombCullFraction(p), resolved);
             }
+        }
+
+        [Fact]
+        public void NonCustomPreset_ImpurePreset_KeepsChangedValueButNotUntouchedOne()
+        {
+            // apply-pure-preset off: a setting left at its vanilla default still
+            // takes the preset's own number...
+            double untouched = OverrideResolution.Resolve(
+                presetValue: 0.5,
+                configuredValue: ConfigDefaults.SporeBombCullFraction,
+                defaultValue: ConfigDefaults.SporeBombCullFraction,
+                preset: PresetId.Balanced,
+                applyPurePreset: false);
+            Assert.Equal(0.5, untouched);
+
+            // ...but a setting the player has actually changed from its default
+            // keeps the player's own value instead of being overwritten.
+            double changed = OverrideResolution.Resolve(
+                presetValue: 0.5,
+                configuredValue: 0.9,
+                defaultValue: ConfigDefaults.SporeBombCullFraction,
+                preset: PresetId.Balanced,
+                applyPurePreset: false);
+            Assert.Equal(0.9, changed);
+        }
+
+        [Fact]
+        public void CustomPreset_ApplyPurePresetFlag_HasNoEffect()
+        {
+            // Under Custom, the player's own value always wins regardless of
+            // apply-pure-preset - the flag is only meaningful for presets 1-4.
+            double resolved = OverrideResolution.Resolve(
+                presetValue: 0.5,
+                configuredValue: ConfigDefaults.SporeBombCullFraction,
+                defaultValue: ConfigDefaults.SporeBombCullFraction,
+                preset: PresetId.Custom,
+                applyPurePreset: false);
+            Assert.Equal(ConfigDefaults.SporeBombCullFraction, resolved);
         }
 
         /// <summary>

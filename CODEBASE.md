@@ -34,16 +34,33 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
 - `src/Fairoots/` — the BepInEx plugin project (game-facing).
   - `Plugin.cs` — entry point (`BepInPlugin`); loads config + Harmony, logs.
   - `PluginConfig.cs` — config binding. Sections in bind (and file) order:
-    `General` — the `seed` field, the `preset` 1-5 selector (1-4 are the fixed
+    `General` — the settings every player, host or not, actually uses on their
+    own client: the cosmetic/readability toggles (`recolor-spore-bombs`, the
+    cloud-opacity pair, the two warning-label toggles) and the cover-mouth
+    keybind trio; then
+    `Host` — the `seed` field, the `preset` 1-5 selector (1-4 are the fixed
     presets, 5 is Custom — see `Core/Presets/PresetId.cs`), and
-    `recolor-spore-bombs` (the one client-side setting, see below); then the
-    per-mechanic Custom-only sections (**every default is the vanilla value** —
-    only read when preset is set to Custom, ignored under presets 1-4 even if
-    changed); then
+    `apply-pure-preset` (see below) — settings that are meaningless for a
+    non-host player to change, since only the host's value is ever read; then
+    the per-mechanic Custom-only sections (**every default is the vanilla
+    value** — only read when preset is set to Custom, or when preset is 1-4
+    and `apply-pure-preset` is off *and* the setting has actually been changed
+    from its default — ignored under presets 1-4 otherwise, even if changed);
+    then
     `Debug`, bound last, which also holds `apply-changes-live` (see below —
     it's in `Debug` because freezing values mid-run is a comparison-testing
     tool, and like `keep-vanilla-trigger-radius` it's a behavior override that
     works regardless of the debug-logging master switch).
+
+    `apply-pure-preset` (`Host`, default on) lets a non-Custom preset apply as
+    a single all-or-nothing block (the original behavior, still the default)
+    or, when turned off, per-setting: an untouched Custom-only entry still
+    takes the preset's number, but one the player has changed from its
+    vanilla default keeps that changed value instead. This is what
+    `Core/Presets/OverrideResolution.Resolve` does with its `defaultValue`
+    and `applyPurePreset` parameters — it lets a player pick a preset like
+    Subtle, turn this off, and change just one or two settings without first
+    copying every one of Subtle's numbers into Custom.
     Exposes *resolved* accessors (e.g. `SporeBombCullFraction`,
     `SporeBombKnockbackMultiplier`) that fold preset + override together via
     `Core/Presets/OverrideResolution`, plus a parallel set of `Effective*`
@@ -60,7 +77,9 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
     the host, but overridden by the host's published value on every other
     client. **As of 2026-07-30 that is every single one, with no exceptions**
     (maintainer's call): the rule is now "everything outside `General` and
-    `Debug` is host-authoritative," which retired the last two carve-outs —
+    `Debug` is host-authoritative" (`Host`'s own settings are host-decided by
+    definition — that's the whole point of the tab), which retired the last
+    two carve-outs —
     `EffectiveWindFallCameraDampenClamp` and the flat
     `WindRecentForceWindowSeconds`, both previously per-client as
     camera-feel/accessibility settings. What has no host lookup is what has no
@@ -832,7 +851,7 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
       `docs/PRESETS.md`: the first is the four preset columns (what
       `PresetCatalog` returns), the second is the Default column (what
       `PluginConfig` binds for every setting in the five gameplay sections;
-      `General`/`Debug` defaults stay literals). Tune by editing that table and re-running the
+      `General`/`Host`/`Debug` defaults stay literals). Tune by editing that table and re-running the
       script; `bash scripts/apply-presets.sh --check` fails if either file is
       stale or a setting has drifted out of the table. `PresetValues` is indexed
       by presets 1-4 only and throws on Custom, since mapping Custom is
@@ -981,7 +1000,7 @@ If you're adding logic and it doesn't strictly need a Unity type, it belongs in
   `--check` to verify without writing.
 - `docs/PRESETS.md` — **the source of truth for every balance number in the
   mod**: one row per setting in the five gameplay sections, with its default and
-  its value under each of the four presets (`General`/`Debug` are excluded — no
+  its value under each of the four presets (`General`/`Host`/`Debug` are excluded — no
   balance values, no preset involvement, defaults stay literal in
   `PluginConfig.cs`). Also documents the two rules the values encode: every
   default is vanilla, and every gameplay setting is preset-driven.

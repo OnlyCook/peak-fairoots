@@ -22,35 +22,39 @@ namespace Fairoots
     /// mechanic it belongs to is switched on). Never hardcode a balance default
     /// here; tune the table and re-run the script.
     ///
-    /// <c>General</c> and <c>Debug</c> are the exception to that: nothing in either
-    /// is preset-driven or a balance number (the seed, the preset selector,
-    /// keybinds, the client-side cosmetic settings, the diagnostics), so they are
-    /// deliberately absent from the table and their defaults stay ordinary literals
-    /// below.
+    /// <c>Host</c>, <c>General</c> and <c>Debug</c> are the exception to that:
+    /// nothing in any of them is preset-driven or a balance number (the seed, the
+    /// preset selector, apply-pure-preset, keybinds, the client-side cosmetic
+    /// settings, the diagnostics), so they are deliberately absent from the table
+    /// and their defaults stay ordinary literals below.
     ///
-    /// It follows that every gameplay setting outside <c>General</c>/<c>Debug</c> is
-    /// preset-driven: if a mechanic is to be on under Balanced while its config entry
-    /// defaults to vanilla, the preset row is the only thing that can turn it on. The
-    /// pre-2026-07-30 category of "flat gameplay setting that applies the same under
-    /// every preset" is therefore gone; what stays flat is only the <c>disable-*</c>
-    /// kill switches (already vanilla when off, and no preset ever sets them), the
-    /// keybinds, and <c>Debug</c>.
+    /// It follows that every gameplay setting outside <c>Host</c>/<c>General</c>/
+    /// <c>Debug</c> is preset-driven: if a mechanic is to be on under Balanced
+    /// while its config entry defaults to vanilla, the preset row is the only
+    /// thing that can turn it on. The pre-2026-07-30 category of "flat gameplay
+    /// setting that applies the same under every preset" is therefore gone; what
+    /// stays flat is only the <c>disable-*</c> kill switches (already vanilla
+    /// when off, and no preset ever sets them), the keybinds, and <c>Debug</c>.
     ///
     /// Config keys are kebab-case per CLAUDE.md; the C# property names stay
     /// PascalCase. Section names follow the maintainer's other PEAK mods
     /// (Capitalized-Hyphenated, or a plain word where there's nothing to hyphenate).
     ///
-    /// Sections, in bind (and therefore file) order: <c>General</c> (seed,
-    /// preset, and the client-side spore-bomb recolor), the per-mechanic
-    /// Custom-only sections, then <c>Debug</c> last.
+    /// Sections, in bind (and therefore file) order: <c>General</c> first (the
+    /// client-side spore-bomb recolor and the other cosmetic/per-player settings,
+    /// plus the cover-mouth keybind) - the tab every player, host or not, actually
+    /// uses - then <c>Host</c> (seed, preset, apply-pure-preset: settings that are
+    /// meaningless for a non-host to touch), then the per-mechanic Custom-only
+    /// sections, then <c>Debug</c> last.
     ///
     /// Resolved accessors (e.g. <see cref="SporeBombCullFraction"/>) fold preset +
-    /// override together so callers never re-implement that logic. Every
-    /// gameplay setting is live by default (edits made in-game, e.g. via
-    /// PEAKLib.ModConfig, take effect immediately) - <see cref="ApplyChangesLive"/>
-    /// (in <c>Debug</c>, since freezing values mid-run is a comparison-testing
-    /// tool) turns that off, in which case game-facing code should read the
-    /// <c>Effective*</c> accessors (snapshotted once per Roots level load via
+    /// override (+ apply-pure-preset, see <see cref="OverrideResolution"/>) together
+    /// so callers never re-implement that logic. Every gameplay setting is live by
+    /// default (edits made in-game, e.g. via PEAKLib.ModConfig, take effect
+    /// immediately) - <see cref="ApplyChangesLive"/> (in <c>Debug</c>, since
+    /// freezing values mid-run is a comparison-testing tool) turns that off, in
+    /// which case game-facing code should read the <c>Effective*</c> accessors
+    /// (snapshotted once per Roots level load via
     /// <see cref="CaptureLevelSnapshot"/>) instead of the raw resolved ones. The
     /// spore-bomb removal fraction and the seed are always level-load-only
     /// regardless of this flag - which spore bombs were already removed can't be
@@ -78,15 +82,44 @@ namespace Fairoots
     /// <see cref="ShowOverlayInSporeBombClouds"/>,
     /// <see cref="ShowSporeCloudLabel"/>, <see cref="ShowSpiderWarningLabel"/> and
     /// the cover-mouth keybind - since they only change what one player sees or
-    /// presses. <c>General</c>'s seed and preset are host-decided by definition.
+    /// presses. <c>Host</c>'s seed, preset and apply-pure-preset are host-decided
+    /// by definition - that's the whole point of the tab.
     /// </summary>
     public class PluginConfig
     {
-        // --- General -------------------------------------------------------
+        // --- Host ------------------------------------------------------------
+        // Seed, the preset selector, and apply-pure-preset: the only settings in
+        // this file that are meaningless for anyone but the host to touch, since
+        // a non-host player's own value here is never read at all (see the class
+        // remarks). Kept in their own "Host" section/tab, separate from
+        // "General" below, which holds only what every player - host or not -
+        // actually uses on their own client.
         public ConfigEntry<int> Seed { get; }
 
         public ConfigEntry<PresetId> Preset { get; }
 
+        /// <summary>
+        /// When a non-Custom preset (1-4) is active: if true (the default), the
+        /// preset applies as a single all-or-nothing block exactly as before -
+        /// every per-mechanic Custom-only override entry is ignored, even if the
+        /// player has changed it. If false, the preset still supplies every
+        /// setting the player has left at its vanilla default, but any setting
+        /// the player *has* changed from its default keeps the player's own
+        /// value instead. This makes "take Subtle, but tweak just one thing"
+        /// possible without first copying every one of Subtle's numbers into
+        /// Custom - pick Subtle, turn this off, change only what you want.
+        ///
+        /// Has no effect at all under <see cref="PresetId.Custom"/>, where the
+        /// player's own values already always apply. HOST-AUTHORITATIVE, like
+        /// <see cref="Preset"/> itself: only the host's value decides how the
+        /// whole lobby's preset is resolved.
+        /// </summary>
+        public ConfigEntry<bool> ApplyPurePreset { get; }
+
+        // --- General ---------------------------------------------------------
+        // Everything below is per-client: it's what every player, host or not,
+        // actually configures for their own game feel or their own screen - see
+        // each entry's remarks for why it isn't host-authoritative.
         /// <summary>
         /// Whether spore bombs are tinted toward the game's own Spores status
         /// color (pink/red) instead of their vanilla green - see
@@ -989,29 +1022,6 @@ namespace Fairoots
 
         public PluginConfig(ConfigFile config)
         {
-            Seed = config.Bind(
-                "General",
-                "seed",
-                0,
-                "Deterministic seed for every random decision Fairoots makes (which spore " +
-                "bombs get culled, etc.). Same seed + same Roots level = identical result, " +
-                "every load. HOST-AUTHORITATIVE: everyone in the lobby must have Fairoots " +
-                "installed, but only the HOST's seed is ever actually used - non-host players' " +
-                "own seed value here is ignored entirely, so there's nothing to coordinate " +
-                "manually (see ROADMAP.md's Host authority section).");
-
-            Preset = config.Bind(
-                "General",
-                "preset",
-                PresetId.Balanced,
-                "Overall balance preset. Subtle (1) is the lightest touch, Tame (4) the " +
-                "heaviest, Balanced (2) is the default. Custom (5) ignores the hard-coded " +
-                "preset numbers entirely and uses your own Spore-Bombs/Wind settings directly " +
-                "instead. Under presets 1-4, the per-mechanic settings below are ignored " +
-                "entirely, even if you've changed them - switch to Custom to use them. " +
-                "HOST-AUTHORITATIVE: only the host's preset (and, under Custom, the host's " +
-                "own per-mechanic values) is ever actually used for the whole lobby.");
-
             RecolorSporeBombs = config.Bind(
                 "General",
                 "recolor-spore-bombs",
@@ -1095,6 +1105,76 @@ namespace Fairoots
                 "on-screen labels, since it adds a HUD element PEAK doesn't have. Purely " +
                 "cosmetic and PER-PLAYER: not host-authoritative. Applies immediately, " +
                 "regardless of apply-changes-live.");
+
+            CoverMouthKey = config.Bind(
+                "General",
+                "cover-mouth-key",
+                KeyCode.X,
+                "Key to cover your mouth with both hands, making you immune to spore areas while " +
+                "you hold it. Your hands are busy while covering: you can't climb, pick things up, " +
+                "or switch items, and anything you're holding is put away (an item you're carrying " +
+                "in your hands with no free pocket for it gets dropped). Set to None to disable " +
+                "the mechanic entirely. PER-PLAYER: this and cover-mouth-hold below are yours " +
+                "alone - unlike most settings, the host's value has no effect on you (how much " +
+                "stamina it costs IS host-controlled, though).");
+
+            CoverMouthHold = config.Bind(
+                "General",
+                "cover-mouth-hold",
+                true,
+                "How cover-mouth-key behaves: on (default) means hold the key to keep your mouth " +
+                "covered and let go to stop; off makes it a toggle - press once to start, press " +
+                "again to stop. PER-PLAYER, same as cover-mouth-key above.");
+
+            CoverMouthUseBonusStamina = config.Bind(
+                "General",
+                "cover-mouth-use-bonus-stamina",
+                false,
+                "Whether covering your mouth is allowed to eat into your bonus stamina (the extra " +
+                "you get from food) once your normal stamina runs out. Off by default - covering " +
+                "simply stops when you run out of normal stamina, leaving your bonus intact for " +
+                "climbing. PER-PLAYER: this is your own call, like the keybind; how fast covering " +
+                "drains stamina in the first place is still the host's setting.");
+
+            Seed = config.Bind(
+                "Host",
+                "seed",
+                0,
+                "Deterministic seed for every random decision Fairoots makes (which spore " +
+                "bombs get culled, etc.). Same seed + same Roots level = identical result, " +
+                "every load. HOST-AUTHORITATIVE: everyone in the lobby must have Fairoots " +
+                "installed, but only the HOST's seed is ever actually used - non-host players' " +
+                "own seed value here is ignored entirely, so there's nothing to coordinate " +
+                "manually (see ROADMAP.md's Host authority section).");
+
+            Preset = config.Bind(
+                "Host",
+                "preset",
+                PresetId.Balanced,
+                "Overall balance preset. Subtle (1) is the lightest touch, Tame (4) the " +
+                "heaviest, Balanced (2) is the default. Custom (5) ignores the hard-coded " +
+                "preset numbers entirely and uses your own Spore-Bombs/Wind settings directly " +
+                "instead. Under presets 1-4, the per-mechanic settings below are ignored " +
+                "entirely, even if you've changed them, UNLESS apply-pure-preset (also in this " +
+                "Host section) is turned off - see that setting to change just one or two things " +
+                "about a preset without switching all the way to Custom. " +
+                "HOST-AUTHORITATIVE: only the host's preset (and, under Custom, the host's " +
+                "own per-mechanic values) is ever actually used for the whole lobby.");
+
+            ApplyPurePreset = config.Bind(
+                "Host",
+                "apply-pure-preset",
+                true,
+                "When a preset other than Custom is active (on by default): if true, the preset " +
+                "applies as a single all-or-nothing block, exactly as before - every per-mechanic " +
+                "Custom-only setting below is ignored, even if you've changed it. If false, the " +
+                "preset still supplies every setting you've left at its vanilla default, but any " +
+                "setting you've actually changed from its default keeps your own value instead - " +
+                "so you can pick, say, Subtle, turn this off, change only " +
+                "climb-shelters-from-wind, and get Subtle with exactly that one difference, " +
+                "without copying every one of Subtle's numbers into Custom first. Has no effect " +
+                "under Custom, where your own values already always apply. " +
+                "HOST-AUTHORITATIVE, like preset itself.");
 
             SporeBombCullFractionOverride = config.Bind(
                 "Spore-Bombs",
@@ -1223,36 +1303,6 @@ namespace Fairoots
                 "host, this has no effect at all - only the host's value counts for the whole " +
                 "lobby. Off by default; no preset ever turns this on automatically. Applies " +
                 "immediately, regardless of apply-changes-live.");
-
-            CoverMouthKey = config.Bind(
-                "General",
-                "cover-mouth-key",
-                KeyCode.X,
-                "Key to cover your mouth with both hands, making you immune to spore areas while " +
-                "you hold it. Your hands are busy while covering: you can't climb, pick things up, " +
-                "or switch items, and anything you're holding is put away (an item you're carrying " +
-                "in your hands with no free pocket for it gets dropped). Set to None to disable " +
-                "the mechanic entirely. PER-PLAYER: this and cover-mouth-hold below are yours " +
-                "alone - unlike most settings, the host's value has no effect on you (how much " +
-                "stamina it costs IS host-controlled, though).");
-
-            CoverMouthHold = config.Bind(
-                "General",
-                "cover-mouth-hold",
-                true,
-                "How cover-mouth-key behaves: on (default) means hold the key to keep your mouth " +
-                "covered and let go to stop; off makes it a toggle - press once to start, press " +
-                "again to stop. PER-PLAYER, same as cover-mouth-key above.");
-
-            CoverMouthUseBonusStamina = config.Bind(
-                "General",
-                "cover-mouth-use-bonus-stamina",
-                false,
-                "Whether covering your mouth is allowed to eat into your bonus stamina (the extra " +
-                "you get from food) once your normal stamina runs out. Off by default - covering " +
-                "simply stops when you run out of normal stamina, leaving your bonus intact for " +
-                "climbing. PER-PLAYER: this is your own call, like the keybind; how fast covering " +
-                "drains stamina in the first place is still the host's setting.");
 
             SporeAreaRemovalFractionOverride = config.Bind(
                 "Spore-Areas",
@@ -1889,7 +1939,7 @@ namespace Fairoots
             SceneScanHotkey = config.Bind(
                 "Debug",
                 "scene-scan-hotkey",
-                KeyCode.F9,
+                KeyCode.None,
                 "When debug logging is on, press this key in-game to dump a scene " +
                 "diagnostics report on demand (e.g. right when you're standing next to a " +
                 "spore bomb). Set to None to disable the hotkey.");
@@ -1897,7 +1947,7 @@ namespace Fairoots
             FoliageProbeHotkey = config.Bind(
                 "Debug",
                 "foliage-probe-hotkey",
-                KeyCode.F10,
+                KeyCode.None,
                 "When debug logging is on, press this key while standing next to a spore " +
                 "bomb visibly camouflaged in bush/grass to probe it for a foliage-detection " +
                 "method (grass-blade density, nearby colliders/renderers). Research tool for " +
@@ -1907,7 +1957,7 @@ namespace Fairoots
             MaterialProbeHotkey = config.Bind(
                 "Debug",
                 "material-probe-hotkey",
-                KeyCode.F11,
+                KeyCode.None,
                 "When debug logging is on, look at something and press this key to dump its material " +
                 "and shader setup: every color slot the shader declares, its value, and whether " +
                 "Fairoots is currently overriding it. Use it to work out why something looks " +
@@ -2049,9 +2099,6 @@ namespace Fairoots
                 "the debug-logging master switch above. Off by default.");
         }
 
-        /// <summary>True when the active preset is Custom - the only preset where the player's own config values apply.</summary>
-        private bool UseCustomOverrides => Preset.Value == PresetId.Custom;
-
         /// <summary>
         /// The effective spore-bomb removal fraction: the player's Custom-preset
         /// value if Custom is active, otherwise the active preset's own catalog
@@ -2061,118 +2108,153 @@ namespace Fairoots
             OverrideResolution.Resolve(
                 PresetCatalog.SporeBombCullFraction(Preset.Value),
                 SporeBombCullFractionOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.SporeBombCullFraction,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective trigger-hitbox radius multiplier for kept spore bombs.</summary>
         public double SporeBombTriggerRadiusMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.SporeBombTriggerRadiusMultiplier(Preset.Value),
                 SporeBombTriggerRadiusMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.SporeBombTriggerRadiusMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective knockback/explosion-force multiplier for a spore-bomb detonation.</summary>
         public double SporeBombKnockbackMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.SporeBombKnockbackMultiplier(Preset.Value),
                 SporeBombKnockbackMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.SporeBombKnockbackMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective screen-shake distance cap, in meters (0 = uncapped).</summary>
         public float SporeBombScreenshakeRangeCapMeters =>
             (float)OverrideResolution.Resolve(
                 PresetCatalog.SporeBombScreenshakeRangeCapMeters(Preset.Value),
                 SporeBombScreenshakeRangeCapOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.SporeBombScreenshakeRangeCapMeters,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective particle/VFX-orb-count multiplier for a spore-bomb detonation.</summary>
         public double SporeBombVfxCountMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.SporeBombVfxCountMultiplier(Preset.Value),
                 SporeBombVfxCountMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.SporeBombVfxCountMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective trigger-height-cutoff multiplier (1.0 = vanilla/disabled) - see <see cref="Core.SporeBombExplosionTuning.ResolveTriggerHeightCutoffMeters"/>.</summary>
         public double SporeBombTriggerHeightMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.SporeBombTriggerHeightMultiplier(Preset.Value),
                 SporeBombTriggerHeightMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.SporeBombTriggerHeightMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective spore-area radius multiplier for a spore-bomb detonation.</summary>
         public double SporeBombSporeAreaRadiusMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.SporeBombSporeAreaRadiusMultiplier(Preset.Value),
                 SporeBombSporeAreaRadiusMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.SporeBombSporeAreaRadiusMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective fraction of the level's spore areas to remove.</summary>
         public double SporeAreaRemovalFraction =>
             OverrideResolution.Resolve(
                 PresetCatalog.SporeAreaRemovalFraction(Preset.Value),
                 SporeAreaRemovalFractionOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.SporeAreaRemovalFraction,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective radius multiplier for every persistent spore area.</summary>
         public double SporeAreaRadiusMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.SporeAreaRadiusMultiplier(Preset.Value),
                 SporeAreaRadiusMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.SporeAreaRadiusMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective Spores build-up rate multiplier for every persistent spore area.</summary>
         public double SporeAreaStatusRateMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.SporeAreaStatusRateMultiplier(Preset.Value),
                 SporeAreaStatusRateMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.SporeAreaStatusRateMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective multiplier on how long the Spores status takes to clear.</summary>
         public double SporeClearTimeMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.SporeClearTimeMultiplier(Preset.Value),
                 SporeClearTimeMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.SporeClearTimeMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective multiplier on every incoming Spores application, from any source.</summary>
         public double SporeBuildUpMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.SporeBuildUpMultiplier(Preset.Value),
                 SporeBuildUpMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.SporeBuildUpMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective movement-speed multiplier for every mushroom zombie.</summary>
         public double ZombieSpeedMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.ZombieSpeedMultiplier(Preset.Value),
                 ZombieSpeedMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.ZombieSpeedMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective movement-speed multiplier for every beetle.</summary>
         public double BeetleSpeedMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.BeetleSpeedMultiplier(Preset.Value),
                 BeetleSpeedMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.BeetleSpeedMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective knockback multiplier for every beetle.</summary>
         public double BeetleKnockbackMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.BeetleKnockbackMultiplier(Preset.Value),
                 BeetleKnockbackMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.BeetleKnockbackMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective ragdoll-duration multiplier for beetle hits and zombie bites.</summary>
         public double CreatureRagdollMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.CreatureRagdollMultiplier(Preset.Value),
                 CreatureRagdollMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.CreatureRagdollMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>Whether zombies can lose a target at all.</summary>
         public bool ZombieDeaggroEnabled =>
-            UseCustomOverrides
-                ? ZombieDeaggroEnabledOverride.Value
-                : PresetCatalog.ZombieDeaggroEnabled(Preset.Value);
+            OverrideResolution.Resolve(
+                PresetCatalog.ZombieDeaggroEnabled(Preset.Value),
+                ZombieDeaggroEnabledOverride.Value,
+                ConfigDefaults.ZombieDeaggroEnabled,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective zombie deaggro difficulty (1.0 = toughest, NOT vanilla).</summary>
         public double ZombieDeaggroMultiplier =>
@@ -2180,7 +2262,9 @@ namespace Fairoots
                 OverrideResolution.Resolve(
                     PresetCatalog.ZombieDeaggroMultiplier(Preset.Value),
                     ZombieDeaggroMultiplierOverride.Value,
-                    UseCustomOverrides));
+                    ConfigDefaults.ZombieDeaggroMultiplier,
+                    Preset.Value,
+                    ApplyPurePreset.Value));
 
         /// <summary>The effective beetle deaggro-distance multiplier (1.0 = vanilla).</summary>
         public double BeetleDeaggroMultiplier =>
@@ -2188,70 +2272,90 @@ namespace Fairoots
                 OverrideResolution.Resolve(
                     PresetCatalog.BeetleDeaggroMultiplier(Preset.Value),
                     BeetleDeaggroMultiplierOverride.Value,
-                    UseCustomOverrides));
+                    ConfigDefaults.BeetleDeaggroMultiplier,
+                    Preset.Value,
+                    ApplyPurePreset.Value));
 
         /// <summary>The effective wind-force (and gust-timing) multiplier.</summary>
         public double WindForceMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.WindForceMultiplier(Preset.Value),
                 WindForceMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.WindForceMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective gust-duration/frequency multiplier (independent of <see cref="WindForceMultiplier"/>).</summary>
         public double WindGustDurationMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.WindGustDurationMultiplier(Preset.Value),
                 WindGustDurationMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.WindGustDurationMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective non-backpack item wind-force multiplier.</summary>
         public double WindItemForceMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.WindItemForceMultiplier(Preset.Value),
                 WindItemForceMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.WindItemForceMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective obstacle-occlusion raycast-distance multiplier.</summary>
         public double WindObstacleOcclusionRangeMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.WindObstacleOcclusionRangeMultiplier(Preset.Value),
                 WindObstacleOcclusionRangeMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.WindObstacleOcclusionRangeMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective wind-preceded-fall camera-control floor (0 = off).</summary>
         public double WindFallCameraDampenClamp =>
             OverrideResolution.Resolve(
                 PresetCatalog.WindFallCameraDampenClamp(Preset.Value),
                 WindFallCameraDampenClampOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.WindFallCameraDampenClamp,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective all-directions climb-speed multiplier while wind is pushing on the climber.</summary>
         public double ClimbWindSpeedMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.ClimbWindSpeedMultiplier(Preset.Value),
                 ClimbWindSpeedMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.ClimbWindSpeedMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective extra multiplier on upward climb movement in wind.</summary>
         public double ClimbWindUpwardSpeedMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.ClimbWindUpwardSpeedMultiplier(Preset.Value),
                 ClimbWindUpwardSpeedMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.ClimbWindUpwardSpeedMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective extra multiplier on climb movement opposing the wind.</summary>
         public double ClimbWindIntoWindSpeedMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.ClimbWindIntoWindSpeedMultiplier(Preset.Value),
                 ClimbWindIntoWindSpeedMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.ClimbWindIntoWindSpeedMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>The effective wind-force multiplier for the let-go grace window.</summary>
         public double ClimbWindGraceForceMultiplier =>
             OverrideResolution.Resolve(
                 PresetCatalog.ClimbWindGraceForceMultiplier(Preset.Value),
                 ClimbWindGraceForceMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.ClimbWindGraceForceMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         // --- Level-load snapshot (ApplyChangesLive == false) --------------
         // Captured once per Roots level load (RootsLevelWatcher, right before
@@ -2458,7 +2562,9 @@ namespace Fairoots
             OverrideResolution.Resolve(
                 PresetCatalog.WindBackpackAlwaysImmune(Preset.Value),
                 WindBackpackAlwaysImmuneOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.WindBackpackAlwaysImmune,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of
@@ -2473,14 +2579,18 @@ namespace Fairoots
             OverrideResolution.Resolve(
                 PresetCatalog.CoverMouthBlocksSporeBombs(Preset.Value),
                 CoverMouthBlocksSporeBombsOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.CoverMouthBlocksSporeBombs,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>Whether the cover-your-mouth mechanic exists at all (on under every preset 1-4).</summary>
         public bool EnableCoverMouth =>
             OverrideResolution.Resolve(
                 PresetCatalog.EnableCoverMouth(Preset.Value),
                 EnableCoverMouthOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.EnableCoverMouth,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>Game-facing code should read this instead of <see cref="EnableCoverMouthOverride"/>.Value. Host-authoritative - whether a counterplay mechanic exists in this run is shared balance.</summary>
         public bool EffectiveEnableCoverMouth =>
@@ -2502,7 +2612,9 @@ namespace Fairoots
             OverrideResolution.Resolve(
                 PresetCatalog.CoverMouthStaminaPerSecond(Preset.Value),
                 CoverMouthStaminaPerSecondOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.CoverMouthStaminaPerSecond,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of
@@ -2564,7 +2676,9 @@ namespace Fairoots
             OverrideResolution.Resolve(
                 PresetCatalog.ZombieKnockoutSeconds(Preset.Value),
                 ZombieKnockoutSecondsOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.ZombieKnockoutSeconds,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of
@@ -2579,7 +2693,9 @@ namespace Fairoots
             OverrideResolution.Resolve(
                 PresetCatalog.BeetleKnockoutSeconds(Preset.Value),
                 BeetleKnockoutSecondsOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.BeetleKnockoutSeconds,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of
@@ -2594,7 +2710,9 @@ namespace Fairoots
             OverrideResolution.Resolve(
                 PresetCatalog.CreatureKnockoutMinThrowSpeed(Preset.Value),
                 CreatureKnockoutMinThrowSpeedOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.CreatureKnockoutMinThrowSpeed,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of
@@ -2609,7 +2727,9 @@ namespace Fairoots
             OverrideResolution.Resolve(
                 PresetCatalog.CreatureKnockoutMaxThrowDistance(Preset.Value),
                 CreatureKnockoutMaxThrowDistanceOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.CreatureKnockoutMaxThrowDistance,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of
@@ -2624,7 +2744,9 @@ namespace Fairoots
             OverrideResolution.Resolve(
                 PresetCatalog.BlowgunAffectsCreatures(Preset.Value),
                 BlowgunAffectsCreaturesOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.BlowgunAffectsCreatures,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of
@@ -2639,7 +2761,9 @@ namespace Fairoots
             OverrideResolution.Resolve(
                 PresetCatalog.BlowgunCreatureStunSeconds(Preset.Value),
                 BlowgunCreatureStunSecondsOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.BlowgunCreatureStunSeconds,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of
@@ -2654,7 +2778,9 @@ namespace Fairoots
             OverrideResolution.Resolve(
                 PresetCatalog.ZombieWindMultiplier(Preset.Value),
                 ZombieWindMultiplierOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.ZombieWindMultiplier,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of
@@ -2669,7 +2795,9 @@ namespace Fairoots
             OverrideResolution.Resolve(
                 PresetCatalog.BeetleWindSusceptibility(Preset.Value),
                 BeetleWindSusceptibilityOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.BeetleWindSusceptibility,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of
@@ -2755,7 +2883,9 @@ namespace Fairoots
             OverrideResolution.Resolve(
                 PresetCatalog.WindRecentForceWindowSeconds(Preset.Value),
                 WindRecentForceWindowSecondsOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.WindRecentForceWindowSeconds,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of
@@ -2771,14 +2901,18 @@ namespace Fairoots
             OverrideResolution.Resolve(
                 PresetCatalog.PreventWindRagdoll(Preset.Value),
                 PreventWindRagdollOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.PreventWindRagdoll,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>Whether the bush/grass placement-removal pass runs. Host-authoritative - which spore bombs exist in the level is shared game state.</summary>
         public bool EnableFoliageRemoval =>
             OverrideResolution.Resolve(
                 PresetCatalog.EnableFoliageRemoval(Preset.Value),
                 EnableFoliageRemovalOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.EnableFoliageRemoval,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>Game-facing code should read this instead of <see cref="EnableFoliageRemovalOverride"/>.Value. Host-authoritative.</summary>
         public bool EffectiveEnableFoliageRemoval =>
@@ -2789,7 +2923,9 @@ namespace Fairoots
             OverrideResolution.Resolve(
                 PresetCatalog.ClimbSheltersFromWind(Preset.Value),
                 ClimbSheltersFromWindOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.ClimbSheltersFromWind,
+                Preset.Value,
+                ApplyPurePreset.Value);
 
         /// <summary>
         /// Game-facing code should read this instead of
@@ -2831,6 +2967,8 @@ namespace Fairoots
             OverrideResolution.Resolve(
                 PresetCatalog.ClimbShelterGraceSeconds(Preset.Value),
                 ClimbShelterGraceSecondsOverride.Value,
-                UseCustomOverrides);
+                ConfigDefaults.ClimbShelterGraceSeconds,
+                Preset.Value,
+                ApplyPurePreset.Value);
     }
 }

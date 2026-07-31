@@ -167,9 +167,10 @@ cosmetic, changing how densely one player's own screen draws a cloud and
 nothing about the hazard itself), the two on-screen warning labels and the
 cover-mouth keybind, and the entire `Debug` section (diagnostics/overlays,
 never gameplay-affecting; this is also where `apply-changes-live` lives, since
-freezing values mid-run is a comparison-testing tool). `General`'s seed and
-preset are the two host-decided entries in that section, by definition.
-Everything outside those two sections is host-authoritative.
+freezing values mid-run is a comparison-testing tool). The `Host` section
+(seed, preset, apply-pure-preset) is host-decided by definition — that's the
+whole point of the tab. Everything outside `General`/`Debug` is
+host-authoritative.
 
 **Enforcement (added 2026-07-22, refined 2026-07-22): every client must
 actually have Fairoots installed, and this is checked, not just
@@ -207,6 +208,15 @@ Four presets, numbered 1 (lightest touch) through 4 (heaviest), plus Custom (5).
 are ignored entirely and the preset's own numbers apply; Custom is the only
 preset that reads what the player configured.
 
+**`Host/apply-pure-preset` (added 2026-07-31, on by default) relaxes that for
+presets 1-4.** Turned off, a preset still supplies every per-mechanic setting
+the player has left at its vanilla default, but any setting the player has
+actually changed keeps that changed value instead of being overwritten by the
+preset. This lets a player pick, say, Subtle, turn this off, and change just
+`climb-shelters-from-wind` without first copying every one of Subtle's numbers
+into Custom. Has no effect under Custom. See
+`Core/Presets/OverrideResolution.Resolve`.
+
 **The preset table now lives in [`docs/PRESETS.md`](docs/PRESETS.md), not here.**
 That file is the machine-readable source of truth: every setting, its default,
 and its value under each of the four presets, parsed by
@@ -224,7 +234,7 @@ framing that isn't a number.
    is a blank slate, not "Balanced with the numbers exposed". The documented
    exceptions are the client-side cosmetic settings in `General` and the gated
    parameters (a dial that means nothing until the mechanic it belongs to is on).
-2. **Every gameplay setting outside `General`/`Debug` is preset-driven.** This
+2. **Every gameplay setting outside `General`/`Host`/`Debug` is preset-driven.** This
    follows from rule 1: if a mechanic is meant to be on under Balanced while its
    config entry defaults to vanilla, only a preset row can turn it on. The old
    category of "flat gameplay setting, same under every preset" is gone as of
