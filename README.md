@@ -6,8 +6,6 @@
 
 Fully configurable through **4 presets + a Custom slate**, from light balancing to a pretty much peaceful climb, and every dial also works in the other direction if you'd rather make Roots harder instead.
 
-<img width="1920" height="540" alt="fairoots-banner" src="https://github.com/OnlyCook/peak-fairoots/blob/main/packaging/fairoots-banner.png?raw=true" />
-
 ---
 
 ## Highlights
@@ -16,6 +14,8 @@ Fully configurable through **4 presets + a Custom slate**, from light balancing 
 - **Throw items at creatures**: spiders can already be bonked in vanilla, Fairoots extends the same counterplay to zombies and beetles too, throw something with enough force and knock them out for a while.
 - **Spore bombs redone**: vanilla's trigger radius and height are much larger than the prop itself, which this mod fixes while also removing all spore bombs that spawned inside grass or bush props.
 - **Climbing counters wind**: never make wind push you off an edge while climbing again.
+
+<img width="1920" height="540" alt="fairoots-banner" src="https://github.com/OnlyCook/peak-fairoots/blob/main/packaging/fairoots-banner.png?raw=true" />
 
 Every randomized decision Fairoots makes (which spore bombs get removed, for example) is bound to your run's seed: same seed + same Roots level = same result, every time. Not more randomness stacked on top of randomness.
 
