@@ -52,6 +52,10 @@ Roots is only the second biome and is (subjectively) the least balanced: on some
 - The host decides all game-changing values. Clients can still adjust any setting in the `General` tab which will only affect their own game though.
 - Translations were done by AI, so if something is off in your language you are free to contact me (see below).
 
+## Feedback & bug reports
+
+Found a bug or have a suggestion? Please **[fill out this form](forms.gle/PLACEHOLDER)** or send me an email at `theactualcooker@gmail.com`.
+
 ## Configuration
 
 Config file: `BepInEx/config/OnlyCook.Fairoots.cfg`.
@@ -68,10 +72,6 @@ If you have [PEAKLib.ModConfig](https://thunderstore.io/c/peak/p/PEAKModding/Mod
 - **Debug**: verbose logging and a handful of QA/diagnostic tools. **Not meant for regular runs!** Some of these settings can break the biome or hurt performance, so it's better to leave this section alone unless you're troubleshooting or reporting a bug.
 
 </details>
-
-## Feedback & bug reports
-
-Found a bug or have a suggestion? Please **[fill out this form](forms.gle/PLACEHOLDER)** or send me an email at `theactualcooker@gmail.com`.
 
 ## Requirements
 
