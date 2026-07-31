@@ -19,9 +19,9 @@ Every randomized decision Fairoots makes (which spore bombs get removed, for exa
 
 ## What else it does
 
-Beyond the highlights above, this mod also softens (or, if you configure it that way, sharpens) wind knockback and duration, zombie/beetle speed and aggression, spore cloud size and *Spore* status clear time, and much more.
+Beyond the highlights above, this mod also softens (or, if you configure it that way, sharpens) wind knockback and duration, zombie/beetle speed and aggression, spore cloud size and *Spore* status clear time, and more.
 
-It also offers a bunch of client-sided features: make spore bombs a darker red to spot them easier, add a clear indicator while prone to getting the *Spore* status effect, or make it easier to see inside spore clouds/areas.
+It also offers a bunch of client-sided features: make spore bombs a darker red to spot them easier, add a clear indicator while prone to getting the *Spore* status effect, or make it easier to see while inside spore clouds/areas.
 
 ## How to use
 
