@@ -10,18 +10,18 @@ Fully configurable through **4 presets + a Custom slate**, from light balancing 
 
 ## Highlights
 
-- **Cover your mouth**: press **`X`** to hold your breath while standing in a spore area.
 - **Throw items at creatures**: spiders can already be bonked in vanilla, Fairoots extends the same counterplay to zombies and beetles too, throw something with enough force and knock them out for a while.
-- **Spore bombs redone**: vanilla's trigger radius and height are much larger than the prop itself, which this mod fixes while also removing all spore bombs that spawned inside grass or bush props.
+- **Cover your mouth**: press **`X`** to hold your breath while standing in a spore area.
 - **Climbing counters wind**: never make wind push you off an edge while climbing again.
+- **Spore bombs redone**: vanilla's trigger radius and height are much larger than the prop itself, which this mod fixes while also removing all spore bombs that spawned inside grass or bush props.
 
 <img width="1920" height="540" alt="fairoots-banner" src="https://github.com/OnlyCook/peak-fairoots/blob/main/packaging/fairoots-banner.png?raw=true" />
 
-Every randomized decision Fairoots makes (which spore bombs get removed, for example) is bound to your run's seed: same seed + same Roots level = same result, every time. Not more randomness stacked on top of randomness.
+Every randomized decision Fairoots makes (which spore bombs get removed, for example) is bound to your run's seed: same seed + same Roots level = same result, every time.
 
 ## What else it does
 
-Beyond the highlights above, this mod also softens (or, if you configure it that way, sharpens) wind knockback and duration, zombie/beetle speed and aggression, spore cloud size and *Spore* status clear time, and more.
+Beyond the highlights above, this mod also softens (or, if you configure it that way, sharpens) wind knockback and duration, player ragdoll, zombie/beetle speed and aggression, spore cloud size and *Spore* status clear time, and more.
 
 It also offers a bunch of client-sided features: make spore bombs a darker red to spot them easier, add a clear indicator while prone to getting the *Spore* status effect, or make it easier to see while inside spore clouds/areas.
 
