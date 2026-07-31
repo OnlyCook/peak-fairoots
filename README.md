@@ -56,7 +56,7 @@ Roots is only the second biome and is (subjectively) the least balanced: on some
 
 ## Feedback & bug reports
 
-Found a bug or have a suggestion? Please **[fill out this form](forms.gle/PLACEHOLDER)** or send me an email at `theactualcooker@gmail.com`.
+Found a bug or have a suggestion? Please **[fill out this form](https://forms.gle/6yeyoVFoavUdu6Fz7)** or send me an email at `theactualcooker@gmail.com`.
 
 ## Configuration
 
