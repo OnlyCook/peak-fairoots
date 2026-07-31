@@ -6,6 +6,8 @@
 
 Fully configurable through **4 presets + a Custom slate**, from light balancing to a pretty much peaceful climb, and every dial also works in the other direction if you'd rather make Roots harder instead.
 
+<img width="1920" height="540" alt="fairoots-banner" src="https://github.com/OnlyCook/peak-fairoots/blob/main/packaging/fairoots-banner.png?raw=true" />
+
 ---
 
 ## Highlights
