@@ -6,7 +6,7 @@ Fully configurable through **4 presets + a Custom slate**, from light balancing 
 
 ## Highlights
 
-- **Cover your mouth**: press `X` to hold your breath while standing in a spore area.
+- **Cover your mouth**: press **`X`** to hold your breath while standing in a spore area.
 - **Throw items at creatures**: spiders can already be bonked in vanilla, Fairoots extends the same counterplay to zombies and beetles too, throw something with enough force and knock them out for a while.
 - **Spore bombs redone**: vanilla's trigger radius and height are much larger than the prop itself, which this mod fixes while also removing all spore bombs that spawned inside grass or bush props.
 - **Climbing counters wind**: never make wind push you off an edge while climbing again.
@@ -47,6 +47,23 @@ Roots is only the second biome and is (subjectively) the least balanced: on some
 - This mod **won't work correctly** if not all clients have it installed.
 - The host decides all game-changing values. Clients can still adjust any setting in the `General` tab which will only affect their own game though.
 - Translations were done by AI, so if something is off in your language you are free to contact me (see below).
+
+## Configuration
+
+Config file: `BepInEx/config/OnlyCook.Fairoots.cfg`.
+
+<details>
+
+<summary><b>View config information</b></summary>
+
+If you have [PEAKLib.ModConfig](https://thunderstore.io/c/peak/p/PEAKModding/ModConfig/) installed, every setting below is also editable in the game's settings under **Mod Settings → Fairoots**, no need to touch the config file by hand.
+
+- **General**: what every player, host or not, configures for their own game feel or screen: spore-bomb recolor, spore-cloud/spore-bomb-cloud opacity, the "standing in spores" overlay and on-screen spore/spider warning labels, and the cover-mouth keybind (default **`X`**) with its hold/toggle mode and whether it can dip into bonus stamina.
+- **Host**: the run's seed, the `preset` selector (Subtle/Balanced/Generous/Tame/Custom), and `apply-pure-preset` (on by default; turn it off to let a preset supply everything except the individual settings you've personally changed). Host-authoritative: only the host's values here matter.
+- **Spore-Bombs**, **Spore-Areas**, **Spores**, **Creatures**, **Wind**: every individual dial for this mod's mechanics. **These only take effect while the Custom preset is selected, or while a preset is selected with `apply-pure-preset` disabled and you've changed the specific setting**, under a pure preset (1-4), the preset's own numbers are used instead and whatever you've set here is ignored. Every gameplay-changing setting in these sections is host-authoritative, same as the preset itself.
+- **Debug**: verbose logging and a handful of QA/diagnostic tools. **Not meant for regular runs!** Some of these settings can break the biome or hurt performance, so it's better to leave this section alone unless you're troubleshooting or reporting a bug.
+
+</details>
 
 ## Feedback & bug reports
 
