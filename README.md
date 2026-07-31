@@ -13,7 +13,7 @@ Fully configurable through **4 presets + a Custom slate**, from light balancing 
 - **Cover your mouth**: press `X` to hold your breath while standing in a spore area.
 - **Throw items at creatures**: spiders can already be bonked in vanilla, Fairoots extends the same counterplay to zombies and beetles too, throw something with enough force and knock them out for a while.
 - **Spore bombs redone**: vanilla's trigger radius and height are much larger than the prop itself, which this mod fixes while also removing all spore bombs that spawned inside grass or bush props.
-- **Climbing counters wind**: never make wind push you off an edge while climbing.
+- **Climbing counters wind**: never make wind push you off an edge while climbing again.
 
 Every randomized decision Fairoots makes (which spore bombs get removed, for example) is bound to your run's seed: same seed + same Roots level = same result, every time. Not more randomness stacked on top of randomness.
 
@@ -21,11 +21,11 @@ Every randomized decision Fairoots makes (which spore bombs get removed, for exa
 
 Beyond the highlights above, this mod also softens (or, if you configure it that way, sharpens) wind knockback and duration, zombie/beetle speed and aggression, spore cloud size and *Spore* status clear time, and much more.
 
-It also offers a bunch of client-sided features: make spore bombs a darker red to spot them easier, add a clear indicator while prone to getting the *Spores* status effect, or make it easier to see in spore clouds/areas.
+It also offers a bunch of client-sided features: make spore bombs a darker red to spot them easier, add a clear indicator while prone to getting the *Spore* status effect, or make it easier to see inside spore clouds/areas.
 
 ## How to use
 
-Upon installing the mod the Balanced preset is picked by default which is recommended for players who want a Roots that doesn't feel too unfair. If that's what you want you don't have to do anything but install this mod. If you want something else, you can pick another preset or create your own.
+Upon installing the mod the Balanced preset is picked by default which is recommended for most players. If that suffices you don't have to do anything else. Although if you want something else, you can pick another preset or create your own.
 
 Open the config file or use [PEAKLib.ModConfig](https://thunderstore.io/c/peak/p/PEAKModding/ModConfig/) if installed, then in the `Host` tab you will see the `preset` option:
 
