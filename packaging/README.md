@@ -4,10 +4,6 @@ Fully configurable through **4 presets + a Custom slate**, from light balancing 
 
 ---
 
-## Why
-
-Roots is only the second biome and is (subjectively) the least balanced: on some seeds you can beat it without ever touching anything but tree leaves and on others you question the energy used to play this game. Although often not because of it being overly challenging but because of how unfair and frustrating it feels instead. I think this is caused by the fact that there are too little mechanics to address the many new hazards. This mod tries to fix exactly that while also making it more tolerable to traverse this biome in general.
-
 ## Highlights
 
 - **Cover your mouth**: press `X` to hold your breath while standing in a spore area.
@@ -20,22 +16,33 @@ Every randomized decision Fairoots makes (which spore bombs get removed, for exa
 
 Beyond the highlights above, Fairoots also softens (or, if you configure it that way, sharpens) wind knockback and duration, zombie/beetle speed and aggression, spore cloud size and *Spore* status build-up, screenshake range and much more.
 
-## Presets
+## How to use
 
-> Open the config file or use [PEAKLib.ModConfig](https://thunderstore.io/c/peak/p/PEAKModding/ModConfig/) if installed.
+Upon installing the mod the Balanced preset is picked by default which is recommended for players who want a Roots that doesn't feel too unfair. If that's what you want you don't have to do anything but install this mod. If you want something else, you can pick another preset or create your own.
+
+Open the config file or use [PEAKLib.ModConfig](https://thunderstore.io/c/peak/p/PEAKModding/ModConfig/) if installed, then in the `Host` tab you will see the `preset` option:
 
 1. **Subtle**: both new mechanics on, everything else barely nudged, still pretty similar to vanilla difficulty.
 2. **Balanced (default)**: a bit more forgiving than Subtle, the tuning I'd ship if this were the base game's own balance pass.
 3. **Generous**: meaningfully easier, most of the RNG-driven unfairness smoothed out.
 4. **Tame**: if you don't want to bother with this biome's RNG at all.
-5. **Custom**: nothing but vanilla until you say otherwise. Every setting ships at its unmodded value, so picking Custom and changing nothing plays exactly like the base game, you can freely configure everything about this mod. Presets 1-4 ignore these settings entirely and apply their own numbers, this is also the preset to use if you want to make Roots harder rather than easier. *Example:* let's say you only want to remove those spore areas, you can with this preset, just enable `disable-spore-areas` and you're golden!
+5. **Custom**: nothing but vanilla until you say otherwise. Every setting ships at its unmodded value, so picking Custom and changing nothing plays exactly like the base game, here you can freely configure everything about this mod. This is also the preset to use if you want to make Roots harder rather than easier.
+
+- *Example 1:* let's say you dislike spore areas and only want to remove those, you can with the Custom preset, then just enable `Spore-Areas/disable-spore-areas` and you're golden!
+- *Example 2:* maybe you like the Subtle preset, but want to additionally make climbing fully counter wind as well, select the Subtle preset, disable `Host/apply-pure-preset` and enable `Wind/climb-shelters-from-wind`.
+
+> **Note:** presets 1-4 ignore most game-changing settings entirely and apply their own values, if you'd like to configure everything yourself pick the Custom preset.
 
 Every value each preset uses is listed, setting by setting, in [`docs/PRESETS.md`](https://github.com/OnlyCook/peak-fairoots/blob/main/docs/PRESETS.md).
+
+## Why
+
+Roots is only the second biome and is (subjectively) the least balanced: on some seeds you can beat it without ever touching anything but tree leaves and on others you question the energy used to play this game. Although often not because of it being overly challenging but because of how unfair and frustrating it feels. I think this is caused by the fact that there are too little mechanics to address the many new hazards. This mod tries to fix exactly that while also making it more tolerable to traverse this biome in general.
 
 ## Notes
 
 - This mod **won't work correctly** if not all clients have it installed.
-- The host decides all game-changing values. Clients can still adjust most settings in the `General` tab which will only affect their own game.
+- The host decides all game-changing values. Clients can still adjust any setting in the `General` tab which will only affect their own game though.
 - Translations were done by AI, so if something is off in your language you are free to contact me (see below).
 
 ## Feedback & bug reports
