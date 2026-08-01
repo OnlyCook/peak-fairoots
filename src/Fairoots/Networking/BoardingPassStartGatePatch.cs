@@ -48,13 +48,27 @@ namespace Fairoots.Networking
                     $"[BoardingPassStartGatePatch] Start blocked pending confirmation - {missing.Count} " +
                     $"player(s) missing Fairoots: {string.Join(", ", missing.ConvertAll(p => p.NickName))}");
 
+                // The native confirm dialog (Peak.UI.ConfirmPage) renders behind the
+                // Boarding Pass window's own canvas, so it'd be invisible if left up
+                // underneath - hide the Boarding Pass panel for the duration instead
+                // of hunting for a sorting-order fix. MenuWindow.Hide()/Show() only
+                // toggle the panel GameObject's active state (no OnClose, no removal
+                // from AllActiveWindows), so this doesn't disturb the window's open
+                // state - it comes right back if the player declines.
+                __instance.Hide();
+
                 ModPresenceDialog.ShowStartConfirm(
                     onConfirm: () =>
                     {
                         _bypassNextCheck = true;
+                        __instance.Show();
                         __instance.StartGame();
                     },
-                    onDecline: () => Diag.Warn("[BoardingPassStartGatePatch] Start canceled by the player."));
+                    onDecline: () =>
+                    {
+                        __instance.Show();
+                        Diag.Warn("[BoardingPassStartGatePatch] Start canceled by the player.");
+                    });
 
                 return false; // suppress the original click until the player decides.
             }
