@@ -115,5 +115,30 @@ namespace Fairoots.Networking
                 && value is bool installed
                 && installed;
         }
+
+        /// <summary>
+        /// Whether the room's MasterClient has Fairoots installed, via the same
+        /// replicated property as everything else in this class - used by
+        /// <see cref="RootsLevelWatcher"/> to fully disable the mod on a client
+        /// whose host doesn't have it (see that class's remarks for why: without
+        /// this, <c>HostAuthority.Resolve</c> silently falls back to this client's
+        /// own local config the moment nothing is published under a given key,
+        /// which for a Fairoots-less host means EVERY key, all the time - so this
+        /// client would independently rebalance/cull the Roots biome using its own
+        /// settings with zero coordination with the host, who applies none of it).
+        /// Solo play or a brief window before the MasterClient is known both read
+        /// as <c>true</c> (nothing to disable against), matching every other
+        /// "not in a room yet" fallback in this codebase.
+        /// </summary>
+        internal static bool HostHasFairoots()
+        {
+            if (!PhotonNetwork.InRoom)
+            {
+                return true;
+            }
+
+            Photon.Realtime.Player master = PhotonNetwork.MasterClient;
+            return master == null || IsInstalled(master);
+        }
     }
 }

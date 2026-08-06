@@ -104,6 +104,23 @@ namespace Fairoots
                 return false; // setup already finished for the loaded biome.
             }
 
+            // Session-diagnosed 2026-08-06: RootsLevelWatcher.CheckAndRun() won't enter
+            // Roots (and so never flips Busy true) until a local character exists to do
+            // the entering FOR (see its own remarks on why that check is deliberately
+            // entry-only). Without this, a character that's slow to (re)spawn - a real
+            // observed failure mode, unrelated to Fairoots itself - reads as "biome live,
+            // never entering" forever: RootsBiomeIsLive alone doesn't need a character, so
+            // it would keep answering true and strand a caller's loading screen up for its
+            // own full timeout instead of the brief, real setup window this method exists
+            // to describe. No character also means RootsLevelWatcher.CheckAndRun() can't
+            // possibly be about to start Busy work this frame either way, so "false" here
+            // is never a lie - just correctly refusing to promise a hold this method can't
+            // back up
+            if (Character.localCharacter == null)
+            {
+                return false;
+            }
+
             return RootsLevelWatcher.RootsBiomeIsLive;
         }
 

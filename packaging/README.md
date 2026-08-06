@@ -38,7 +38,7 @@ Open the config file or use [PEAKLib.ModConfig](https://thunderstore.io/c/peak/p
 
 > **Note:** presets 1-4 ignore most game-changing settings entirely and apply their own values, if you'd like to configure everything yourself pick the Custom preset.
 
-Every value each preset uses is listed, setting by setting, in [`docs/PRESETS.md`](https://github.com/OnlyCook/peak-fairoots/blob/main/docs/PRESETS.md).
+Every value each preset uses is listed, setting by setting, in [docs/PRESETS.md](https://github.com/OnlyCook/peak-fairoots/blob/main/docs/PRESETS.md).
 
 ## Why
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using Fairoots.Diagnostics;
+using Fairoots.Networking;
 using Fairoots.SporeBombs;
 using Fairoots.Ui;
 using UnityEngine;
@@ -80,8 +81,47 @@ namespace Fairoots
         /// </summary>
         private static Coroutine _setup;
 
+        /// <summary>
+        /// Whether the last <see cref="CheckAndRun"/> logged the "host is missing
+        /// Fairoots" notice, so it's said once per gap rather than once per frame.
+        /// Reset the moment the host has it again, so a later host-missing window
+        /// (a master-client switch, say) logs again instead of staying silent.
+        /// </summary>
+        private static bool _loggedHostMissing;
+
         internal static void CheckAndRun()
         {
+            // Whole-mod kill switch (session-diagnosed 2026-08-06): a client with
+            // Fairoots whose HOST doesn't have it gets none of HostAuthority's
+            // published values (the host never publishes anything, having no
+            // Fairoots code path to do it with), so every Resolve() call would
+            // silently fall back to this client's own local config - meaning this
+            // client alone culls/rebalances the shared Roots biome with zero
+            // coordination with the host, who applies none of it. Treating the
+            // biome as "not live" here closes the single gate every other patch in
+            // this mod is written against (see RootsState's remarks) - the whole
+            // mod goes inert, matching vanilla, rather than just skipping the
+            // per-level setup passes
+            if (!ModPresenceCheck.HostHasFairoots())
+            {
+                if (!_loggedHostMissing)
+                {
+                    _loggedHostMissing = true;
+                    Diag.Warn("[RootsLevelWatcher] the room's host does not have Fairoots installed - "
+                        + "disabling Fairoots entirely on this client until that changes (see HostAuthority's remarks "
+                        + "for why a partial/local-only application would desync the shared Roots biome).");
+                }
+
+                if (_levelLoaded)
+                {
+                    ExitLevel();
+                }
+
+                return;
+            }
+
+            _loggedHostMissing = false;
+
             bool inRoots = IsInLiveRootsBiome();
 
             if (_levelLoaded && (!inRoots || _processed == null))
