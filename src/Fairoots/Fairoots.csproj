@@ -4,7 +4,7 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>Fairoots</AssemblyName>
     <Product>Fairoots</Product>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <NoWarn>$(NoWarn);CS0436;CS0618;CS0649</NoWarn>
