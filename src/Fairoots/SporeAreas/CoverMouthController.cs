@@ -48,9 +48,63 @@ namespace Fairoots.SporeAreas
         /// <c>Character.UseStamina</c> is <c>internal</c> in Assembly-CSharp, so it
         /// can't be called directly from this assembly. Resolved once via Harmony's
         /// <see cref="AccessTools"/> rather than per frame.
+        ///
+        /// <b>Matched on its leading <c>(float, bool)</c> parameters, not an exact
+        /// signature.</b> PEAK 2.0.a appended a third optional parameter
+        /// (<c>bool ignoreAscents = false</c>), which made the previous exact
+        /// <c>(float, bool)</c> lookup return <c>null</c> - covering your mouth
+        /// silently became free. The game keeps appending optional parameters to
+        /// this method, so pinning the full signature is guaranteed to break again;
+        /// matching the prefix and letting <see cref="BuildUseStaminaArgs"/> fill
+        /// whatever follows with the game's own declared defaults survives that.
         /// </summary>
-        private static readonly MethodInfo UseStaminaMethod =
-            AccessTools.Method(typeof(Character), "UseStamina", new[] { typeof(float), typeof(bool) });
+        private static readonly MethodInfo UseStaminaMethod = ResolveUseStamina();
+
+        private static MethodInfo ResolveUseStamina()
+        {
+            foreach (var candidate in AccessTools.GetDeclaredMethods(typeof(Character)))
+            {
+                if (candidate.Name != "UseStamina")
+                {
+                    continue;
+                }
+
+                var parameters = candidate.GetParameters();
+                if (parameters.Length >= 2
+                    && parameters[0].ParameterType == typeof(float)
+                    && parameters[1].ParameterType == typeof(bool))
+                {
+                    return candidate;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The argument array for <see cref="UseStaminaMethod"/>: the two the mod
+        /// actually cares about, then each remaining parameter at the default the
+        /// game itself declares for it - so an added optional parameter keeps
+        /// vanilla behavior rather than needing a code change here.
+        /// </summary>
+        private static object[] BuildUseStaminaArgs(float cost, bool useBonusStamina)
+        {
+            var parameters = UseStaminaMethod.GetParameters();
+            var args = new object[parameters.Length];
+            args[0] = cost;
+            args[1] = useBonusStamina;
+
+            for (int i = 2; i < parameters.Length; i++)
+            {
+                args[i] = parameters[i].HasDefaultValue
+                    ? parameters[i].DefaultValue
+                    : (parameters[i].ParameterType.IsValueType
+                        ? Activator.CreateInstance(parameters[i].ParameterType)
+                        : null);
+            }
+
+            return args;
+        }
 
         private static bool _loggedMissingUseStamina;
 
@@ -279,7 +333,8 @@ namespace Fairoots.SporeAreas
             }
 
             // The second argument is the game's own useBonusStamina flag.
-            UseStaminaMethod.Invoke(character, new object[] { cost, Plugin.Cfg.CoverMouthUseBonusStamina.Value });
+            UseStaminaMethod.Invoke(
+                character, BuildUseStaminaArgs(cost, Plugin.Cfg.CoverMouthUseBonusStamina.Value));
         }
 
         // --- Replication --------------------------------------------------

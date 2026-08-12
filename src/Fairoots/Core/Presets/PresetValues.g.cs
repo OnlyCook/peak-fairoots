@@ -48,7 +48,7 @@ namespace Fairoots.Core.Presets
         public static double SporeBombVfxCountMultiplier(PresetId preset) =>
             Pick(preset, 1.00, 0.75, 0.50, 0.35);
         public static double SporeBombTriggerHeightMultiplier(PresetId preset) =>
-            Pick(preset, 0.9, 0.804, 0.804, 0.804);
+            Pick(preset, 0.90, 0.804, 0.804, 0.804);
         public static double SporeBombSporeAreaRadiusMultiplier(PresetId preset) =>
             Pick(preset, 1.00, 1.00, 1.00, 1.00);
         public static bool CoverMouthBlocksSporeBombs(PresetId preset) =>
@@ -58,7 +58,7 @@ namespace Fairoots.Core.Presets
         public static double SporeAreaRemovalFraction(PresetId preset) =>
             Pick(preset, 0.00, 0.00, 0.20, 0.35);
         public static double SporeAreaRadiusMultiplier(PresetId preset) =>
-            Pick(preset, 1.00, 1.00, 0.85, 0.70);
+            Pick(preset, 1.00, 1.00, 0.90, 0.80);
         public static double SporeAreaStatusRateMultiplier(PresetId preset) =>
             Pick(preset, 1.00, 1.00, 0.90, 0.80);
         public static bool EnableCoverMouth(PresetId preset) =>

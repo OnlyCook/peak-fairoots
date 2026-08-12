@@ -392,7 +392,8 @@ namespace Fairoots
         /// area's radius - and, proportionally, its inner/outer fade and the visible
         /// size of the cloud itself, so what you see matches what actually applies
         /// the status (see <see cref="Core.SporeAreaTuning"/>). 1.0 = vanilla
-        /// (radius 16 world units). Only takes effect under
+        /// (radius 11 world units as of PEAK 2.0.a, which cut it down from 16).
+        /// Only takes effect under
         /// <see cref="PresetId.Custom"/>; see
         /// <see cref="SporeBombCullFractionOverride"/>.
         ///
@@ -1328,7 +1329,8 @@ namespace Fairoots
                     "Multiplier applied to how far every spore area reaches, e.g. 0.7 shrinks it " +
                     "to 70% of vanilla, 1.5 makes it half again as big. The visible cloud is " +
                     "resized to match, so what you can see is what actually gives you spores. " +
-                    "1.0 always means vanilla size (radius 16, about 26m across from the middle). " +
+                    "1.0 always means vanilla size (radius 11, about 18m across from the middle - " +
+                    "PEAK 2.0.a shrank this from 16/26m). " +
                     "How quickly the spores themselves are applied is a separate setting - this " +
                     "only changes the size. Only takes effect when preset is set to Custom (5) - " +
                     "ignored under presets 1-4.",

@@ -16,12 +16,17 @@ namespace Fairoots.Ui
     /// (English, French, Italian, German, SpanishSpain, SpanishLatam, BRPortuguese,
     /// Russian, Ukrainian, SimplifiedChinese, TraditionalChinese, Japanese, Korean,
     /// Polish, Turkish) - <see cref="LocalizationHelper"/> falls back to English
-    /// (index 0) for any entry a language doesn't cover. TraditionalChinese is left
-    /// blank, matching the convention already set by
-    /// <c>ModPresenceLocalization</c>: the game's own
-    /// <c>LocalizedText.LANGUAGE_COUNT</c> is 14, one less than the 15-value enum,
-    /// so this mirrors that precedent rather than guessing a translation for a
-    /// language slot the game itself doesn't use.
+    /// (index 0) for any entry a language doesn't cover. Every slot is now filled,
+    /// including TraditionalChinese, which used to be left blank on the assumption
+    /// that <c>LocalizedText.LANGUAGE_COUNT</c> being 14 (one less than the
+    /// 15-value enum) meant that slot was unused - see
+    /// <c>ModPresenceLocalization</c>'s remarks for why that reasoning was wrong.
+    ///
+    /// The Traditional Chinese spore and spider warnings are character-for-character
+    /// identical to the Simplified ones on purpose, not by copy-paste: every
+    /// character in those two strings is shared between the two scripts, so there is
+    /// nothing to convert. Only "Preparing the Roots" actually differs
+    /// (准备 -> 準備).
     ///
     /// Kept deliberately short in every language: these are read at a glance, in
     /// the moment, off a single unwrapped line
@@ -56,7 +61,7 @@ namespace Fairoots.Ui
                 "Вы дышите спорами!",
                 "Ви дихаєте спорами!",
                 "正在吸入孢子！",
-                "",
+                "正在吸入孢子！",
                 "胞子を吸い込んでいます！",
                 "포자를 흡입하고 있습니다!",
                 "Wdychasz zarodniki!",
@@ -74,7 +79,7 @@ namespace Fairoots.Ui
                 "На вас спускается паук!",
                 "На вас спускається павук!",
                 "蜘蛛正朝你落下！",
-                "",
+                "蜘蛛正朝你落下！",
                 "クモが降りてきます！",
                 "거미가 당신을 향해 내려옵니다!",
                 "Pająk spada na ciebie!",
@@ -92,7 +97,7 @@ namespace Fairoots.Ui
                 "Подготовка Корней...",
                 "Підготовка Коренів...",
                 "正在准备根系...",
-                "",
+                "正在準備根系...",
                 "ルーツを準備しています...",
                 "뿌리를 준비하는 중...",
                 "Przygotowywanie Korzeni...",

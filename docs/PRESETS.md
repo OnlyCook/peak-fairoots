@@ -29,7 +29,7 @@ The rows marked `*` on the default are the one documented exception: **gated par
 | `knockback-multiplier` | double | 1.0 | 1.00 | 0.90 | 0.70 | 0.50 | <!--SporeBombKnockbackMultiplier-->
 | `screenshake-range-cap-meters` | double | 0.0 | 75 | 75 | 50 | 50 | <!--SporeBombScreenshakeRangeCapMeters-->
 | `vfx-count-multiplier` | double | 1.0 | 1.00 | 0.75 | 0.50 | 0.35 | <!--SporeBombVfxCountMultiplier-->
-| `trigger-height-multiplier` | double | 1.0 | 0.9 | 0.804 | 0.804 | 0.804 | <!--SporeBombTriggerHeightMultiplier-->
+| `trigger-height-multiplier` | double | 1.0 | 0.90 | 0.804 | 0.804 | 0.804 | <!--SporeBombTriggerHeightMultiplier-->
 | `spore-area-radius-multiplier` | double | 1.0 | 1.00 | 1.00 | 1.00 | 1.00 | <!--SporeBombSporeAreaRadiusMultiplier-->
 | `cover-mouth-blocks-spore-bombs` | bool | off | off | off | off | off | <!--CoverMouthBlocksSporeBombs-->
 - `cull-fraction` is the **total** removal target (the foliage pass plus the seeded cull combined), not an extra cull on top. `0` means the seeded pass removes nothing; the foliage pass still runs if `enable-foliage-removal` is on.
@@ -41,7 +41,7 @@ The rows marked `*` on the default are the one documented exception: **gated par
 |---|---|---|---|---|---|---|
 | `disable-spore-areas` | bool | off | — | — | — | — | <!--DisableSporeAreas-->
 | `removal-fraction` | double | 0.0 | 0.00 | 0.00 | 0.20 | 0.35 | <!--SporeAreaRemovalFraction-->
-| `radius-multiplier` | double | 1.0 | 1.00 | 1.00 | 0.85 | 0.70 | <!--SporeAreaRadiusMultiplier-->
+| `radius-multiplier` | double | 1.0 | 1.00 | 1.00 | 0.90 | 0.80 | <!--SporeAreaRadiusMultiplier-->
 | `status-rate-multiplier` | double | 1.0 | 1.00 | 1.00 | 0.90 | 0.80 | <!--SporeAreaStatusRateMultiplier-->
 | `enable-cover-mouth` | bool | off | on | on | on | on | <!--EnableCoverMouth-->
 | └ `cover-mouth-stamina-per-second` | float | 0.03* | 0.04 | 0.03 | 0.02 | 0.01 | <!--CoverMouthStaminaPerSecond-->

@@ -968,8 +968,8 @@ change it while watching.
 3. `radius-multiplier = 1.0` must be pixel-for-pixel vanilla, including after
    having been set to something else first and back (every value is applied from
    a cached vanilla baseline, so repeated changes can't compound).
-4. Check the log line: `multiplier=..., N spore area(s) resized (e.g. radius 16
-   -> X world units, 25.6m -> Ym), 2N cloud VFX transform(s) scaled` — the VFX
+4. Check the log line: `multiplier=..., N spore area(s) resized (e.g. radius 11
+   -> X world units, 17.6m -> Ym), 2N cloud VFX transform(s) scaled` — the VFX
    count should be exactly twice the area count (two particle systems each). If
    it ever says `had no VFX to scale`, the prefab layout changed.
 
