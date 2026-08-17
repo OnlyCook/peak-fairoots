@@ -6,7 +6,9 @@
 
 The rows marked `*` on the default are the one documented exception: **gated parameters**, a dial that only means anything while some other setting is on. There is no vanilla value for the cost of a mechanic vanilla doesn't have, so the default is the sensible tuned number and the parent toggle is what defaults to off. So when the parent row isn't enabled these values aren't read anyway and therefore still play like vanilla.
 
-**2. Presets 1-4 ignore the config entries entirely.** The config entries are read only under `Custom`.
+**2. Presets 1-4 (Subtle - Tame) ignore most config entries entirely.** The config entries are read only when the chosen preset is `Custom` or when you disable `Host/apply-pure-preset`.
+
+Having `Host/apply-pure-preset` enabled means your chosen preset (if it's **not** `Custom`) will use its own values therefore ignore what is manually set.
 
 ## How to read the columns
 
