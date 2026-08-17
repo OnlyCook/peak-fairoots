@@ -115,18 +115,6 @@ namespace Fairoots.Core.Presets
         public static bool EnableFoliageRemoval(PresetId preset) =>
             PresetValues.EnableFoliageRemoval(CatalogKey(preset));
 
-        /// <summary>
-        /// Whether covering your mouth also blocks the spore status from a spore
-        /// bomb's temporary cloud, on top of the biome's persistent spore areas.
-        /// Off on every preset today (see <c>SporeBombs/CoverMouthSporeBombPatch</c>
-        /// for why the mechanic is scoped to spore areas) - kept as a preset row
-        /// so the tuning pass can turn it on for the forgiving presets without a
-        /// code change. Only the spore status is ever suppressed either way:
-        /// knockback and screen shake still land.
-        /// </summary>
-        public static bool CoverMouthBlocksSporeBombs(PresetId preset) =>
-            PresetValues.CoverMouthBlocksSporeBombs(CatalogKey(preset));
-
         // --- Spore areas --------------------------------------------------
 
         /// <summary>

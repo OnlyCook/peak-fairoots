@@ -31,7 +31,7 @@ The rows marked `*` on the default are the one documented exception: **gated par
 | `vfx-count-multiplier` | double | 1.0 | 1.00 | 0.75 | 0.50 | 0.35 | <!--SporeBombVfxCountMultiplier-->
 | `trigger-height-multiplier` | double | 1.0 | 0.90 | 0.804 | 0.804 | 0.804 | <!--SporeBombTriggerHeightMultiplier-->
 | `spore-area-radius-multiplier` | double | 1.0 | 1.00 | 1.00 | 1.00 | 1.00 | <!--SporeBombSporeAreaRadiusMultiplier-->
-| `cover-mouth-blocks-spore-bombs` | bool | off | off | off | off | off | <!--CoverMouthBlocksSporeBombs-->
+| `cover-mouth-blocks-spore-bombs` | bool | off | — | — | — | — | <!--CoverMouthBlocksSporeBombs-->
 - `cull-fraction` is the **total** removal target (the foliage pass plus the seeded cull combined), not an extra cull on top. `0` means the seeded pass removes nothing; the foliage pass still runs if `enable-foliage-removal` is on.
 - `screenshake-range-cap-meters`: `0` means uncapped (vanilla). Any positive value is a cap in meters. Vanilla does not have a cap which means that a player triggering a spore bomb will make the screen of another player shake even those that are very far away.
 

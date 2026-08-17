@@ -222,7 +222,6 @@ namespace Fairoots.Tests
             {
                 "SporeBuildUpMultiplier",              // compounds with the per-hazard rows
                 "SporeBombSporeAreaRadiusMultiplier",  // not yet tuned per preset
-                "CoverMouthBlocksSporeBombs",          // off everywhere, for now
             };
 
             var presets = new[] { PresetId.Subtle, PresetId.Balanced, PresetId.Generous, PresetId.Tame };

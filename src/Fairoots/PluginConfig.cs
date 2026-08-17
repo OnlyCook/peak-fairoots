@@ -729,15 +729,18 @@ namespace Fairoots
 
 
         /// <summary>
-        /// Custom-preset value for whether covering your mouth also blocks the spore
-        /// status from a spore bomb's temporary mini spore cloud, on top of the
-        /// biome's persistent spore areas. Off = vanilla, and off on every preset
-        /// today - see <c>SporeBombs/CoverMouthSporeBombPatch</c> for why the
-        /// mechanic is scoped to spore areas. Only the spore status is ever
-        /// suppressed either way: knockback and screen shake still land. Only takes
-        /// effect under <see cref="PresetId.Custom"/>.
+        /// Whether covering your mouth also blocks the spore status from a spore
+        /// bomb's temporary mini spore cloud, on top of the biome's persistent spore
+        /// areas. Off = vanilla - see <c>SporeBombs/CoverMouthSporeBombPatch</c> for
+        /// why the mechanic is scoped to spore areas. Only the spore status is ever
+        /// suppressed either way: knockback and screen shake still land.
+        /// <b>Host-authoritative</b> (read via
+        /// <see cref="EffectiveCoverMouthBlocksSporeBombs"/>), flat (not folded
+        /// through the preset/override system - no preset ever turns it on, and it
+        /// works regardless of <see cref="ApplyPurePreset"/>), exactly like
+        /// <see cref="DisableSporeAreas"/>.
         /// </summary>
-        public ConfigEntry<bool> CoverMouthBlocksSporeBombsOverride { get; }
+        public ConfigEntry<bool> CoverMouthBlocksSporeBombs { get; }
 
         // --- Wind -----------------------------------------------------------
         /// <summary>
@@ -1279,7 +1282,7 @@ namespace Fairoots
                     "preset is set to Custom (5) - ignored under presets 1-4.",
                     new AcceptableValueRange<double>(0.0, 5.0)));
 
-            CoverMouthBlocksSporeBombsOverride = config.Bind(
+            CoverMouthBlocksSporeBombs = config.Bind(
                 "Spore-Bombs",
                 "cover-mouth-blocks-spore-bombs",
                 ConfigDefaults.CoverMouthBlocksSporeBombs,
@@ -1288,8 +1291,8 @@ namespace Fairoots
                 "default: the mechanic is meant for the biome's spore areas, which you can see " +
                 "coming and choose to walk into, whereas a spore bomb is a surprise you've " +
                 "already set off. Either way this only stops the spores - the blast still knocks " +
-                "you around. Only takes effect when preset is set to Custom (5) - it is off " +
-                "under presets 1-4 as well, for now. HOST-AUTHORITATIVE: only the host's value " +
+                "you around. Not preset-driven - works no matter what preset (including " +
+                "apply-pure-preset) is selected. HOST-AUTHORITATIVE: only the host's value " +
                 "counts for the whole lobby.");
 
             DisableSporeAreas = config.Bind(
@@ -2570,20 +2573,12 @@ namespace Fairoots
 
         /// <summary>
         /// Game-facing code should read this instead of
-        /// <see cref="CoverMouthBlocksSporeBombsOverride"/>.Value.
-        /// Host-authoritative.
+        /// <see cref="CoverMouthBlocksSporeBombs"/>.Value. Host-authoritative - flat
+        /// (not preset/live-snapshot resolved, matching the raw config entry
+        /// itself), same shape as <see cref="EffectiveDisableSporeAreas"/>.
         /// </summary>
         public bool EffectiveCoverMouthBlocksSporeBombs =>
-            HostAuthority.Resolve("CoverMouthBlocksSporeBombs", CoverMouthBlocksSporeBombs);
-
-        /// <summary>Whether covering your mouth also blocks a spore bomb's cloud, not just the persistent spore areas. Resolved from the preset, or from the player's own value under Custom.</summary>
-        public bool CoverMouthBlocksSporeBombs =>
-            OverrideResolution.Resolve(
-                PresetCatalog.CoverMouthBlocksSporeBombs(Preset.Value),
-                CoverMouthBlocksSporeBombsOverride.Value,
-                ConfigDefaults.CoverMouthBlocksSporeBombs,
-                Preset.Value,
-                ApplyPurePreset.Value);
+            HostAuthority.Resolve("CoverMouthBlocksSporeBombs", CoverMouthBlocksSporeBombs.Value);
 
         /// <summary>Whether the cover-your-mouth mechanic exists at all (on under every preset 1-4).</summary>
         public bool EnableCoverMouth =>

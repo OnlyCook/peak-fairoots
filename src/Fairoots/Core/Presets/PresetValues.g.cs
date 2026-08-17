@@ -51,8 +51,6 @@ namespace Fairoots.Core.Presets
             Pick(preset, 0.90, 0.804, 0.804, 0.804);
         public static double SporeBombSporeAreaRadiusMultiplier(PresetId preset) =>
             Pick(preset, 1.00, 1.00, 1.00, 1.00);
-        public static bool CoverMouthBlocksSporeBombs(PresetId preset) =>
-            Pick(preset, false, false, false, false);
 
         // --- Spore-Areas ---
         public static double SporeAreaRemovalFraction(PresetId preset) =>
