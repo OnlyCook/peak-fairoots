@@ -1,3 +1,7 @@
+## 1.0.3
+
+- `Spore-Bombs/cover-mouth-blocks-spore-bombs` is now non-preset driven, which means you can always change it no matter the preset or other settings (if you're the host that is). Thanks to coolmen4302 for the feedback!
+
 ## 1.0.2
 
 - **PEAK 2.0.a compatibility update.**

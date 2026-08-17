@@ -37,12 +37,12 @@ Open the config file or use [PEAKLib.ModConfig](https://thunderstore.io/c/peak/p
 4. **Tame**: if you don't want to bother with this biome's shenanigans at all.
 5. **Custom**: nothing but vanilla until you say otherwise. Every setting ships at its unmodded value, so picking Custom and changing nothing plays exactly like the base game, here you can freely configure everything about this mod. This is also the preset to use if you want to make Roots harder rather than easier.
 
-- *Example 1:* let's say you dislike spore areas and only want to remove those, you can with the Custom preset, then just enable `Spore-Areas/disable-spore-areas` and you're golden!
-- *Example 2:* maybe you like the Subtle preset, but want to additionally make climbing fully counter wind as well, select the Subtle preset, disable `Host/apply-pure-preset` and enable `Wind/climb-shelters-from-wind`.
+- *Example 1:* let's say you dislike spore areas and only want to remove those, you can with the *Custom* preset, then just enable `Spore-Areas/disable-spore-areas` and you're golden!
+- *Example 2:* maybe you like the *Subtle* preset, but want to additionally make climbing fully counter wind as well, select the *Subtle* preset, disable `Host/apply-pure-preset` and enable `Wind/climb-shelters-from-wind`.
 
-> **Note:** presets 1-4 ignore most game-changing settings entirely and apply their own values, if you'd like to configure everything yourself pick the Custom preset.
+> **Note:** presets *Subtle - Tame* ignore most game-changing settings entirely and apply their own values, if you'd like to configure everything yourself pick the *Custom* preset. If you want to only change certain things about any non-*Custom* preset you have to disable `Host/apply-pure-preset`.
 
-Every value each preset uses is listed, setting by setting, in [docs/PRESETS.md](https://github.com/OnlyCook/peak-fairoots/blob/main/docs/PRESETS.md).
+Every value each preset uses is listed, setting by setting, in **>>> [docs/PRESETS.md](https://github.com/OnlyCook/peak-fairoots/blob/main/docs/PRESETS.md) <<<**.
 
 ## Why
 
